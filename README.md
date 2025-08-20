@@ -12,3 +12,68 @@ Proyecto de Ingeniería de Software 2 (IS2) de la Facultad Politécnica de la Un
 - [Jira](https://fpuna-team-rlp0euzv.atlassian.net/jira)
 - [Wiki](http://109.199.116.203:8060/es/links-de-interes)
 - [Repositorio del proyecto](https://github.com/ingenieria-software-fpuna/global-exchange)
+
+
+### Requisitos
+- [Python 3.13.7](https://www.python.org/ftp/python/3.13.7/Python-3.13.7.tar.xz)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [Docker Compose](https://docs.docker.com/compose/) (incluido en Docker Desktop a partir de la versión 2.0)
+- [Poetry](https://python-poetry.org/)
+
+### Instalación
+1. Clonar el repositorio:
+
+```bash
+git clone https://github.com/ingenieria-software-fpuna/global-exchange.git
+```
+2. Navegar al directorio del proyecto:
+
+```bash
+cd global-exchange
+```
+
+3. Crear un entorno virtual con python 3.13.7 (opcional pero recomendado)
+    - Linux/Unix
+    ```bash
+    curl -fsSL https://pyenv.run | bash
+    ```
+
+4. Instalar Poetry (si no lo tienes instalado):
+
+```bash
+# En Linux/macOS/Windows (WSL)
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+5. Agregar Poetry al PATH (si es necesario, si no, omitir este paso):
+
+```bash
+# Agregar al final de ~/.bashrc o ~/.zshrc
+export PATH="$HOME/.local/bin:$PATH"
+# Recargar el shell o ejecutar:
+source ~/.bashrc  # o source ~/.zshrc
+```
+
+6. Verificar la instalación de Poetry:
+
+```bash
+poetry --version
+```
+
+7. Instalar las dependencias del proyecto:
+
+```bash
+poetry install
+```
+
+### Uso del proyecto
+
+Una vez instaladas las dependencias, puedes ejecutar el proyecto de Django:
+
+```bash
+# Realizar migraciones
+poetry run python manage.py migrate
+
+# Ejecutar el servidor de desarrollo
+poetry run python manage.py runserver
+```
