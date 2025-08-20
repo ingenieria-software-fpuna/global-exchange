@@ -1,0 +1,12 @@
+services:
+
+  glx-db:
+    image: postgres:13.6
+    restart: always
+    ports:
+      - "5432:5432"
+    shm_size: 128mb
+    environment:
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_USER: admin
+      POSTGRES_DB: glx_db
