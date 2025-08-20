@@ -71,10 +71,19 @@ poetry install
 
 Una vez instaladas las dependencias, puedes ejecutar el proyecto de Django:
 
+Si tienes `Makefile`, puedes usar los siguientes comandos:
 ```bash
-# Realizar migraciones
-poetry run python manage.py migrate
-
-# Ejecutar el servidor de desarrollo
-poetry run python manage.py runserver
+make app-setup  # Configurar el proyecto Django (limpiar DB, levantar DB, aplicar migraciones)
+make app-run    # Correr el proyecto Django
 ```
+
+Si no tienes `Makefile`, puedes usar los siguientes comandos manualmente:
+```bash
+# Limpiar la base de datos y volúmenes
+docker compose down -v
+# Levantar la base de datos PostgreSQL
+docker compose up -d
+# Aplicar migraciones de la base de datos
+poetry run python manage.py migrate
+# Correr el proyecto Django
+poetry run python manage.py runserver
