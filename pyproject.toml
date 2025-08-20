@@ -1,0 +1,24 @@
+[project]
+name = "global-exchange"
+version = "0.1.0"
+description = "Global exchange es una proyecto para IS2 de la facultad politécnica de la Universidad Nacional de Asunción"
+authors = [
+    {name = "Diego Noguera",email = "diegonoguerarec@fpuna.edu.py"},
+    {name = "Juan David",email = "juanemanueldavidzaracho@fpuna.edu.py"},
+    {name = "Kyara Popov",email = "kyarapopov@fpuna.edu.py"},
+    {name = "Zinri Bobadilla",email = "zinri@fpuna.edu.py"},
+    {name = "Sebastian Alvarez",email = "ca.sebastianlv@fpuna.edu.py"}   
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "django (>=5.2.5,<6.0.0)"
+]
+
+[project.urls]
+repository = "https://github.com/ingenieria-software-fpuna/global-exchange"
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
