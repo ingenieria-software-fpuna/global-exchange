@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Verificar Código{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0 text-center">Verificación de Código</h4>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% else %}{{ message.tags }}{% endif %}" role="alert">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    <p class="text-center">Por favor, introduce el código de 6 dígitos que hemos enviado a tu correo.</p>
+                    <form action="{% url 'auth:verify_code' %}" method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            {{ form.code.label_tag }}
+                            {{ form.code }}
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Verificar</button>
+                    </form>
+                    <hr>
+                    <p class="text-center">
+                        <small>
+                            ¿No has recibido el código?
+                            <a href="{% url 'auth:login' %}">Volver e intentar de nuevo</a>
+                        </small>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

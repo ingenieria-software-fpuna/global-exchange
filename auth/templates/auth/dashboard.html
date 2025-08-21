@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Global Exchange{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col text-center">
+            <h1 class="display-4">¡Bienvenido, {{ user.nombre|default:user.email }}!</h1>
+            <p class="lead">Dashboard de administración para Global Exchange.</p>
+        </div>
+    </div>
+    <hr>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4 text-center">
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <i class="fas fa-users fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">Usuarios</h5>
+                    <p class="card-text">Administra los usuarios del sistema. Crea, edita y elimina perfiles.</p>
+                </div>
+                <div class="card-footer bg-light">
+                    <a href="#" class="btn btn-primary w-100 disabled" aria-disabled="true">
+                        Ir a Usuarios
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <i class="fas fa-user-tag fa-3x text-info mb-3"></i>
+                    <h5 class="card-title">Roles</h5>
+                    <p class="card-text">Gestiona los roles y permisos para controlar el acceso a la aplicación.</p>
+                </div>
+                <div class="card-footer bg-light">
+                    <a href="#" class="btn btn-info w-100 text-white disabled" aria-disabled="true">
+                        Ir a Roles
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <i class="fas fa-user-tie fa-3x text-success mb-3"></i>
+                    <h5 class="card-title">Clientes</h5>
+                    <p class="card-text">Administra la información de tus clientes y su segmentación.</p>
+                </div>
+                <div class="card-footer bg-light">
+                    <a href="#" class="btn btn-success w-100 disabled" aria-disabled="true">
+                        Ir a Clientes
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <i class="fas fa-link fa-3x text-secondary mb-3"></i>
+                    <h5 class="card-title">Asignaciones</h5>
+                    <p class="card-text">Asigna usuarios a roles y clientes para definir sus relaciones.</p>
+                </div>
+                <div class="card-footer bg-light">
+                    <a href="#" class="btn btn-secondary w-100 disabled" aria-disabled="true">
+                        Ir a Asignaciones
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
