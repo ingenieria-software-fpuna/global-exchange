@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Verificar Registro{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0 text-center">Verificar tu Cuenta</h4>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% else %}{{ message.tags }}{% endif %}" role="alert">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-info-circle"></i>
+                        Se ha enviado un código de verificación a tu correo electrónico. 
+                        Por favor, revisa tu bandeja de entrada e ingresa el código a continuación.
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="code" class="form-label">Código de Verificación</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="code" 
+                                   name="code" 
+                                   placeholder="Ingresa el código de 6 dígitos"
+                                   maxlength="6"
+                                   pattern="[0-9]{6}"
+                                   required>
+                            <div class="form-text">Ingresa el código de 6 dígitos que recibiste por email</div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-info w-100">Verificar Cuenta</button>
+                    </form>
+                    
+                    <hr>
+                    <p class="text-center">
+                        <small>
+                            ¿No recibiste el código?
+                            <a href="{% url 'auth:registro' %}">Registrarse de nuevo</a>
+                        </small>
+                    </p>
+                    <p class="text-center">
+                        <small>
+                            <a href="{% url 'welcome' %}">← Volver a la pantalla principal</a>
+                        </small>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
