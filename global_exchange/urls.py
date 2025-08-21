@@ -17,10 +17,14 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic.base import RedirectView
+from django.shortcuts import render
+
+def welcome_view(request):
+    """Vista para la pantalla de bienvenida con tasas de cambio"""
+    return render(request, 'welcome.html')
 
 urlpatterns = [
-    path('', RedirectView.as_view(pattern_name='auth:login', permanent=False), name='home'),
-    
+    path('', welcome_view, name='welcome'),
     path('admin/', admin.site.urls),
     path('auth/', include('auth.urls', namespace='auth')),
     path('roles/', include('roles.urls', namespace='roles')),

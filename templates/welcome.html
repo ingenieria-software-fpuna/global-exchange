@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Global Exchange - Casa de Cambios{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header con logo y nombre -->
+    <div class="row bg-primary text-white py-4">
+        <div class="col-12 text-center">
+            <h1 class="display-4 fw-bold">Global Exchange</h1>
+            <p class="lead">Tu casa de cambios de confianza</p>
+        </div>
+    </div>
+
+    <!-- Sección de tasas de cambio -->
+    <div class="row py-5">
+        <div class="col-12">
+            <div class="text-center mb-5">
+                <h2 class="h1 text-primary">Tasas de Cambio</h2>
+                <p class="text-muted">Moneda base: Guaraní (PYG)</p>
+            </div>
+            
+            <!-- Tarjetas de monedas -->
+            <div class="row justify-content-center">
+                <!-- Dólar Americano -->
+                <div class="col-md-3 mb-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <span class="display-6">💵</span>
+                            </div>
+                            <h5 class="card-title text-primary">Dólar Americano</h5>
+                            <p class="card-text">
+                                <span class="h4 text-success">7,250</span>
+                                <small class="text-muted">PYG/USD</small>
+                            </p>
+                            <small class="text-muted">Compra: 7,200 | Venta: 7,300</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Euro -->
+                <div class="col-md-3 mb-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <span class="display-6">💶</span>
+                            </div>
+                            <h5 class="card-title text-primary">Euro</h5>
+                            <p class="card-text">
+                                <span class="h4 text-success">7,850</span>
+                                <small class="text-muted">PYG/EUR</small>
+                            </p>
+                            <small class="text-muted">Compra: 7,800 | Venta: 7,900</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real Brasileño -->
+                <div class="col-md-3 mb-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <span class="display-6">🇧🇷</span>
+                            </div>
+                            <h5 class="card-title text-primary">Real Brasileño</h5>
+                            <p class="card-text">
+                                <span class="h4 text-success">1,450</span>
+                                <small class="text-muted">PYG/BRL</small>
+                            </p>
+                            <small class="text-muted">Compra: 1,430 | Venta: 1,470</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Peso Argentino -->
+                <div class="col-md-3 mb-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <span class="display-6">🇦🇷</span>
+                            </div>
+                            <h5 class="card-title text-primary">Peso Argentino</h5>
+                            <p class="card-text">
+                                <span class="h4 text-success">8.50</span>
+                                <small class="text-muted">PYG/ARS</small>
+                            </p>
+                            <small class="text-muted">Compra: 8.40 | Venta: 8.60</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información adicional -->
+            <div class="row mt-5">
+                <div class="col-12 text-center">
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Nota:</strong> Las tasas se actualizan cada hora. Para operaciones específicas, contacta con nuestros agentes.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección de botones de acción -->
+    <div class="row py-4 bg-light">
+        <div class="col-12 text-center">
+            <h3 class="mb-4">¿Qué deseas hacer?</h3>
+            <div class="d-flex justify-content-center gap-3 flex-wrap">
+                <a href="{% url 'auth:login' %}" class="btn btn-primary btn-lg px-4 py-2">
+                    <i class="fas fa-sign-in-alt me-2"></i>
+                    Iniciar Sesión
+                </a>
+                <a href="{% url 'auth:registro' %}" class="btn btn-success btn-lg px-4 py-2">
+                    <i class="fas fa-user-plus me-2"></i>
+                    Registrarse
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="row bg-dark text-white py-3">
+        <div class="col-12 text-center">
+            <p class="mb-0">
+                <small>&copy; 2024 Global Exchange. Todos los derechos reservados.</small>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
