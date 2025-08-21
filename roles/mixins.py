@@ -20,7 +20,9 @@ class PermisoRequeridoMixin:
         return super().dispatch(request, *args, **kwargs)
     
     def handle_no_permission(self):
-        if self.request.is_ajax() or getattr(self.request, 'content_type', '') == 'application/json':
+        is_ajax = self.request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest'
+
+        if is_ajax or getattr(self.request, 'content_type', '') == 'application/json':
             return JsonResponse({
                 'error': 'No tienes permisos para realizar esta acción'
             }, status=403)

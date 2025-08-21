@@ -1,8 +1,8 @@
 from django import forms
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.forms import UserCreationForm
 from usuarios.models import Usuario
-
+from django.contrib.auth.forms import PasswordResetForm
 class LoginForm(forms.Form):
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Correo electrónico'}),
@@ -19,7 +19,7 @@ class LoginForm(forms.Form):
         password = cleaned_data.get('password')
         
         if email and password:
-            user_model = get_user_model()
+            user_model =get_user_model()
             try:
                 user = user_model.objects.get(email=email)
                 self.user_cache = authenticate(username=user.email, password=password)
