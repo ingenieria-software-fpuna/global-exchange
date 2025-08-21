@@ -23,3 +23,6 @@ class LoginForm(forms.Form):
                 raise forms.ValidationError("Correo electrónico o contraseña inválidos.")
         
         return cleaned_data
+    
+    def get_user(self):
+        return self.user_cache
