@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Lista de Permisos{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Permisos del Sistema</h1>
+    <a href="{% url 'roles:permiso_create' %}" class="btn btn-primary mb-3">Crear Nuevo Permiso</a>
+    
+    {% if messages %}
+    <ul class="messages list-unstyled">
+        {% for message in messages %}
+        <li class="alert alert-{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <table class="table table-striped table-bordered">
+        <thead class="thead-dark">
+            <tr>
+                <th>Nombre</th>
+                <th>Código</th>
+                <th>Módulo</th>
+                <th>Tipo</th>
+                <th>Activo</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for permiso in permisos %}
+            <tr>
+                <td>{{ permiso.nombre }}</td>
+                <td>{{ permiso.codigo }}</td>
+                <td>{{ permiso.modulo.nombre }}</td>
+                <td>{{ permiso.get_tipo_display }}</td>
+                <td>{{ permiso.activo|yesno:"Sí,No" }}</td>
+                <td>
+                    <a href="{% url 'roles:permiso_update' permiso.pk %}" class="btn btn-sm btn-info text-white">Editar</a>
+                    <a href="{% url 'roles:permiso_delete' permiso.pk %}" class="btn btn-sm btn-danger">Eliminar</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

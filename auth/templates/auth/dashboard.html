@@ -20,7 +20,7 @@
                     <p class="card-text">Administra los usuarios del sistema. Crea, edita y elimina perfiles.</p>
                 </div>
                 <div class="card-footer bg-light">
-                    <a href="#" class="btn btn-primary w-100 disabled" aria-disabled="true">
+                    <a href="{% url 'usuarios:user_list' %}"  class="btn btn-primary w-100">
                         Ir a Usuarios
                     </a>
                 </div>
@@ -34,7 +34,7 @@
                     <p class="card-text">Gestiona los roles y permisos para controlar el acceso a la aplicación.</p>
                 </div>
                 <div class="card-footer bg-light">
-                    <a href="#" class="btn btn-info w-100 text-white disabled" aria-disabled="true">
+                    <a href="{% url 'roles:rol_list' %}" class="btn btn-info w-100 text-white">
                         Ir a Roles
                     </a>
                 </div>

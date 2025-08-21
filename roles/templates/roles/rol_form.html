@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}
+{% if object %}Editar Rol{% else %}Crear Rol{% endif %}
+{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <h1 class="mb-4">{% if object %}Editar Rol{% else %}Crear Nuevo Rol{% endif %}</h1>
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        {{ form.as_p }}
+                        <button type="submit" class="btn btn-primary">
+                            {% if object %}Guardar Cambios{% else %}Crear Rol{% endif %}
+                        </button>
+                        <a href="{% url 'roles:rol_list' %}" class="btn btn-secondary">Cancelar</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
