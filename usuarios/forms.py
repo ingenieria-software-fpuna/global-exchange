@@ -62,3 +62,6 @@ class UsuarioUpdateForm(forms.ModelForm):
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),
             'apellido': forms.TextInput(attrs={'class': 'form-control'}),
         }
+    
+    def get_user(self):
+        return self.user_cache
