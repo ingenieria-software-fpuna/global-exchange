@@ -3,6 +3,24 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 from .models import Rol, Permiso, UsuarioRol, RolPermiso
 
+class Permisos:
+    # Permisos del CRUD de usuarios
+    USUARIO_LEER = 'usuario_leer'
+    USUARIO_CREAR = 'usuario_crear'
+    USUARIO_EDITAR = 'usuario_editar'
+    USUARIO_ELIMINAR = 'usuario_eliminar'
+    # Permisos del CRUD de roles
+    ROL_LEER = 'rol_leer'
+    ROL_CREAR = 'rol_crear'
+    ROL_EDITAR = 'rol_editar'
+    ROL_ELIMINAR = 'rol_eliminar'
+    # Permisos del CRUD de módulos y permisos
+    PERMISO_LEER = 'permiso_leer'
+    PERMISO_CREAR = 'permiso_crear'
+    PERMISO_EDITAR = 'permiso_editar'
+    PERMISO_ELIMINAR = 'permiso_eliminar'
+    # ------>>>> aca hay que añadir para todos los CRUD !!!!
+
 class RolesService:
     """Servicio para manejar la lógica de negocio de roles"""
     
