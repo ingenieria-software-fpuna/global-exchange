@@ -22,11 +22,12 @@ class LoginForm(forms.Form):
             try:
                 user = user_model.objects.get(email=email)
                 self.user_cache = authenticate(username=user.email, password=password)
+                
+                if self.user_cache is None:
+                    raise forms.ValidationError("Contraseña incorrecta")
+                    
             except user_model.DoesNotExist:
-                raise forms.ValidationError("El correo electrónico no existe.")
-            
-            if self.user_cache is None:
-                raise forms.ValidationError("Contraseña inválida.")
+                raise forms.ValidationError("El correo electrónico no existe")
 
         return cleaned_data
         
