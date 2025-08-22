@@ -5,6 +5,7 @@ from django.db import models
 class TipoCliente(models.Model):
     nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre del tipo")
     descripcion = models.TextField(blank=True, null=True, verbose_name="Descripción")
+    descuento = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, verbose_name="Descuento (%)")
     activo = models.BooleanField(default=True, verbose_name="Activo")
     fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de creación")
     fecha_modificacion = models.DateTimeField(auto_now=True, verbose_name="Fecha de modificación")
