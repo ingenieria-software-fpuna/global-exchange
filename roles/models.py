@@ -1,6 +1,6 @@
 from django.db import models
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
+from django.db.models import Prefetch
 
 class Modulo(models.Model):
     """Representa los diferentes módulos del sistema"""
@@ -87,7 +87,6 @@ class Rol(models.Model):
     
     def get_permisos_por_modulo(self):
         """Obtiene los permisos agrupados por módulo"""
-        from django.db.models import Prefetch
         return self.permisos.prefetch_related(
             Prefetch('modulo')
         ).select_related('modulo').order_by('modulo__nombre', 'tipo')
