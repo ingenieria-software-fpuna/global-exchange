@@ -14,7 +14,7 @@ Proyecto de Ingeniería de Software 2 (IS2) de la Facultad Politécnica de la Un
 - [Repositorio del proyecto](https://github.com/ingenieria-software-fpuna/global-exchange)
 
 
-### Requisitos
+### Pre-requisitos
 - [Python 3.13.7](https://www.python.org/ftp/python/3.13.7/Python-3.13.7.tar.xz)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 - [Docker Compose](https://docs.docker.com/compose/) (incluido en Docker Desktop a partir de la versión 2.0)
@@ -69,15 +69,19 @@ poetry install
 
 ### Uso del proyecto
 
-Una vez instaladas las dependencias, puedes ejecutar el proyecto de Django:
+Una vez instaladas las dependencias, puedes ejecutar el proyecto con los siguientes comandos:
+
 
 Si tienes `Makefile`, puedes usar los siguientes comandos:
 ```bash
-make app-setup  # Configurar el proyecto Django (limpiar DB, levantar DB, aplicar migraciones)
-make app-run    # Correr el proyecto Django
+make app-setup  # Configuración (limpiar DB, levantar DB, aplicar migraciones)
+make app-run    # Correr el proyecto
+
+# Opcional
+make user # Crear un usuario para usar el sistema
 ```
 
-Si no tienes `Makefile`, puedes usar los siguientes comandos manualmente:
+Si no tienes `Makefile`, puedes usar los siguientes comandos:
 ```bash
 # Limpiar la base de datos y volúmenes
 docker compose down -v
@@ -85,5 +89,12 @@ docker compose down -v
 docker compose up -d
 # Aplicar migraciones de la base de datos
 poetry run python manage.py migrate
+# Cargar permisos iniciales
+poetry run python manage.py loaddata roles/fixtures/initial_permissions.json
 # Correr el proyecto Django
 poetry run python manage.py runserver
+
+# Opcional
+# Crear un usuario para usar el sistema
+scripts\create_user.bat
+```
