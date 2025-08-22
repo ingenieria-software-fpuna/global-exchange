@@ -1,20 +1,29 @@
 #!/bin/bash
 
 # Script para crear usuarios de desarrollo
-# Uso: ./scripts/create_user.sh [username]
+# Uso: ./scripts/create_user.sh [username] [-f]
 
 set -e
 
+# Variables para modo rápido
+FAST_MODE=false
+
 # Función para mostrar ayuda
 show_help() {
-    echo "Uso: $0 [username]"
+    echo "Uso: $0 [username] [-f]"
     echo ""
     echo "Crea un nuevo usuario en el sistema para desarrollo."
     echo "Si no se proporciona username, se solicitará interactivamente."
     echo ""
-    echo "Ejemplo:"
-    echo "  $0 juan.perez"
-    echo "  $0  # Modo interactivo"
+    echo "Opciones:"
+    echo "  -f, --fast    Modo rápido usando valores predeterminados del .env"
+    echo "  -h, --help    Mostrar esta ayuda"
+    echo ""
+    echo "Ejemplos:"
+    echo "  $0 juan.perez        # Con username predefinido"
+    echo "  $0 juan.perez -f     # Modo rápido con username"
+    echo "  $0 -f                # Modo rápido interactivo"
+    echo "  $0                   # Modo interactivo completo"
 }
 
 # Función para validar email
@@ -43,12 +52,48 @@ generate_email() {
     echo "${username}@gmail.com"
 }
 
+# Función para cargar valores por defecto para modo rápido
+load_default_values() {
+    local username=${1:-"testuser"}
+    
+    # Valores por defecto para desarrollo
+    EMAIL=$(generate_email "$username")
+    NOMBRE="Usuario"
+    APELLIDO="Prueba"
+    CEDULA="12345678"
+    FECHA_NACIMIENTO="1990-01-01"
+    PASSWORD="123456"  # Contraseña simple para desarrollo
+    
+    echo "=== Modo Rápido - Usando valores por defecto ==="
+    echo "Email: $EMAIL"
+    echo "Nombre: $NOMBRE $APELLIDO"
+    echo "Cédula: $CEDULA"
+    echo "Fecha de nacimiento: $FECHA_NACIMIENTO"
+    echo "Contraseña: $PASSWORD"
+    echo ""
+}
+
 # Función principal para crear usuario
 create_user() {
     local username=$1
     
-    # Si se proporciona username como parámetro
-    if [ -n "$username" ]; then
+    # Modo rápido
+    if [ "$FAST_MODE" = true ]; then
+        if [ -n "$username" ]; then
+            load_default_values "$username"
+        else
+            read -p "Username para generar email: " username
+            load_default_values "$username"
+        fi
+        
+        read -p "¿Continuar con estos valores? (Y/n): " CONFIRM
+        if [[ $CONFIRM =~ ^[Nn]$ ]]; then
+            echo "Operación cancelada."
+            exit 0
+        fi
+        
+    # Si se proporciona username como parámetro (modo normal)
+    elif [ -n "$username" ]; then
         EMAIL=$(generate_email "$username")
         echo "Creando usuario con email: $EMAIL"
         
@@ -189,12 +234,28 @@ except Exception as e:
 }
 
 # Procesar argumentos
-case "${1:-}" in
-    -h|--help)
-        show_help
-        exit 0
-        ;;
-    *)
-        create_user "$1"
-        ;;
-esac
+USERNAME=""
+for arg in "$@"; do
+    case $arg in
+        -f|--fast)
+            FAST_MODE=true
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -*)
+            echo "Opción desconocida: $arg"
+            show_help
+            exit 1
+            ;;
+        *)
+            if [ -z "$USERNAME" ]; then
+                USERNAME="$arg"
+            fi
+            ;;
+    esac
+done
+
+create_user "$USERNAME"

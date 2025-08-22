@@ -12,6 +12,7 @@
     </div>
     <hr>
     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4 text-center">
+        {% if can_view_usuarios %}
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
@@ -26,6 +27,8 @@
                 </div>
             </div>
         </div>
+        {% endif %}
+        {% if can_view_roles %}
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
@@ -40,20 +43,8 @@
                 </div>
             </div>
         </div>
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <i class="fas fa-user-tie fa-3x text-success mb-3"></i>
-                    <h5 class="card-title">Clientes</h5>
-                    <p class="card-text">Administra la información de tus clientes y su segmentación.</p>
-                </div>
-                <div class="card-footer bg-light">
-                    <a href="#" class="btn btn-success w-100 disabled" aria-disabled="true">
-                        Ir a Clientes
-                    </a>
-                </div>
-            </div>
-        </div>
+        {% endif %}
+        {% if can_view_tipocliente %}
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
@@ -64,6 +55,22 @@
                 <div class="card-footer bg-light">
                     <a href="{% url 'clientes:tipocliente_list' %}" class="btn btn-warning w-100 text-dark">
                         Ir a Tipos de Cliente
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% if is_admin_role %}
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <i class="fas fa-user-tie fa-3x text-success mb-3"></i>
+                    <h5 class="card-title">Clientes</h5>
+                    <p class="card-text">Administra la información de tus clientes y su segmentación.</p>
+                </div>
+                <div class="card-footer bg-light">
+                    <a href="#" class="btn btn-success w-100 disabled" aria-disabled="true">
+                        Ir a Clientes
                     </a>
                 </div>
             </div>
@@ -82,6 +89,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

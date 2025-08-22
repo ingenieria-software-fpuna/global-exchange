@@ -1,4 +1,4 @@
-.PHONY: db-up db-clean app-run app-migrate app-setup load-permissions user help
+.PHONY: db-up db-clean app-run app-migrate app-setup load-permissions user-admin user user-fast create-superuser app-reset help
 
 #-------------- Operaciones de base de datos ----------------#
 db-up:
@@ -43,6 +43,14 @@ user:
 		scripts/create_user.sh $(filter-out $@,$(MAKECMDGOALS)); \
 	fi
 
+user-fast:
+	@echo "Creando usuario de desarrollo (modo rápido)..."
+	@if [ "$(OS)" = "Windows_NT" ]; then \
+		scripts/create_user.bat $(filter-out $@,$(MAKECMDGOALS)) -f; \
+	else \
+		scripts/create_user.sh $(filter-out $@,$(MAKECMDGOALS)) -f; \
+	fi
+
 # Regla especial para manejar argumentos del comando user
 %:
 	@if [ "$@" != "user" ] && echo "$(MAKECMDGOALS)" | grep -q "^user "; then \
@@ -58,10 +66,15 @@ help:
 	@echo "  app-migrate       - Aplicar migraciones de la base de datos"
 	@echo "  app-setup         - Configurar el proyecto (db + migraciones)"
 	@echo "  load-permissions  - Cargar permisos iniciales desde fixtures"
-	@echo "  user [username]   - Crear usuario de desarrollo (interactivo o con username)"
+		@echo "  user [username] [-f] - Crear usuario de desarrollo (interactivo o con username)"
+	@echo "  user-fast [username] - Crear usuario rápido con valores predeterminados"
 	@echo "  user-admin        - Crear un superusuario de Django"
+	@echo "  create-superuser  - Crear un superusuario de Django"
+	@echo "  app-reset         - Reset completo (db + migraciones + permisos)"
 	@echo "  help              - Mostrar esta ayuda"
 	@echo ""
 	@echo "Ejemplos de uso:"
 	@echo "  make user                    # Modo interactivo"
 	@echo "  make user juan.perez         # Con username predefinido"
+	@echo "  make user-fast               # Modo rápido interactivo"
+	@echo "  make user-fast admin         # Modo rápido con username 'admin'"

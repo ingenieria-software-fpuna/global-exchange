@@ -1,13 +1,68 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM Script para crear usuarios de desarrollo en Windows
-REM Uso: scripts\create_user.bat [username]
+REM Script para crear us:main
+if "!FAST_MODE!"=="true" (
+    if defined USERNAME_PARAM (
+        set "EMAIL=!USERNAME_PARAM!@gmail.com"
+    ) else (
+        set /p "USERNAME_PARAM=Username para generar email: "
+        set "EMAIL=!USERNAME_PARAM!@gmail.com"
+    )
+    
+    REM Valores por defecto para modo rapido
+    set "NOMBRE=Usuario"
+    set "APELLIDO=Prueba"
+    set "CEDULA=12345678"
+    set "FECHA_NACIMIENTO=1990-01-01"
+    set "PASSWORD=123456"
+    
+    echo === Modo Rapido - Usando valores por defecto ===
+    echo Email: !EMAIL!
+    echo Nombre: !NOMBRE! !APELLIDO!
+    echo Cedula: !CEDULA!
+    echo Fecha de nacimiento: !FECHA_NACIMIENTO!
+    echo Contraseña: !PASSWORD!
+    echo.
+    
+    set /p "CONFIRM=¿Continuar con estos valores? (Y/n): "
+    if /i "!CONFIRM!"=="n" (
+        echo Operacion cancelada.
+        exit /b 0
+    )
+    
+) else if defined USERNAME_PARAM (
+    REM Modo con username proporcionado
+    set "EMAIL=!USERNAME_PARAM!@gmail.com"
+    echo Creando usuario con email: !EMAIL!
+    echo.
+    
+    set /p "NOMBRE=Nombre: "
+    set /p "APELLIDO=Apellido: "
+    set /p "CEDULA=Cedula: "sarrollo en Windows
+REM Uso: scripts\create_user.bat [username] [-f]
 
-REM Función para mostrar ayuda
+REM Variables
+set FAST_MODE=false
+
+REM Procesar argumentos
+:parse_args
+if "%1"=="-f" (
+    set FAST_MODE=true
+    shift
+    goto :parse_args
+)
+if "%1"=="--fast" (
+    set FAST_MODE=true
+    shift
+    goto :parse_args
+)
 if "%1"=="-h" goto :show_help
 if "%1"=="--help" goto :show_help
 if "%1"=="/?" goto :show_help
+
+REM Guardar username si se proporciona
+set USERNAME_PARAM=%1
 
 REM Verificar si Poetry está instalado
 poetry --version >nul 2>&1
@@ -21,13 +76,19 @@ REM Función principal
 goto :main
 
 :show_help
-echo Uso: %~nx0 [username]
+echo Uso: %~nx0 [username] [-f]
 echo.
 echo Crea un nuevo usuario en el sistema para desarrollo.
 echo Si no se proporciona username, se solicitara interactivamente.
 echo.
-echo Ejemplo:
-echo   %~nx0 juan.perez
+echo Opciones:
+echo   -f, --fast    Modo rapido usando valores predeterminados
+echo   -h, --help    Mostrar esta ayuda
+echo.
+echo Ejemplos:
+echo   %~nx0 juan.perez        # Con username predefinido
+echo   %~nx0 juan.perez -f     # Modo rapido con username
+echo   %~nx0 -f                # Modo rapido interactivo
 echo   %~nx0   # Modo interactivo
 echo.
 goto :eof
