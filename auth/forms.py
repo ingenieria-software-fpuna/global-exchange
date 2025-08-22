@@ -46,6 +46,12 @@ class RegistroForm(UserCreationForm):
         label="Correo electrónico",
         required=True
     )
+    cedula = forms.CharField(
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': '12345678'}),
+        label="Cédula de Identidad",
+        max_length=20,
+        required=True
+    )
     nombre = forms.CharField(
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre'}),
         label="Nombre",
@@ -57,6 +63,11 @@ class RegistroForm(UserCreationForm):
         label="Apellido",
         max_length=100,
         required=False
+    )
+    fecha_nacimiento = forms.DateField(
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+        label="Fecha de Nacimiento",
+        required=True
     )
     password1 = forms.CharField(
         widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Contraseña'}),
@@ -71,13 +82,23 @@ class RegistroForm(UserCreationForm):
     
     class Meta:
         model = Usuario
-        fields = ('email', 'nombre', 'apellido', 'password1', 'password2')
+        fields = ('email', 'cedula', 'nombre', 'apellido', 'fecha_nacimiento', 'password1', 'password2')
     
     def clean_email(self):
         email = self.cleaned_data.get('email')
         if Usuario.objects.filter(email=email).exists():
             raise forms.ValidationError("Este correo electrónico ya está registrado.")
         return email
+    
+    def clean_cedula(self):
+        cedula = self.cleaned_data.get('cedula')
+        if Usuario.objects.filter(cedula=cedula).exists():
+            raise forms.ValidationError("Esta cédula ya está registrada.")
+        if not cedula.isdigit():
+            raise forms.ValidationError("La cédula debe contener solo números.")
+        if len(cedula) < 5:
+            raise forms.ValidationError("La cédula debe tener al menos 5 dígitos.")
+        return cedula
     
     def clean_password2(self):
         password1 = self.cleaned_data.get('password1')

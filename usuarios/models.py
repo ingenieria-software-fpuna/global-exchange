@@ -18,13 +18,15 @@ class UsuarioManager(BaseUserManager):
 
 class Usuario(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
+    cedula = models.CharField(max_length=20, unique=True, verbose_name="Cédula de Identidad", null=True, blank=True)
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100, blank=True)
+    fecha_nacimiento = models.DateField(verbose_name="Fecha de Nacimiento", null=True, blank=True)
     activo = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['nombre']
+    REQUIRED_FIELDS = ['nombre', 'cedula', 'fecha_nacimiento']
 
     objects = UsuarioManager()
 
