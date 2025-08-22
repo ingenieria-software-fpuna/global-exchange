@@ -18,6 +18,11 @@ class Permisos:
     PERMISO_CREAR = 'permiso_crear'
     PERMISO_EDITAR = 'permiso_editar'
     PERMISO_ELIMINAR = 'permiso_eliminar'
+    # Permisos del CRUD de tipos de cliente
+    TIPOCLIENTE_LEER = 'tipocliente_leer'
+    TIPOCLIENTE_CREAR = 'tipocliente_crear'
+    TIPOCLIENTE_EDITAR = 'tipocliente_editar'
+    TIPOCLIENTE_ELIMINAR = 'tipocliente_eliminar'
 
 class RolesService:
     """Servicio para manejar la lógica de negocio de roles"""
