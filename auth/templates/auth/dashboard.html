@@ -12,6 +12,7 @@
     </div>
     <hr>
     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4 text-center">
+        {% if can_view_usuarios %}
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
@@ -26,6 +27,8 @@
                 </div>
             </div>
         </div>
+        {% endif %}
+        {% if can_view_roles %}
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
@@ -40,6 +43,8 @@
                 </div>
             </div>
         </div>
+        {% endif %}
+        {% if is_admin_role %}
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
@@ -82,6 +87,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
