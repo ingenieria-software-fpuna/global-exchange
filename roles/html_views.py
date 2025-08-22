@@ -5,9 +5,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
 from .models import Rol, Permiso, Modulo, UsuarioRol
-from .services import RolesService
 from .decorators import requiere_permiso
-from .forms import RolForm, ModuloForm, PermisoForm
+from .forms import RolForm
 
 @login_required
 @requiere_permiso('roles_read')

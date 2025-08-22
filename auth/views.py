@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, logout, authenticate, get_user_model
+from django.contrib.auth import login, logout, get_user_model
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.conf import settings
