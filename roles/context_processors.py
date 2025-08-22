@@ -17,7 +17,7 @@ def permissions_context(request):
         or RolesService.usuario_tiene_permiso(user, Permisos.PERMISO_LEER)
     )
 
-    can_view_tipocliente = False
+    can_view_tipocliente = RolesService.usuario_tiene_permiso(user, Permisos.TIPOCLIENTE_LEER)
 
     return {
         'can_view_usuarios': can_view_usuarios,
