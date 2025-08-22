@@ -23,6 +23,8 @@ class Permisos:
     TIPOCLIENTE_CREAR = 'tipocliente_crear'
     TIPOCLIENTE_EDITAR = 'tipocliente_editar'
     TIPOCLIENTE_ELIMINAR = 'tipocliente_eliminar'
+    # Otros permisos
+    DASHBOARD_VER = 'dashboard_ver'
 
 class RolesService:
     """Servicio para manejar la lógica de negocio de roles"""
@@ -71,6 +73,16 @@ class RolesService:
                 return True
         
         return False
+
+    @staticmethod
+    def usuario_es_admin(usuario):
+        """Indica si el usuario posee algún rol administrador activo"""
+        return UsuarioRol.objects.filter(
+            usuario=usuario,
+            activo=True,
+            rol__activo=True,
+            rol__es_admin=True,
+        ).exists()
     
     @staticmethod
     def obtener_permisos_usuario(usuario):
