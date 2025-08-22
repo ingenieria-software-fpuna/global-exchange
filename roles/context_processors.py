@@ -18,11 +18,13 @@ def permissions_context(request):
     )
 
     can_view_tipocliente = RolesService.usuario_tiene_permiso(user, Permisos.TIPOCLIENTE_LEER)
+    can_view_cliente = RolesService.usuario_tiene_permiso(user, Permisos.CLIENTE_LEER)
 
     return {
         'can_view_usuarios': can_view_usuarios,
         'can_view_roles': can_view_roles,
         'can_view_tipocliente': can_view_tipocliente,
+        'can_view_cliente': can_view_cliente,
         'can_view_dashboard': RolesService.usuario_tiene_permiso(user, Permisos.DASHBOARD_VER) or RolesService.usuario_es_admin(user),
         'is_admin_role': RolesService.usuario_es_admin(user),
     }
