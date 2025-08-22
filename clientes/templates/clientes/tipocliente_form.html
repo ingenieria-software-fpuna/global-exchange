@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}{% if form.instance.pk %}Editar{% else %}Crear{% endif %} Tipo de Cliente - Global Exchange{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Breadcrumbs -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'auth:dashboard' %}">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'clientes:tipocliente_list' %}">
+                    <i class="fas fa-tags me-1"></i>Tipos de Cliente
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                {% if form.instance.pk %}Editar{% else %}Crear{% endif %}
+            </li>
+        </ol>
+    </nav>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">
+                        <i class="fas fa-tags me-2"></i>
+                        {% if form.instance.pk %}Editar{% else %}Crear{% endif %} Tipo de Cliente
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.nombre.id_for_label }}" class="form-label">
+                                <strong>Nombre:</strong>
+                            </label>
+                            {{ form.nombre }}
+                            {% if form.nombre.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.nombre.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">Nombre único para identificar el tipo de cliente.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.descripcion.id_for_label }}" class="form-label">
+                                <strong>Descripción:</strong>
+                            </label>
+                            {{ form.descripcion }}
+                            {% if form.descripcion.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.descripcion.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">Descripción opcional del tipo de cliente.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.descuento.id_for_label }}" class="form-label">
+                                <strong>Descuento (%):</strong>
+                            </label>
+                            {{ form.descuento }}
+                            {% if form.descuento.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.descuento.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">Porcentaje de descuento que recibirá este tipo de cliente en las comisiones de compra.</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="form-check">
+                                {{ form.activo }}
+                                <label class="form-check-label" for="{{ form.activo.id_for_label }}">
+                                    <strong>Activo</strong>
+                                </label>
+                                {% if form.activo.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.activo.errors.0 }}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">Indica si este tipo de cliente está activo en el sistema.</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'clientes:tipocliente_list' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-save me-2"></i>
+                                {% if form.instance.pk %}Actualizar{% else %}Crear{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
