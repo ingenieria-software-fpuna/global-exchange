@@ -57,6 +57,20 @@
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
+                    <i class="fas fa-tags fa-3x text-warning mb-3"></i>
+                    <h5 class="card-title">Tipos de Cliente</h5>
+                    <p class="card-text">Gestiona las categorías y tipos de clientes del sistema.</p>
+                </div>
+                <div class="card-footer bg-light">
+                    <a href="{% url 'clientes:tipocliente_list' %}" class="btn btn-warning w-100 text-dark">
+                        Ir a Tipos de Cliente
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
                     <i class="fas fa-link fa-3x text-secondary mb-3"></i>
                     <h5 class="card-title">Asignaciones</h5>
                     <p class="card-text">Asigna usuarios a roles y clientes para definir sus relaciones.</p>
