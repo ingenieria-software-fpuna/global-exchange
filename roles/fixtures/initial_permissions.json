@@ -168,11 +168,11 @@
     "model": "roles.permiso",
     "pk": 10,
     "fields": {
-      "nombre": "Crear Permisos",
-      "codigo": "permiso_crear",
-      "descripcion": "Permite crear nuevos permisos",
-      "tipo": "create",
-      "modulo": 2,
+      "nombre": "Ver Dashboard",
+      "codigo": "dashboard_ver",
+      "descripcion": "Permite acceder al panel de control",
+      "tipo": "read",
+      "modulo": 3,
       "activo": true,
       "created_at": "2025-08-22T03:37:00Z",
       "updated_at": "2025-08-22T03:37:00Z"
@@ -182,11 +182,11 @@
     "model": "roles.permiso",
     "pk": 11,
     "fields": {
-      "nombre": "Editar Permisos",
-      "codigo": "permiso_editar",
-      "descripcion": "Permite modificar permisos existentes",
-      "tipo": "update",
-      "modulo": 2,
+      "nombre": "Leer Tipo Cliente",
+      "codigo": "tipocliente_leer",
+      "descripcion": "Permite ver la lista de tipos de cliente",
+      "tipo": "read",
+      "modulo": 4,
       "activo": true,
       "created_at": "2025-08-22T03:37:00Z",
       "updated_at": "2025-08-22T03:37:00Z"
@@ -196,11 +196,11 @@
     "model": "roles.permiso",
     "pk": 12,
     "fields": {
-      "nombre": "Eliminar Permisos",
-      "codigo": "permiso_eliminar",
-      "descripcion": "Permite eliminar permisos",
-      "tipo": "delete",
-      "modulo": 2,
+      "nombre": "Crear Tipo Cliente",
+      "codigo": "tipocliente_crear",
+      "descripcion": "Permite crear nuevos tipos de cliente",
+      "tipo": "create",
+      "modulo": 4,
       "activo": true,
       "created_at": "2025-08-22T03:37:00Z",
       "updated_at": "2025-08-22T03:37:00Z"
@@ -210,11 +210,25 @@
     "model": "roles.permiso",
     "pk": 13,
     "fields": {
-      "nombre": "Ver Dashboard",
-      "codigo": "dashboard_ver",
-      "descripcion": "Permite acceder al panel de control",
-      "tipo": "read",
-      "modulo": 3,
+      "nombre": "Editar Tipo Cliente",
+      "codigo": "tipocliente_editar",
+      "descripcion": "Permite modificar tipos de cliente existentes",
+      "tipo": "update",
+      "modulo": 4,
+      "activo": true,
+      "created_at": "2025-08-22T03:37:00Z",
+      "updated_at": "2025-08-22T03:37:00Z"
+    }
+  },
+  {
+    "model": "roles.permiso",
+    "pk": 14,
+    "fields": {
+      "nombre": "Eliminar Tipo Cliente",
+      "codigo": "tipocliente_eliminar",
+      "descripcion": "Permite eliminar tipos de cliente",
+      "tipo": "delete",
+      "modulo": 4,
       "activo": true,
       "created_at": "2025-08-22T03:37:00Z",
       "updated_at": "2025-08-22T03:37:00Z"
@@ -403,97 +417,11 @@
     }
   },
   {
-    "model": "roles.permiso",
-    "pk": 14,
-    "fields": {
-      "nombre": "Leer Tipo Cliente",
-      "codigo": "tipocliente_leer",
-      "descripcion": "Permite ver la lista de tipos de cliente",
-      "tipo": "read",
-      "modulo": 4,
-      "activo": true,
-      "created_at": "2025-08-22T03:37:00Z",
-      "updated_at": "2025-08-22T03:37:00Z"
-    }
-  },
-  {
-    "model": "roles.permiso",
-    "pk": 15,
-    "fields": {
-      "nombre": "Crear Tipo Cliente",
-      "codigo": "tipocliente_crear",
-      "descripcion": "Permite crear nuevos tipos de cliente",
-      "tipo": "create",
-      "modulo": 4,
-      "activo": true,
-      "created_at": "2025-08-22T03:37:00Z",
-      "updated_at": "2025-08-22T03:37:00Z"
-    }
-  },
-  {
-    "model": "roles.permiso",
-    "pk": 16,
-    "fields": {
-      "nombre": "Editar Tipo Cliente",
-      "codigo": "tipocliente_editar",
-      "descripcion": "Permite modificar tipos de cliente existentes",
-      "tipo": "update",
-      "modulo": 4,
-      "activo": true,
-      "created_at": "2025-08-22T03:37:00Z",
-      "updated_at": "2025-08-22T03:37:00Z"
-    }
-  },
-  {
-    "model": "roles.permiso",
-    "pk": 17,
-    "fields": {
-      "nombre": "Eliminar Tipo Cliente",
-      "codigo": "tipocliente_eliminar",
-      "descripcion": "Permite eliminar tipos de cliente",
-      "tipo": "delete",
-      "modulo": 4,
-      "activo": true,
-      "created_at": "2025-08-22T03:37:00Z",
-      "updated_at": "2025-08-22T03:37:00Z"
-    }
-  },
-  {
     "model": "roles.rolpermiso",
     "pk": 14,
     "fields": {
       "rol": 1,
       "permiso": 14,
-      "asignado_por": "sistema",
-      "fecha_asignacion": "2025-08-22T03:37:00Z"
-    }
-  },
-  {
-    "model": "roles.rolpermiso",
-    "pk": 15,
-    "fields": {
-      "rol": 1,
-      "permiso": 15,
-      "asignado_por": "sistema",
-      "fecha_asignacion": "2025-08-22T03:37:00Z"
-    }
-  },
-  {
-    "model": "roles.rolpermiso",
-    "pk": 16,
-    "fields": {
-      "rol": 1,
-      "permiso": 16,
-      "asignado_por": "sistema",
-      "fecha_asignacion": "2025-08-22T03:37:00Z"
-    }
-  },
-  {
-    "model": "roles.rolpermiso",
-    "pk": 17,
-    "fields": {
-      "rol": 1,
-      "permiso": 17,
       "asignado_por": "sistema",
       "fecha_asignacion": "2025-08-22T03:37:00Z"
     }
