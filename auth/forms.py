@@ -2,7 +2,6 @@ from django import forms
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.forms import UserCreationForm
 from usuarios.models import Usuario
-from django.contrib.auth.forms import PasswordResetForm
 class LoginForm(forms.Form):
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Correo electrónico'}),
@@ -99,15 +98,3 @@ class RegistroForm(UserCreationForm):
         if len(cedula) < 5:
             raise forms.ValidationError("La cédula debe tener al menos 5 dígitos.")
         return cedula
-    
-    def clean_password2(self):
-        password1 = self.cleaned_data.get('password1')
-        password2 = self.cleaned_data.get('password2')
-        
-        if password1 and password2 and password1 != password2:
-            raise forms.ValidationError("Las contraseñas no coinciden.")
-        
-        if len(password1) < 8:
-            raise forms.ValidationError("La contraseña debe tener al menos 8 caracteres.")
-        
-        return password2

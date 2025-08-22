@@ -1,9 +1,7 @@
-from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-# ... tus otras importaciones existentes
 
 from roles.mixins import PermisoRequeridoMixin
 from roles.services import Permisos

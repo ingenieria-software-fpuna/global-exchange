@@ -1,7 +1,0 @@
-roles/models.py: Define la estructura de tu base de datos.
-
-roles/mixins.py: Utiliza un permiso para restringir el acceso a las vistas.
-
-roles/views.py: Declara qué permiso necesita cada vista.
-
-roles/services.py: Contiene la lógica para verificar si un usuario tiene un permiso específico
