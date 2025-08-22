@@ -23,6 +23,11 @@ class Permisos:
     TIPOCLIENTE_CREAR = 'tipocliente_crear'
     TIPOCLIENTE_EDITAR = 'tipocliente_editar'
     TIPOCLIENTE_ELIMINAR = 'tipocliente_eliminar'
+    # Permisos del CRUD de clientes
+    CLIENTE_LEER = 'cliente_leer'
+    CLIENTE_CREAR = 'cliente_crear'
+    CLIENTE_EDITAR = 'cliente_editar'
+    CLIENTE_ELIMINAR = 'cliente_eliminar'
     # Otros permisos
     DASHBOARD_VER = 'dashboard_ver'
 
@@ -62,6 +67,7 @@ class RolesService:
     @staticmethod
     def usuario_tiene_permiso(usuario, codigo_permiso):
         """Verifica si un usuario tiene un permiso específico"""
+            
         roles_activos = UsuarioRol.objects.filter(
             usuario=usuario,
             activo=True,
