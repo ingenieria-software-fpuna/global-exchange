@@ -3,7 +3,26 @@
 {% block title %}Lista de Permisos{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
+<div class="container mt-4">
+    <!-- Breadcrumbs -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'auth:dashboard' %}">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'roles:rol_list' %}">
+                    <i class="fas fa-user-shield me-1"></i>Roles
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-key me-1"></i>Permisos
+            </li>
+        </ol>
+    </nav>
+
     <h1 class="mb-4">Permisos del Sistema</h1>
     <a href="{% url 'roles:permiso_create' %}" class="btn btn-primary mb-3">Crear Nuevo Permiso</a>
     

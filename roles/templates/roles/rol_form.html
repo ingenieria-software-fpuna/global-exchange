@@ -3,7 +3,27 @@
 {% if object %}Editar Rol{% else %}Crear Rol{% endif %}
 {% endblock %}
 {% block content %}
-<div class="container mt-5">
+<div class="container mt-4">
+    <!-- Breadcrumbs -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'auth:dashboard' %}">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'roles:rol_list' %}">
+                    <i class="fas fa-user-shield me-1"></i>Roles
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-{% if object %}edit{% else %}plus{% endif %} me-1"></i>
+                {% if object %}Editar Rol{% else %}Crear Rol{% endif %}
+            </li>
+        </ol>
+    </nav>
+
     <div class="row justify-content-center">
         <div class="col-md-8">
             <h1 class="mb-4">{% if object %}Editar Rol{% else %}Crear Nuevo Rol{% endif %}</h1>
