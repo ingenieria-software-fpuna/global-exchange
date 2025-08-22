@@ -3,7 +3,7 @@ from .models import TipoCliente
 
 @admin.register(TipoCliente)
 class TipoClienteAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'descripcion', 'activo', 'fecha_creacion', 'fecha_modificacion']
+    list_display = ['nombre', 'descripcion', 'descuento', 'activo', 'fecha_creacion', 'fecha_modificacion']
     list_filter = ['activo', 'fecha_creacion']
     search_fields = ['nombre', 'descripcion']
     readonly_fields = ['fecha_creacion', 'fecha_modificacion']
@@ -11,7 +11,7 @@ class TipoClienteAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Información Básica', {
-            'fields': ('nombre', 'descripcion')
+            'fields': ('nombre', 'descripcion', 'descuento')
         }),
         ('Estado', {
             'fields': ('activo',)

@@ -15,7 +15,7 @@ class TipoClienteListView(ListView):
 class TipoClienteCreateView(CreateView):
     model = TipoCliente
     template_name = 'clientes/tipocliente_form.html'
-    fields = ['nombre', 'descripcion', 'activo']
+    fields = ['nombre', 'descripcion', 'descuento', 'activo']
     success_url = reverse_lazy('clientes:tipocliente_list')
     
     def form_valid(self, form):
@@ -25,7 +25,7 @@ class TipoClienteCreateView(CreateView):
 class TipoClienteUpdateView(UpdateView):
     model = TipoCliente
     template_name = 'clientes/tipocliente_form.html'
-    fields = ['nombre', 'descripcion', 'activo']
+    fields = ['nombre', 'descripcion', 'descuento', 'activo']
     success_url = reverse_lazy('clientes:tipocliente_list')
     
     def form_valid(self, form):
