@@ -67,7 +67,7 @@ def verify_code_view(request):
     else:
         form = VerificationCodeForm()
 
-        return render(request, 'auth/verify_code.html', {'form': form}) 
+    return render(request, 'auth/verify_code.html', {'form': form}) 
     
 def dashboard_view(request):
     """Renderiza la página del dashboard."""
