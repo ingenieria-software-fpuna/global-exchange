@@ -67,9 +67,6 @@ class RolesService:
     @staticmethod
     def usuario_tiene_permiso(usuario, codigo_permiso):
         """Verifica si un usuario tiene un permiso específico"""
-        # Si el usuario es admin, tiene todos los permisos
-        if RolesService.usuario_es_admin(usuario):
-            return True
             
         roles_activos = UsuarioRol.objects.filter(
             usuario=usuario,
