@@ -67,6 +67,12 @@ poetry --version
 poetry install
 ```
 
+8. Crear un archivo `.env` a partir del archivo de ejemplo:
+
+```bash
+cp .env.example .env
+```
+
 ### Uso del proyecto
 
 Una vez instaladas las dependencias, puedes ejecutar el proyecto con los siguientes comandos:
