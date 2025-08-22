@@ -102,6 +102,13 @@
                                     </a>
                                 </li>
                                 {% endif %}
+                                {% if can_view_cliente %}
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'clientes:cliente_list' %}">
+                                        <i class="fas fa-user-tie me-2"></i>Clientes
+                                    </a>
+                                </li>
+                                {% endif %}
                             </ul>
                         </li>
                         {% endif %}
