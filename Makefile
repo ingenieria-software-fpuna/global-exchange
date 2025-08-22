@@ -1,4 +1,4 @@
-.PHONY: db-up db-clean app-run app-migrate app-setup load-permissions user-admin user user-fast create-superuser app-reset help
+.PHONY: db-up db-clean app-run app-migrate app-test app-setup load-permissions user-admin user user-fast create-superuser app-reset help
 
 #-------------- Operaciones de base de datos ----------------#
 db-up:
@@ -57,6 +57,12 @@ user-fast:
 		true; \
 	fi
 
+#-------------- App tests ----------------#
+app-test:
+	@echo "Ejecutando todos los tests del proyecto..."
+	poetry run python manage.py test -v 2
+	@echo "Tests completados"
+
 # Ayuda
 help:
 	@echo "Comandos disponibles:"
@@ -64,6 +70,7 @@ help:
 	@echo "  db-clean          - Limpiar la base de datos y sus volúmenes"
 	@echo "  app-run           - Correr el proyecto Django"
 	@echo "  app-migrate       - Aplicar migraciones de la base de datos"
+	@echo "  app-test          - Ejecutar todos los tests del proyecto"
 	@echo "  app-setup         - Configurar el proyecto (db + migraciones)"
 	@echo "  load-permissions  - Cargar permisos iniciales desde fixtures"
 		@echo "  user [username] [-f] - Crear usuario de desarrollo (interactivo o con username)"
