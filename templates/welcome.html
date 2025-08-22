@@ -2,131 +2,219 @@
 
 {% block title %}Global Exchange - Casa de Cambios{% endblock %}
 
+{% block extra_css %}
+<style>
+/* Ticker styles scoped to welcome */
+.ticker { position: relative; overflow: hidden; background:#fff; border-radius:.75rem; }
+.ticker__track {
+    display:flex; align-items:center; gap:2rem; white-space:nowrap;
+    animation: ticker-scroll 35s linear infinite;
+    padding: .75rem 1rem;
+}
+.ticker:hover .ticker__track { animation-play-state: paused; }
+.ticker__item { display:flex; align-items:center; gap:.5rem; color:#0f172a; }
+.ticker__label { color:#6c757d; font-size:.9rem; }
+.ticker__value { font-weight:700; color:#198754; }
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) { .ticker__track { animation:none; } }
+</style>
+{% endblock %}
+
+{% block main_container_class %}container-fluid p-0{% endblock %}
+
 {% block content %}
-<div class="container-fluid">
-    <!-- Header con logo y nombre -->
-    <div class="row bg-primary text-white py-4">
-        <div class="col-12 text-center">
-            <h1 class="display-4 fw-bold">Global Exchange</h1>
-            <p class="lead">Tu casa de cambios de confianza</p>
-        </div>
-    </div>
-
-    <!-- Sección de tasas de cambio -->
-    <div class="row py-5">
-        <div class="col-12">
-            <div class="text-center mb-5">
-                <h2 class="h1 text-primary">Tasas de Cambio</h2>
-                <p class="text-muted">Moneda base: Guaraní (PYG)</p>
-            </div>
-            
-            <!-- Tarjetas de monedas -->
-            <div class="row justify-content-center">
-                <!-- Dólar Americano -->
-                <div class="col-md-3 mb-4">
-                    <div class="card h-100 border-0 shadow-sm">
-                        <div class="card-body text-center">
-                            <div class="mb-3">
-                                <span class="display-6">💵</span>
-                            </div>
-                            <h5 class="card-title text-primary">Dólar Americano</h5>
-                            <p class="card-text">
-                                <span class="h4 text-success">7,250</span>
-                                <small class="text-muted">PYG/USD</small>
-                            </p>
-                            <small class="text-muted">Compra: 7,200 | Venta: 7,300</small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Euro -->
-                <div class="col-md-3 mb-4">
-                    <div class="card h-100 border-0 shadow-sm">
-                        <div class="card-body text-center">
-                            <div class="mb-3">
-                                <span class="display-6">💶</span>
-                            </div>
-                            <h5 class="card-title text-primary">Euro</h5>
-                            <p class="card-text">
-                                <span class="h4 text-success">7,850</span>
-                                <small class="text-muted">PYG/EUR</small>
-                            </p>
-                            <small class="text-muted">Compra: 7,800 | Venta: 7,900</small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Real Brasileño -->
-                <div class="col-md-3 mb-4">
-                    <div class="card h-100 border-0 shadow-sm">
-                        <div class="card-body text-center">
-                            <div class="mb-3">
-                                <span class="display-6">🇧🇷</span>
-                            </div>
-                            <h5 class="card-title text-primary">Real Brasileño</h5>
-                            <p class="card-text">
-                                <span class="h4 text-success">1,450</span>
-                                <small class="text-muted">PYG/BRL</small>
-                            </p>
-                            <small class="text-muted">Compra: 1,430 | Venta: 1,470</small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Peso Argentino -->
-                <div class="col-md-3 mb-4">
-                    <div class="card h-100 border-0 shadow-sm">
-                        <div class="card-body text-center">
-                            <div class="mb-3">
-                                <span class="display-6">🇦🇷</span>
-                            </div>
-                            <h5 class="card-title text-primary">Peso Argentino</h5>
-                            <p class="card-text">
-                                <span class="h4 text-success">8.50</span>
-                                <small class="text-muted">PYG/ARS</small>
-                            </p>
-                            <small class="text-muted">Compra: 8.40 | Venta: 8.60</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Información adicional -->
-            <div class="row mt-5">
-                <div class="col-12 text-center">
-                    <div class="alert alert-info" role="alert">
-                        <i class="fas fa-info-circle"></i>
-                        <strong>Nota:</strong> Las tasas se actualizan cada hora. Para operaciones específicas, contacta con nuestros agentes.
-                    </div>
+<!-- Hero principal -->
+<section class="bg-primary text-white py-5 shadow-soft" style="background: linear-gradient(135deg, rgba(13,110,253,1) 0%, rgba(2,62,138,1) 100%);">
+    <div class="container py-4">
+        <div class="row align-items-center g-4">
+            <div class="col-12 text-center">
+                <h1 class="display-5 fw-bold mb-2">Global Exchange</h1>
+                <p class="lead mb-4">Tu casa de cambios de confianza</p>
+                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'auth:dashboard' %}" class="btn btn-light btn-lg btn-rounded px-4">
+                        <i class="fas fa-gauge-high me-2"></i>Ir al Dashboard
+                    </a>
+                    <a href="{% url 'auth:logout' %}" class="btn btn-outline-light btn-lg btn-rounded px-4">
+                        <i class="fas fa-right-from-bracket me-2"></i>Cerrar Sesión
+                    </a>
+                    {% else %}
+                    <a href="{% url 'auth:login' %}" class="btn btn-light btn-lg btn-rounded px-4">
+                        <i class="fas fa-right-to-bracket me-2"></i>Iniciar Sesión
+                    </a>
+                    <a href="{% url 'auth:registro' %}" class="btn btn-outline-light btn-lg btn-rounded px-4">
+                        <i class="fas fa-user-plus me-2"></i>Registrarse
+                    </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
+    <div class="bg-white" style="height: 24px; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 60%);"></div>
+</section>
 
-    <!-- Sección de botones de acción -->
-    <div class="row py-4 bg-light">
-        <div class="col-12 text-center">
-            <h3 class="mb-4">¿Qué deseas hacer?</h3>
-            <div class="d-flex justify-content-center gap-3 flex-wrap">
-                <a href="{% url 'auth:login' %}" class="btn btn-primary btn-lg px-4 py-2">
-                    <i class="fas fa-sign-in-alt me-2"></i>
-                    Iniciar Sesión
+<!-- Ticker de tasas en movimiento -->
+<section class="py-3">
+  <div class="container">
+    <div class="ticker shadow-soft" role="region" aria-label="Tasas de cambio en movimiento">
+      <div class="ticker__track">
+        <!-- Bloque 1 -->
+        <span class="ticker__item"><i class="fas fa-dollar-sign text-primary"></i><span class="ticker__label">USD</span><span class="ticker__value">7.250</span><span class="text-muted">Compra 7.200 · Venta 7.300</span></span>
+        <span class="ticker__item"><i class="fas fa-euro-sign text-primary"></i><span class="ticker__label">EUR</span><span class="ticker__value">7.850</span><span class="text-muted">Compra 7.800 · Venta 7.900</span></span>
+        <span class="ticker__item"><i class="fas fa-brazilian-real-sign text-primary"></i><span class="ticker__label">BRL</span><span class="ticker__value">1.450</span><span class="text-muted">Compra 1.430 · Venta 1.470</span></span>
+        <span class="ticker__item"><i class="fas fa-peso-sign text-primary"></i><span class="ticker__label">ARS</span><span class="ticker__value">8,50</span><span class="text-muted">Compra 8,40 · Venta 8,60</span></span>
+
+        <!-- Bloque 2 (duplicado para desplazamiento infinito) -->
+        <span class="ticker__item"><i class="fas fa-dollar-sign text-primary"></i><span class="ticker__label">USD</span><span class="ticker__value">7.250</span><span class="text-muted">Compra 7.200 · Venta 7.300</span></span>
+        <span class="ticker__item"><i class="fas fa-euro-sign text-primary"></i><span class="ticker__label">EUR</span><span class="ticker__value">7.850</span><span class="text-muted">Compra 7.800 · Venta 7.900</span></span>
+        <span class="ticker__item"><i class="fas fa-brazilian-real-sign text-primary"></i><span class="ticker__label">BRL</span><span class="ticker__value">1.450</span><span class="text-muted">Compra 1.430 · Venta 1.470</span></span>
+        <span class="ticker__item"><i class="fas fa-peso-sign text-primary"></i><span class="ticker__label">ARS</span><span class="ticker__value">8,50</span><span class="text-muted">Compra 8,40 · Venta 8,60</span></span>
+      </div>
+    </div>
+  </div>
+  <div class="bg-white" style="height: 16px;"></div>
+  
+</section>
+
+<!-- Tasas de cambio -->
+<section class="py-5">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="h1 text-primary mb-2">Tasas de Cambio</h2>
+            <p class="text-muted">Moneda base: Guaraní (PYG)</p>
+        </div>
+
+        <div class="row g-4 justify-content-center">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <div class="display-6 text-primary mb-2"><i class="fas fa-dollar-sign"></i></div>
+                        <h5 class="card-title">Dólar Americano</h5>
+                        <p class="mb-1">
+                            <span class="h4 text-success">7,250</span>
+                            <small class="text-muted"> PYG/USD</small>
+                        </p>
+                        <small class="text-muted">Compra: 7,200 · Venta: 7,300</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <div class="display-6 text-primary mb-2"><i class="fas fa-euro-sign"></i></div>
+                        <h5 class="card-title">Euro</h5>
+                        <p class="mb-1">
+                            <span class="h4 text-success">7,850</span>
+                            <small class="text-muted"> PYG/EUR</small>
+                        </p>
+                        <small class="text-muted">Compra: 7,800 · Venta: 7,900</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <div class="display-6 text-primary mb-2"><i class="fas fa-brazilian-real-sign"></i></div>
+                        <h5 class="card-title">Real Brasileño</h5>
+                        <p class="mb-1">
+                            <span class="h4 text-success">1,450</span>
+                            <small class="text-muted"> PYG/BRL</small>
+                        </p>
+                        <small class="text-muted">Compra: 1,430 · Venta: 1,470</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <div class="display-6 text-primary mb-2"><i class="fas fa-peso-sign"></i></div>
+                        <h5 class="card-title">Peso Argentino</h5>
+                        <p class="mb-1">
+                            <span class="h4 text-success">8.50</span>
+                            <small class="text-muted"> PYG/ARS</small>
+                        </p>
+                        <small class="text-muted">Compra: 8.40 · Venta: 8.60</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-5">
+            <div class="col-12">
+                <div class="alert alert-info shadow-sm text-center" role="alert">
+                    <i class="fas fa-circle-info me-2"></i>
+                    <strong>Nota:</strong> Las tasas se actualizan cada hora. Para operaciones específicas, contacta con nuestros agentes.
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="bg-white" style="height: 24px; clip-path: polygon(0 0, 100% 40%, 100% 100%, 0 100%);"></div>
+</section>
+
+<!-- Características -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-12 col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-primary fs-3 mb-2"><i class="fas fa-shield-halved"></i></div>
+                        <h5 class="mb-2">Seguro</h5>
+                        <p class="text-muted mb-0">Protección y cumplimiento para cada operación.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-primary fs-3 mb-2"><i class="fas fa-bolt"></i></div>
+                        <h5 class="mb-2">Rápido</h5>
+                        <p class="text-muted mb-0">Procesos ágiles y sin fricciones.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-primary fs-3 mb-2"><i class="fas fa-scale-balanced"></i></div>
+                        <h5 class="mb-2">Transparente</h5>
+                        <p class="text-muted mb-0">Precios claros y actualizados.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Llamado a la acción -->
+<section class="py-5">
+    <div class="container">
+        <div class="d-flex flex-column flex-md-row align-items-center justify-content-between p-4 p-md-5 bg-white rounded-3 shadow-soft">
+            <div class="mb-3 mb-md-0">
+                <h4 class="mb-1">¿Listo para comenzar?</h4>
+                <p class="text-muted mb-0">Crea tu cuenta o inicia sesión para operar.</p>
+            </div>
+            <div class="d-flex gap-2">
+                {% if user.is_authenticated %}
+                <a href="{% url 'auth:dashboard' %}" class="btn btn-primary btn-rounded px-4">
+                    <i class="fas fa-gauge-high me-2"></i>Ir al Dashboard
                 </a>
-                <a href="{% url 'auth:registro' %}" class="btn btn-success btn-lg px-4 py-2">
-                    <i class="fas fa-user-plus me-2"></i>
-                    Registrarse
+                {% else %}
+                <a href="{% url 'auth:login' %}" class="btn btn-primary btn-rounded px-4">
+                    <i class="fas fa-right-to-bracket me-2"></i>Iniciar Sesión
                 </a>
+                <a href="{% url 'auth:registro' %}" class="btn btn-outline-primary btn-rounded px-4">
+                    <i class="fas fa-user-plus me-2"></i>Registrarse
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>
-
-    <!-- Footer -->
-    <div class="row bg-dark text-white py-3">
-        <div class="col-12 text-center">
-            <p class="mb-0">
-                <small>&copy; 2024 Global Exchange. Todos los derechos reservados.</small>
-            </p>
-        </div>
-    </div>
-</div>
+</section>
 {% endblock %}
