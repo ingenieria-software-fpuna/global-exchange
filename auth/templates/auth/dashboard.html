@@ -60,7 +60,7 @@
             </div>
         </div>
         {% endif %}
-        {% if is_admin_role %}
+        {% if can_view_cliente %}
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
@@ -69,12 +69,14 @@
                     <p class="card-text">Administra la información de tus clientes y su segmentación.</p>
                 </div>
                 <div class="card-footer bg-light">
-                    <a href="#" class="btn btn-success w-100 disabled" aria-disabled="true">
+                    <a href="{% url 'clientes:cliente_list' %}" class="btn btn-success w-100">
                         Ir a Clientes
                     </a>
                 </div>
             </div>
         </div>
+        {% endif %}
+        {% if is_admin_role %}
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
