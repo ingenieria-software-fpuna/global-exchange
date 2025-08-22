@@ -32,8 +32,9 @@ RUN poetry config virtualenvs.create false \
 # Copy application source
 COPY . .
 
-# Create non-root user and adjust permissions
-RUN chmod +x scripts/entrypoint.sh \
+# Build documentation and set up user permissions
+RUN poetry run sphinx-build -M html "$(pwd)/docs/source" "$(pwd)/docs/_build" \
+    && chmod +x scripts/entrypoint.sh \
     && useradd --create-home --shell /bin/bash appuser \
     && chown -R appuser:appuser /app
 
