@@ -77,28 +77,38 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     {% if user.is_authenticated %}
+                    {% if can_view_dashboard %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'auth:dashboard' %}">
                             <i class="fas fa-tachometer-alt me-1"></i>Dashboard
                         </a>
                     </li>
+                    {% endif %}
+                    {% if can_view_usuarios or can_view_roles or can_view_tipocliente or is_admin_role %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-cogs me-1"></i>Administración
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                            {% if can_view_usuarios %}
                             <li><a class="dropdown-item" href="{% url 'usuarios:user_list' %}">
                                 <i class="fas fa-users me-2"></i>Usuarios
                             </a></li>
+                            {% endif %}
+                            {% if can_view_roles %}
                             <li><a class="dropdown-item" href="{% url 'roles:rol_list' %}">
                                 <i class="fas fa-user-tag me-2"></i>Roles
                             </a></li>
+                            {% endif %}
+                            {% if can_view_tipocliente or is_admin_role %}
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{% url 'clientes:tipocliente_list' %}">
                                 <i class="fas fa-tags me-2"></i>Tipos de Cliente
                             </a></li>
+                            {% endif %}
                         </ul>
                     </li>
+                    {% endif %}
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav">
