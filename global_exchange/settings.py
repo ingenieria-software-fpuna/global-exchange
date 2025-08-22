@@ -133,6 +133,11 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Additional static files directories
+STATICFILES_DIRS = [
+    BASE_DIR / "docs" / "_build" / "html",  # Sphinx documentation
+]
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

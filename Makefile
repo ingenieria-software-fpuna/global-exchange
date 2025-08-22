@@ -1,4 +1,4 @@
-.PHONY: db-up db-clean app-run app-migrate app-test app-setup load-permissions user-admin user user-fast create-superuser app-reset help
+.PHONY: db-up db-clean app-run app-migrate app-test app-setup load-permissions user-admin user user-fast create-superuser app-reset help docs-html docs-clean docs-live
 
 #-------------- Operaciones de base de datos ----------------#
 db-up:
@@ -78,6 +78,10 @@ help:
 	@echo "  user-admin        - Crear un superusuario de Django"
 	@echo "  create-superuser  - Crear un superusuario de Django"
 	@echo "  app-reset         - Reset completo (db + migraciones + permisos)"
+	@echo "  docs-html         - Generar documentación HTML (Sphinx)"
+	@echo "  docs-deploy       - Construir documentación para Django (disponible en /docs/)"
+	@echo "  docs-live         - Servidor live de docs (sphinx-autobuild)"
+	@echo "  docs-clean        - Limpiar artefactos de build de docs"
 	@echo "  help              - Mostrar esta ayuda"
 	@echo ""
 	@echo "Ejemplos de uso:"
@@ -85,3 +89,23 @@ help:
 	@echo "  make user juan.perez         # Con username predefinido"
 	@echo "  make user-fast               # Modo rápido interactivo"
 	@echo "  make user-fast admin         # Modo rápido con username 'admin'"
+
+#-------------- Documentación (Sphinx) ----------------#
+docs-html:
+	@echo "Construyendo documentación HTML..."
+	$(MAKE) -C docs html
+	@echo "Documentación generada en docs/_build/html"
+
+docs-deploy:
+	@echo "Construyendo documentación para despliegue..."
+	$(MAKE) -C docs html
+	@echo "Documentación lista para servir en /docs/"
+	@echo "La documentación estará disponible en: http://localhost:8000/docs/"
+
+docs-clean:
+	@echo "Limpiando artefactos de documentación..."
+	$(MAKE) -C docs clean
+
+docs-live:
+	@echo "Iniciando servidor live de documentación..."
+	$(MAKE) -C docs live
