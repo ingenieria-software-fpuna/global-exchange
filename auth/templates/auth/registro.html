@@ -44,6 +44,14 @@
                         </div>
                         
                         <div class="mb-3">
+                            {{ form.cedula.label_tag }}
+                            {{ form.cedula }}
+                            {% if form.cedula.help_text %}
+                                <small class="form-text text-muted">{{ form.cedula.help_text }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
                             {{ form.nombre.label_tag }}
                             {{ form.nombre }}
                             {% if form.nombre.help_text %}
@@ -56,6 +64,14 @@
                             {{ form.apellido }}
                             {% if form.apellido.help_text %}
                                 <small class="form-text text-muted">{{ form.apellido.help_text }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.fecha_nacimiento.label_tag }}
+                            {{ form.fecha_nacimiento }}
+                            {% if form.fecha_nacimiento.help_text %}
+                                <small class="form-text text-muted">{{ form.fecha_nacimiento.help_text }}</small>
                             {% endif %}
                         </div>
                         
