@@ -81,10 +81,8 @@ Una vez instaladas las dependencias, puedes ejecutar el proyecto con los siguien
 Si tienes `Makefile`, puedes usar los siguientes comandos:
 ```bash
 make app-setup  # Configuración (limpiar DB, levantar DB, aplicar migraciones)
-make app-run    # Correr el proyecto
-
-# Opcional
 make user # Crear un usuario para usar el sistema
+make app-run    # Correr el proyecto
 ```
 
 Si no tienes `Makefile`, puedes usar los siguientes comandos:
