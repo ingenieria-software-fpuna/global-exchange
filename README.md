@@ -12,6 +12,7 @@ Proyecto de Ingeniería de Software 2 (IS2) de la Facultad Politécnica de la Un
 - [Jira](https://fpuna-team-rlp0euzv.atlassian.net/jira)
 - [Wiki](http://109.199.116.203:8060/es/links-de-interes)
 - [Repositorio del proyecto](https://github.com/ingenieria-software-fpuna/global-exchange)
+- [Guía de contribución al código](http://109.199.116.203:8060/es/dev/guia-de-contribucion)
 
 
 ### Pre-requisitos
@@ -20,6 +21,7 @@ Proyecto de Ingeniería de Software 2 (IS2) de la Facultad Politécnica de la Un
 - [Docker Compose](https://docs.docker.com/compose/) (incluido en Docker Desktop a partir de la versión 2.0)
 - [Poetry](https://python-poetry.org/)
 - Algún cliente de postgres ([pgAdmin](https://www.pgadmin.org/), [DBeaver](https://dbeaver.io/), etc.)
+- Make (en windows, instalar de aquí: [Make for Windows](https://gnuwin32.sourceforge.net/packages/make.htm))
 
 ### Instalación
 1. Clonar el repositorio:
@@ -77,28 +79,12 @@ cp .env.example .env
 
 Una vez instaladas las dependencias, puedes ejecutar el proyecto con los siguientes comandos:
 
-
-Si tienes `Makefile`, puedes usar los siguientes comandos:
 ```bash
 make app-setup  # Configuración (limpiar DB, levantar DB, aplicar migraciones)
 make user # Crear un usuario para usar el sistema
 make app-run    # Correr el proyecto
 ```
 
-Si no tienes `Makefile`, puedes usar los siguientes comandos:
-```bash
-# Limpiar la base de datos y volúmenes
-docker compose down -v
-# Levantar la base de datos PostgreSQL
-docker compose up -d
-# Aplicar migraciones de la base de datos
-poetry run python manage.py migrate
-# Cargar permisos iniciales
-poetry run python manage.py loaddata roles/fixtures/initial_permissions.json
-# Correr el proyecto Django
-poetry run python manage.py runserver
 
-# Opcional
-# Crear un usuario para usar el sistema
-scripts\create_user.bat
-```
+### Contribución
+Antes de contribuir, por favor lee el archivo [CONTRIBUTING.md](CONTRIBUTING.md) para entender las normas y directrices del proyecto.
