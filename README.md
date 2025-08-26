@@ -12,7 +12,7 @@ Proyecto de Ingeniería de Software 2 (IS2) de la Facultad Politécnica de la Un
 - [Jira](https://fpuna-team-rlp0euzv.atlassian.net/jira)
 - [Wiki](http://109.199.116.203:8060/es/links-de-interes)
 - [Repositorio del proyecto](https://github.com/ingenieria-software-fpuna/global-exchange)
-- [Guía de contribución al código] (http://109.199.116.203:8060/es/dev/guia-de-contribucion)
+- [Guía de contribución al código](http://109.199.116.203:8060/es/dev/guia-de-contribucion)
 
 
 ### Pre-requisitos
