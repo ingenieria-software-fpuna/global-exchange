@@ -1,4 +1,4 @@
-.PHONY: db-up db-clean app-run app-migrate app-setup load-permissions user-admin user user-fast create-superuser app-reset help docs-html docs-clean docs-live
+.PHONY: db-up db-clean app-run app-migrate app-setup load-permissions user-admin user user-fast create-superuser app-reset help docs-html docs-clean docs-live app-test
 
 #-------------- Operaciones de base de datos ----------------#
 db-up:
