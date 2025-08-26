@@ -78,10 +78,12 @@ cp .env.example .env
 
 Una vez instaladas las dependencias, puedes ejecutar el proyecto con los siguientes comandos:
 
-
-Si tienes `Makefile`, puedes usar los siguientes comandos:
 ```bash
 make app-setup  # Configuración (limpiar DB, levantar DB, aplicar migraciones)
 make user # Crear un usuario para usar el sistema
 make app-run    # Correr el proyecto
 ```
+
+
+### Contribución
+Antes de contribuir, por favor lee el archivo [CONTRIBUTING.md](CONTRIBUTING.md) para entender las normas y directrices del proyecto.
