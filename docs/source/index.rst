@@ -8,6 +8,7 @@ Bienvenido a la documentación del proyecto Global Exchange.
    :caption: Contenidos
 
    getting-started
+   bitacora_ia/index
 
 Índices y tablas
 ----------------
