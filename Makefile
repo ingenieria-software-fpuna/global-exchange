@@ -1,4 +1,4 @@
-.PHONY: db-up db-clean app-run app-migrate app-setup load-permissions user-admin user user-fast create-superuser app-reset help docs-html docs-clean docs-live
+.PHONY: db-up db-clean app-run app-migrate check-admin-group app-setup user user-fast app-reset help docs-html docs-clean docs-live
 
 #-------------- Operaciones de base de datos ----------------#
 db-up:
@@ -21,19 +21,19 @@ app-migrate:
 	poetry run python manage.py migrate
 	@echo "Migraciones aplicadas correctamente"
 
+check-admin-group:
+	@echo "Verificando grupo de administradores del sistema..."
+	poetry run python scripts/check_admin_group.py
+
 app-setup:
 	@echo "Configurando el proyecto Django..."
 	make db-clean
 	make db-up
 	sleep 5
 	make app-migrate
-	make load-permissions
+	make check-admin-group
 
 #-------------- Comandos de administración ----------------#
-load-permissions:
-	@echo "Cargando permisos iniciales desde fixtures..."
-	poetry run python manage.py loaddata roles/fixtures/initial_permissions.json
-	@echo "Permisos iniciales cargados correctamente"
 
 user:
 	@echo "Creando usuario de desarrollo..."
@@ -72,11 +72,8 @@ help:
 	@echo "  app-migrate       - Aplicar migraciones de la base de datos"
 	@echo "  app-test          - Ejecutar todos los tests del proyecto"
 	@echo "  app-setup         - Configurar el proyecto (db + migraciones)"
-	@echo "  load-permissions  - Cargar permisos iniciales desde fixtures"
-		@echo "  user [username] [-f] - Crear usuario de desarrollo (interactivo o con username)"
+	@echo "  user [username] [-f] - Crear usuario de desarrollo (interactivo o con username)"
 	@echo "  user-fast [username] - Crear usuario rápido con valores predeterminados"
-	@echo "  user-admin        - Crear un superusuario de Django"
-	@echo "  create-superuser  - Crear un superusuario de Django"
 	@echo "  app-reset         - Reset completo (db + migraciones + permisos)"
 	@echo "  docs-html         - Generar documentación HTML (Sphinx)"
 	@echo "  docs-deploy       - Construir documentación para Django (disponible en /docs/)"
