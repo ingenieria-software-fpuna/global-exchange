@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Eliminar Grupo{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-danger">
+                        <i class="fas fa-exclamation-triangle"></i> Confirmar Eliminación
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h5 class="alert-heading">
+                            <i class="fas fa-exclamation-triangle"></i> ¡Atención!
+                        </h5>
+                        <p>Estás a punto de eliminar el grupo <strong>"{{ object.name }}"</strong>.</p>
+                        
+                        <hr>
+                        
+                        <h6>Información del Grupo:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Nombre:</strong> {{ object.name }}</li>
+                            <li><strong>Permisos:</strong> {{ object.permissions.count }}</li>
+                            <li><strong>Usuarios:</strong> {{ object.user_set.count }}</li>
+                        </ul>
+                        
+                        <hr>
+                        
+                        <h6>⚠️ Consecuencias de la eliminación:</h6>
+                        <ul class="mb-0">
+                            <li>Se eliminarán todos los permisos asignados al grupo</li>
+                            <li>Los usuarios perderán acceso a funcionalidades asociadas</li>
+                            <li>Esta acción NO se puede deshacer</li>
+                        </ul>
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'grupos:group_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Eliminar Definitivamente
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

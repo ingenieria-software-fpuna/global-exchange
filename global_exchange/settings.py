@@ -54,7 +54,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     
     # Apps del proyecto
-    'roles', 'usuarios', 'auth.apps.AuthConfig', 'clientes',
+    'grupos', 'usuarios', 'auth.apps.AuthConfig', 'clientes',
 ]
 
 MIDDLEWARE = [
@@ -79,7 +79,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'roles.context_processors.permissions_context',
+                'grupos.context_processors.permissions_context',
             ],
         },
     },

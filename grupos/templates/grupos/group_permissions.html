@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestionar Permisos - {{ object.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-key"></i> Gestionar Permisos del Grupo: <strong>{{ object.name }}</strong>
+        </h1>
+        <a href="{% url 'grupos:group_list' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Volver a Grupos
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-list"></i> Permisos Disponibles
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <p class="text-muted">
+                                Selecciona los permisos que deseas asignar al grupo <strong>{{ object.name }}</strong>.
+                                Los permisos se agrupan por aplicación para facilitar la selección.
+                            </p>
+                        </div>
+
+                        {% for app_label, permissions in permissions_by_app.items %}
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0 text-uppercase">
+                                    <i class="fas fa-cube"></i> {{ app_label }}
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    {% for permission in permissions %}
+                                    <div class="col-md-6 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" 
+                                                   name="permissions" value="{{ permission.id }}" 
+                                                   id="perm_{{ permission.id }}"
+                                                   {% if permission in group_permissions %}checked{% endif %}>
+                                            <label class="form-check-label" for="perm_{{ permission.id }}">
+                                                <strong>{{ permission.name }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ permission.codename }}</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'grupos:group_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Guardar Permisos
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">
+                        <i class="fas fa-info-circle"></i> Información del Grupo
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <h6>Detalles del Grupo:</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>Nombre:</strong> {{ object.name }}</li>
+                        <li><strong>Permisos actuales:</strong> {{ group_permissions.count }}</li>
+                        <li><strong>Usuarios:</strong> {{ object.user_set.count }}</li>
+                    </ul>
+                    
+                    <hr>
+                    
+                    <h6>Permisos Asignados:</h6>
+                    {% if group_permissions %}
+                    <ul class="list-unstyled">
+                        {% for perm in group_permissions %}
+                        <li class="mb-1">
+                            <span class="badge bg-success">{{ perm.codename }}</span>
+                            <small class="text-muted d-block">{{ perm.name }}</small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted">No hay permisos asignados</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
