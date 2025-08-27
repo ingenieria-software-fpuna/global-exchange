@@ -36,9 +36,9 @@ class UsuarioModelTestCase(TestCase):
         self.assertFalse(user.is_staff)
         self.assertTrue(user.check_password('testpass123'))
 
-    def test_create_superuser(self):
-        """Test creación de superusuario"""
-        user = Usuario.objects.create_superuser(
+    def test_create_admin_user(self):
+        """Test creación de usuario administrador"""
+        user = Usuario.objects.create_admin_user(
             email='admin@example.com',
             password='adminpass123',
             nombre='Admin',
@@ -47,8 +47,11 @@ class UsuarioModelTestCase(TestCase):
             fecha_nacimiento='1985-01-01'
         )
         self.assertTrue(user.is_staff)
-        self.assertTrue(user.is_superuser)
+        self.assertFalse(user.is_superuser)
         self.assertTrue(user.activo)
+        # Verificar que está en el grupo de administradores
+        admin_group = user.groups.filter(name='Admin').first()
+        self.assertIsNotNone(admin_group)
 
     def test_create_user_without_email(self):
         """Test que no se puede crear usuario sin email"""

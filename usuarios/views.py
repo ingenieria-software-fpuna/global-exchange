@@ -2,50 +2,50 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 
-from roles.mixins import PermisoRequeridoMixin
-from roles.services import Permisos
 from .forms import UsuarioCreationForm, UsuarioUpdateForm
 
 Usuario = get_user_model()
 
 # Vista para listar usuarios
-class UsuarioListView(PermisoRequeridoMixin, ListView):
+class UsuarioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     model = Usuario
     template_name = 'usuarios/user_list.html'
     context_object_name = 'usuarios'
-    permiso_requerido = Permisos.USUARIO_LEER
+    permission_required = 'usuarios.view_usuario'
+    paginate_by = 20
 
 # Vista para crear un nuevo usuario
-class UsuarioCreateView(PermisoRequeridoMixin, CreateView):
+class UsuarioCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = Usuario
     form_class = UsuarioCreationForm
     template_name = 'usuarios/user_form.html'
     success_url = reverse_lazy('usuarios:user_list')
-    permiso_requerido = Permisos.USUARIO_CREAR
+    permission_required = 'usuarios.add_usuario'
 
     def form_valid(self, form):
         messages.success(self.request, "Usuario creado exitosamente.")
         return super().form_valid(form)
 
 # Vista para actualizar un usuario
-class UsuarioUpdateView(PermisoRequeridoMixin, UpdateView):
+class UsuarioUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = Usuario
     form_class = UsuarioUpdateForm
     template_name = 'usuarios/user_form.html'
     success_url = reverse_lazy('usuarios:user_list')
-    permiso_requerido = Permisos.USUARIO_EDITAR
+    permission_required = 'usuarios.change_usuario'
 
     def form_valid(self, form):
         messages.success(self.request, "Usuario actualizado exitosamente.")
         return super().form_valid(form)
 
 # Vista para eliminar un usuario
-class UsuarioDeleteView(PermisoRequeridoMixin, DeleteView):
+class UsuarioDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
     model = Usuario
     template_name = 'usuarios/user_confirm_delete.html'
     success_url = reverse_lazy('usuarios:user_list')
-    permiso_requerido = Permisos.USUARIO_ELIMINAR
+    permission_required = 'usuarios.delete_usuario'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
