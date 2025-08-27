@@ -200,32 +200,42 @@ except Exception as e:
         echo ""
         echo "🎉 Usuario creado correctamente!"
         
-        # Preguntar si quiere asignar rol de administrador
-        read -p "¿Desea asignar el rol de administrador a este usuario? (y/N): " ASSIGN_ADMIN
+        # Preguntar si quiere asignar todos los permisos (admin)
+        read -p "¿Desea asignar TODOS los permisos del sistema a este usuario? (y/N): " ASSIGN_ADMIN
         if [[ $ASSIGN_ADMIN =~ ^[Yy]$ ]]; then
-            echo "Asignando rol de administrador..."
+            echo "Asignando todos los permisos del sistema..."
             
             poetry run python manage.py shell -c "
 from usuarios.models import Usuario
-from roles.models import Rol, UsuarioRol
+from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group
 
 try:
     usuario = Usuario.objects.get(email='$EMAIL')
-    admin_rol = Rol.objects.get(codigo='admin')
     
-    usuario_rol, created = UsuarioRol.objects.get_or_create(
-        usuario=usuario,
-        rol=admin_rol,
-        defaults={'asignado_por': 'script_desarrollo'}
-    )
-    
+    # Crear grupo de administradores si no existe
+    admin_group, created = Group.objects.get_or_create(name='Admin')
     if created:
-        print('✅ Rol de administrador asignado correctamente')
-    else:
-        print('ℹ️  El usuario ya tenía el rol de administrador')
+        print('✅ Grupo de administradores creado')
+    
+    # Asignar todos los permisos al grupo
+    all_permissions = Permission.objects.all()
+    admin_group.permissions.set(all_permissions)
+    print(f'✅ {all_permissions.count()} permisos asignados al grupo de administradores')
+    
+    # Agregar usuario al grupo de administradores
+    usuario.groups.add(admin_group)
+    print('✅ Usuario agregado al grupo de administradores')
+    
+    # También marcar como staff (opcional, para acceso a ciertas funcionalidades)
+    usuario.is_staff = True
+    usuario.save()
+    print('✅ Usuario marcado como staff')
+    
+    print('🎉 Usuario configurado como administrador del sistema')
         
 except Exception as e:
-    print(f'❌ Error al asignar rol: {e}')
+    print(f'❌ Error al configurar permisos: {e}')
 "
         fi
     else
