@@ -60,16 +60,17 @@ try:
             # Crear grupo de administradores si no existe
             admin_group, created = Group.objects.get_or_create(name='Admin')
             if created:
-                print('✅ Grupo de administradores creado')
+                print('✅ Grupo Admin creado')
+                # Asignar todos los permisos al grupo nuevo
+                all_permissions = Permission.objects.all()
+                admin_group.permissions.set(all_permissions)
+                print(f'✅ {all_permissions.count()} permisos asignados al grupo Admin')
+            else:
+                print('✅ Grupo Admin ya existe')
             
-            # Asignar todos los permisos al grupo
-            all_permissions = Permission.objects.all()
-            admin_group.permissions.set(all_permissions)
-            print(f'✅ {all_permissions.count()} permisos asignados al grupo de administradores')
-            
-            # Agregar usuario al grupo de administradores
+            # Agregar usuario al grupo Admin
             user.groups.add(admin_group)
-            print('✅ Usuario agregado al grupo de administradores')
+            print('✅ Usuario agregado al grupo Admin')
             
             # También marcar como staff
             user.is_staff = True

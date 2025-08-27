@@ -200,10 +200,10 @@ except Exception as e:
         echo ""
         echo "🎉 Usuario creado correctamente!"
         
-        # Preguntar si quiere asignar todos los permisos (admin)
-        read -p "¿Desea asignar TODOS los permisos del sistema a este usuario? (y/N): " ASSIGN_ADMIN
+        # Preguntar si quiere asignar al grupo Admin
+        read -p "¿Desea asignar este usuario al grupo 'Admin'? (y/N): " ASSIGN_ADMIN
         if [[ $ASSIGN_ADMIN =~ ^[Yy]$ ]]; then
-            echo "Asignando todos los permisos del sistema..."
+            echo "Asignando usuario al grupo Admin..."
             
             poetry run python manage.py shell -c "
 from usuarios.models import Usuario
@@ -213,19 +213,21 @@ from django.contrib.auth.models import Group
 try:
     usuario = Usuario.objects.get(email='$EMAIL')
     
-    # Crear grupo de administradores si no existe
+    # Obtener o crear el grupo Admin
     admin_group, created = Group.objects.get_or_create(name='Admin')
     if created:
-        print('✅ Grupo de administradores creado')
+        print('✅ Grupo Admin creado')
+        # Asignar todos los permisos al grupo nuevo
+        from django.contrib.auth.models import Permission
+        all_permissions = Permission.objects.all()
+        admin_group.permissions.set(all_permissions)
+        print(f'✅ {all_permissions.count()} permisos asignados al grupo Admin')
+    else:
+        print('✅ Grupo Admin ya existe')
     
-    # Asignar todos los permisos al grupo
-    all_permissions = Permission.objects.all()
-    admin_group.permissions.set(all_permissions)
-    print(f'✅ {all_permissions.count()} permisos asignados al grupo de administradores')
-    
-    # Agregar usuario al grupo de administradores
+    # Agregar usuario al grupo Admin
     usuario.groups.add(admin_group)
-    print('✅ Usuario agregado al grupo de administradores')
+    print('✅ Usuario agregado al grupo Admin')
     
     # También marcar como staff (opcional, para acceso a ciertas funcionalidades)
     usuario.is_staff = True
