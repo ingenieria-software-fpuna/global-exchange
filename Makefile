@@ -22,7 +22,7 @@ app-migrate:
 	@echo "Migraciones aplicadas correctamente"
 
 check-admin-group:
-	@echo "Verificando grupo de administradores del sistema..."
+	@echo "Verificando grupo Admin del sistema..."
 	poetry run python scripts/check_admin_group.py
 
 app-setup:

@@ -213,9 +213,9 @@ if errorlevel 1 (
 echo.
 echo 🎉 Usuario creado correctamente!
 
-set /p "ASSIGN_ADMIN=¿Desea asignar TODOS los permisos del sistema a este usuario? (y/N): "
+set /p "ASSIGN_ADMIN=¿Desea asignar este usuario al grupo 'Admin'? (y/N): "
 if /i "!ASSIGN_ADMIN!"=="y" (
-    echo Asignando todos los permisos del sistema...
+    echo Asignando usuario al grupo Admin...
     
     poetry run python manage.py shell -c "
 from usuarios.models import Usuario
