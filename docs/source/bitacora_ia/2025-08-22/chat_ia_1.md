@@ -1,3 +1,8 @@
+# Chat IA - Sistema de Login con 2FA
+_Exported on 22/8/2025 at 08:40:43 GMT-4 from Cursor (1.4.5)_
+
+---
+
 **user**
 creame el login y usa mi modulo propio de roles y permisos # apps/roles/decorators.py
 
@@ -97,7 +102,7 @@ Here are the necessary components to create a login system that uses your custom
 
 -----
 
-### 1\. Create a Login Form (`forms.py`)
+### 1 Create a Login Form (`forms.py`)
 
 First, you need a form to capture the user's credentials. You can place this in your `apps/usuarios/forms.py` file or a new `forms.py` file within a dedicated `autenticacion` app if you want to separate authentication logic. For this example, let's assume it goes in the `forms.py` file of your `usuarios` app.
 
