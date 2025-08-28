@@ -14,7 +14,6 @@ fi
 
 echo "[entrypoint] Applying database migrations..."
 python manage.py migrate --noinput
-python manage.py loaddata roles/fixtures/initial_permissions.json
 
 # Optionally create a development user from env vars
 if [ -n "${INIT_USER_EMAIL:-}" ]; then
