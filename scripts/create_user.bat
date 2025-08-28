@@ -1,45 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM Script para crear us:main
-if "!FAST_MODE!"=="true" (
-    if defined USERNAME_PARAM (
-        set "EMAIL=!USERNAME_PARAM!@gmail.com"
-    ) else (
-        set /p "USERNAME_PARAM=Username para generar email: "
-        set "EMAIL=!USERNAME_PARAM!@gmail.com"
-    )
-    
-    REM Valores por defecto para modo rapido
-    set "NOMBRE=Usuario"
-    set "APELLIDO=Prueba"
-    set "CEDULA=12345678"
-    set "FECHA_NACIMIENTO=1990-01-01"
-    set "PASSWORD=123456"
-    
-    echo === Modo Rapido - Usando valores por defecto ===
-    echo Email: !EMAIL!
-    echo Nombre: !NOMBRE! !APELLIDO!
-    echo Cedula: !CEDULA!
-    echo Fecha de nacimiento: !FECHA_NACIMIENTO!
-    echo Contraseña: !PASSWORD!
-    echo.
-    
-    set /p "CONFIRM=¿Continuar con estos valores? (Y/n): "
-    if /i "!CONFIRM!"=="n" (
-        echo Operacion cancelada.
-        exit /b 0
-    )
-    
-) else if defined USERNAME_PARAM (
-    REM Modo con username proporcionado
-    set "EMAIL=!USERNAME_PARAM!@gmail.com"
-    echo Creando usuario con email: !EMAIL!
-    echo.
-    
-    set /p "NOMBRE=Nombre: "
-    set /p "APELLIDO=Apellido: "
-    set /p "CEDULA=Cedula: "sarrollo en Windows
+REM Script para crear usuario de desarrollo en Windows
 REM Uso: scripts\create_user.bat [username] [-f]
 
 REM Variables
@@ -47,6 +9,33 @@ set FAST_MODE=false
 
 REM Procesar argumentos
 :parse_args
+if "%1"=="-f" (
+    set FAST_MODE=true
+    shift
+    goto :parse_args
+)
+if "%1"=="--fast" (
+    set FAST_MODE=true
+    shift
+    goto :parse_args
+)
+if "%1"=="-h" goto :show_help
+if "%1"=="--help" goto :show_help
+if "%1"=="/?" goto :show_help
+
+REM Guardar username si se proporciona
+set USERNAME_PARAM=%1
+
+REM Verificar si Poetry está instalado
+poetry --version >nul 2>&1
+if errorlevel 1 (
+    echo Error: Poetry no está instalado o no está en el PATH
+    echo Por favor instale Poetry primero: https://python-poetry.org/docs/#installation
+    exit /b 1
+)
+
+REM Función principal
+goto :main
 if "%1"=="-f" (
     set FAST_MODE=true
     shift
@@ -95,15 +84,54 @@ goto :eof
 
 :validate_email
 set "email=%~1"
-echo !email! | findstr /R "^[a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]*\.[a-zA-Z][a-zA-Z]*$" >nul
+REM Validación simple: contiene @ y al menos un punto después del @
+echo !email! | findstr "@" >nul
+if errorlevel 1 exit /b 1
+echo !email! | findstr /R ".*@.*\..*" >nul
 exit /b %errorlevel%
 
 :validate_date
 set "date=%~1"
-echo !date! | findstr /R "^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$" >nul
-exit /b %errorlevel%
+REM Validación simple: verificar longitud y formato básico
+if not "!date:~10,1!"=="" exit /b 1
+if "!date:~9,1!"=="" exit /b 1
+if not "!date:~4,1!"=="-" exit /b 1
+if not "!date:~7,1!"=="-" exit /b 1
+exit /b 0
 
 :main
+REM Verificar modo rápido
+if "!FAST_MODE!"=="true" (
+    if defined USERNAME_PARAM (
+        set "EMAIL=!USERNAME_PARAM!@gmail.com"
+    ) else (
+        set /p "USERNAME_PARAM=Username para generar email: "
+        set "EMAIL=!USERNAME_PARAM!@gmail.com"
+    )
+    
+    REM Valores por defecto para modo rapido
+    set "NOMBRE=Usuario"
+    set "APELLIDO=Prueba"
+    set "CEDULA=12345678"
+    set "FECHA_NACIMIENTO=1990-01-01"
+    set "PASSWORD=123456"
+    
+    echo === Modo Rapido - Usando valores por defecto ===
+    echo Email: !EMAIL!
+    echo Nombre: !NOMBRE! !APELLIDO!
+    echo Cedula: !CEDULA!
+    echo Fecha de nacimiento: !FECHA_NACIMIENTO!
+    echo Contraseña: !PASSWORD!
+    echo.
+    
+    set /p "CONFIRM=¿Continuar con estos valores? (Y/n): "
+    if /i "!CONFIRM!"=="n" (
+        echo Operacion cancelada.
+        exit /b 0
+    )
+    goto :create_user
+)
+
 set "USERNAME_PARAM=%1"
 
 if defined USERNAME_PARAM (
@@ -170,43 +198,15 @@ if defined USERNAME_PARAM (
     )
 )
 
+:create_user
 echo.
 echo Creando usuario...
 
-REM Crear el usuario usando Django shell
-poetry run python manage.py shell -c "
-from usuarios.models import Usuario
-from django.db import IntegrityError
-import sys
+REM Ejecutar el script de Python
+poetry run python -c "import os; import sys; import django; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'global_exchange.settings'); django.setup(); from usuarios.models import Usuario; from django.db import IntegrityError; exec('''try:\n    usuario = Usuario.objects.create_user(email=\"!EMAIL!\", password=\"!PASSWORD!\", nombre=\"!NOMBRE!\", apellido=\"!APELLIDO!\", cedula=\"!CEDULA!\", fecha_nacimiento=\"!FECHA_NACIMIENTO!\")\n    print(f\"Usuario creado exitosamente: {usuario.email}\")\nexcept IntegrityError as e:\n    if \"email\" in str(e): print(\"Error: Ya existe un usuario con ese email\")\n    elif \"cedula\" in str(e): print(\"Error: Ya existe un usuario con esa cedula\")\n    else: print(f\"Error: {e}\")\n    sys.exit(1)\nexcept Exception as e:\n    print(f\"Error inesperado: {e}\")\n    sys.exit(1)''')"
+set SCRIPT_RESULT=%errorlevel%
 
-try:
-    usuario = Usuario.objects.create_user(
-        email='!EMAIL!',
-        password='!PASSWORD!',
-        nombre='!NOMBRE!',
-        apellido='!APELLIDO!',
-        cedula='!CEDULA!',
-        fecha_nacimiento='!FECHA_NACIMIENTO!'
-    )
-    print(f'✅ Usuario creado exitosamente:')
-    print(f'   Email: {usuario.email}')
-    print(f'   Nombre: {usuario.nombre} {usuario.apellido}')
-    print(f'   Cedula: {usuario.cedula}')
-    print(f'   ID: {usuario.id}')
-except IntegrityError as e:
-    if 'email' in str(e):
-        print('❌ Error: Ya existe un usuario con ese email')
-    elif 'cedula' in str(e):
-        print('❌ Error: Ya existe un usuario con esa cedula')
-    else:
-        print(f'❌ Error: {e}')
-    sys.exit(1)
-except Exception as e:
-    print(f'❌ Error inesperado: {e}')
-    sys.exit(1)
-"
-
-if errorlevel 1 (
+if %SCRIPT_RESULT% neq 0 (
     exit /b 1
 )
 
@@ -217,38 +217,7 @@ set /p "ASSIGN_ADMIN=¿Desea asignar este usuario al grupo 'Admin'? (y/N): "
 if /i "!ASSIGN_ADMIN!"=="y" (
     echo Asignando usuario al grupo Admin...
     
-    poetry run python manage.py shell -c "
-from usuarios.models import Usuario
-from django.contrib.auth.models import Permission
-from django.contrib.auth.models import Group
-
-try:
-    usuario = Usuario.objects.get(email='!EMAIL!')
-    
-    # Crear grupo de administradores si no existe
-    admin_group, created = Group.objects.get_or_create(name='Admin')
-    if created:
-        print('✅ Grupo de administradores creado')
-    
-    # Asignar todos los permisos al grupo
-    all_permissions = Permission.objects.all()
-    admin_group.permissions.set(all_permissions)
-    print(f'✅ {all_permissions.count()} permisos asignados al grupo de administradores')
-    
-    # Agregar usuario al grupo de administradores
-    usuario.groups.add(admin_group)
-    print('✅ Usuario agregado al grupo de administradores')
-    
-    # También marcar como staff (opcional, para acceso a ciertas funcionalidades)
-    usuario.is_staff = True
-    usuario.save()
-    print('✅ Usuario marcado como staff')
-    
-    print('🎉 Usuario configurado como administrador del sistema')
-        
-except Exception as e:
-    print(f'❌ Error al configurar permisos: {e}')
-"
+    poetry run python -c "import os; import django; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'global_exchange.settings'); django.setup(); from usuarios.models import Usuario; from django.contrib.auth.models import Permission, Group; usuario = Usuario.objects.get(email='!EMAIL!'); admin_group, created = Group.objects.get_or_create(name='Admin'); print('Grupo creado' if created else 'Grupo existente'); all_permissions = Permission.objects.all(); admin_group.permissions.set(all_permissions); print('Permisos asignados:', all_permissions.count()); usuario.groups.add(admin_group); usuario.is_staff = True; usuario.save(); print('Usuario configurado como administrador')"
 )
 
 endlocal
