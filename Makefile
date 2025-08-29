@@ -37,20 +37,18 @@ app-setup:
 
 user:
 	@echo "Creando usuario de desarrollo..."
-	@if [ "$(OS)" = "Windows_NT" ]; then \
-		scripts/create_user.bat $(filter-out $@,$(MAKECMDGOALS)); \
-	else \
-		scripts/create_user.sh $(filter-out $@,$(MAKECMDGOALS)); \
-	fi
-
+ifeq ($(OS),Windows_NT)
+	scripts\create_user.bat $(filter-out $@,$(MAKECMDGOALS))
+else
+	scripts/create_user.sh $(filter-out $@,$(MAKECMDGOALS))
+endif
 user-fast:
 	@echo "Creando usuario de desarrollo (modo rápido)..."
-	@if [ "$(OS)" = "Windows_NT" ]; then \
-		scripts/create_user.bat $(filter-out $@,$(MAKECMDGOALS)) -f; \
-	else \
-		scripts/create_user.sh $(filter-out $@,$(MAKECMDGOALS)) -f; \
-	fi
-
+ifeq ($(OS),Windows_NT)
+	scripts\create_user.bat $(filter-out $@,$(MAKECMDGOALS)) -f
+else
+	scripts/create_user.sh $(filter-out $@,$(MAKECMDGOALS)) -f
+endif
 # Regla especial para manejar argumentos del comando user
 %:
 	@if [ "$@" != "user" ] && echo "$(MAKECMDGOALS)" | grep -q "^user "; then \

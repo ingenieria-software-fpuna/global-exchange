@@ -54,6 +54,7 @@ urlpatterns = [
     path('usuarios/', include('usuarios.urls', namespace='usuarios')),
     path('grupos/', include('grupos.urls', namespace='grupos')),
     path('clientes/', include('clientes.urls', namespace='clientes')),
+    path('monedas/', include('monedas.urls', namespace='monedas')),
     path('docs/', docs_view, name='docs_index'),
     path('docs/<path:path>', docs_view, name='docs'),
 ]
