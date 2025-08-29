@@ -88,13 +88,19 @@ def permissions_context(request):
         context['can_edit_groups'] = request.user.has_perm('auth.change_group')
         context['can_delete_groups'] = request.user.has_perm('auth.delete_group')
         
+        # Permisos específicos para monedas
+        context['can_view_monedas'] = request.user.has_perm('monedas.view_moneda')
+        context['can_create_monedas'] = request.user.has_perm('monedas.add_moneda')
+        context['can_edit_monedas'] = request.user.has_perm('monedas.change_moneda')
+        
         # Dashboard
         context['can_view_dashboard'] = (
             context['is_admin'] or 
             request.user.is_staff or
             context['can_view_usuarios'] or
             context['can_view_groups'] or
-            context['can_view_cliente']
+            context['can_view_cliente'] or
+            context['can_view_monedas']
         )
         
     else:
@@ -125,6 +131,9 @@ def permissions_context(request):
         context['can_create_groups'] = False
         context['can_edit_groups'] = False
         context['can_delete_groups'] = False
+        context['can_view_monedas'] = False
+        context['can_create_monedas'] = False
+        context['can_edit_monedas'] = False
         context['can_view_dashboard'] = False
     
     return context
