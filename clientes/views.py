@@ -168,3 +168,27 @@ def toggle_cliente_status(request, pk):
             'success': False,
             'message': f'Error al cambiar el estado: {str(e)}'
         })
+
+
+@login_required
+@permission_required('clientes.change_tipocliente', raise_exception=True)
+@require_http_methods(["POST"])
+def toggle_tipocliente_status(request, pk):
+    """Vista AJAX para cambiar el estado activo/inactivo de un tipo de cliente"""
+    try:
+        tipo_cliente = get_object_or_404(TipoCliente, pk=pk)
+        
+        tipo_cliente.activo = not tipo_cliente.activo
+        tipo_cliente.save()
+        
+        status_text = "activado" if tipo_cliente.activo else "desactivado"
+        return JsonResponse({
+            'success': True,
+            'message': f'Tipo de cliente {status_text} exitosamente.',
+            'nueva_estado': tipo_cliente.activo
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al cambiar el estado: {str(e)}'
+        })

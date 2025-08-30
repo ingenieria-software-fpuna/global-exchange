@@ -91,13 +91,18 @@
                                                 <i class="fas fa-edit"></i>
                                             </a>
                                             {% endif %}
-                                            {% if can_delete_tipocliente %}
-                                            <a href="{% url 'clientes:tipocliente_delete' tipo.pk %}" 
-                                               class="btn btn-sm btn-outline-danger"
-                                               title="Eliminar"
-                                               onclick="return confirm('¿Estás seguro de que quieres eliminar este tipo de cliente?')">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
+                                            {% if can_edit_tipocliente %}
+                                            <button type="button" 
+                                                    class="btn btn-sm {% if tipo.activo %}btn-outline-warning{% else %}btn-outline-success{% endif %} toggle-status-btn" 
+                                                    title="{% if tipo.activo %}Desactivar{% else %}Activar{% endif %}"
+                                                    data-tipo-id="{{ tipo.pk }}"
+                                                    data-current-status="{% if tipo.activo %}true{% else %}false{% endif %}">
+                                                {% if tipo.activo %}
+                                                    <i class="fas fa-eye-slash"></i>
+                                                {% else %}
+                                                    <i class="fas fa-eye"></i>
+                                                {% endif %}
+                                            </button>
                                             {% endif %}
                                         </div>
                                     </td>
@@ -163,4 +168,84 @@
         </div>
     </div>
 </div>
+
+<!-- Modal para confirmación de cambio de estado -->
+<div class="modal fade" id="statusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Cambio de Estado</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="statusMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmStatusChange">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentTipoId = null;
+let currentAction = null;
+
+// Event listener para los botones de toggle status
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.toggle-status-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const tipoId = this.getAttribute('data-tipo-id');
+            const currentStatus = this.getAttribute('data-current-status');
+            const newStatus = currentStatus === 'true' ? 'false' : 'true';
+            
+            toggleTipoClienteStatus(tipoId, newStatus);
+        });
+    });
+});
+
+function toggleTipoClienteStatus(tipoId, newStatus) {
+    currentTipoId = tipoId;
+    currentAction = newStatus;
+    
+    const action = newStatus === 'true' ? 'activar' : 'desactivar';
+    document.getElementById('statusMessage').textContent = 
+        `¿Estás seguro de que quieres ${action} este tipo de cliente?`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('statusModal'));
+    modal.show();
+}
+
+document.getElementById('confirmStatusChange').addEventListener('click', function() {
+    if (currentTipoId && currentAction) {
+        fetch(`/clientes/tipos/toggle-status/${currentTipoId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                'activo': currentAction === 'true'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error al cambiar el estado del tipo de cliente: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al cambiar el estado del tipo de cliente');
+        });
+        
+        bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide();
+    }
+});
+</script>
+
+{% csrf_token %}
 {% endblock %}
