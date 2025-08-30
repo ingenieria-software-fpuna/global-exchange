@@ -3,7 +3,10 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.decorators import login_required, permission_required
 from django.db.models import Q
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
 from .models import TipoCliente, Cliente
 
 # Create your views here.
@@ -141,3 +144,27 @@ class ClienteDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView)
     def delete(self, request, *args, **kwargs):
         messages.success(request, 'Cliente eliminado exitosamente.')
         return super().delete(request, *args, **kwargs)
+
+
+@login_required
+@permission_required('clientes.change_cliente', raise_exception=True)
+@require_http_methods(["POST"])
+def toggle_cliente_status(request, pk):
+    """Vista AJAX para cambiar el estado activo/inactivo de un cliente"""
+    try:
+        cliente = get_object_or_404(Cliente, pk=pk)
+        
+        cliente.activo = not cliente.activo
+        cliente.save()
+        
+        status_text = "activado" if cliente.activo else "desactivado"
+        return JsonResponse({
+            'success': True,
+            'message': f'Cliente {status_text} exitosamente.',
+            'nueva_estado': cliente.activo
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al cambiar el estado: {str(e)}'
+        })
