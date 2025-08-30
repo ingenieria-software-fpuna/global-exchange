@@ -3,6 +3,10 @@ from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.decorators import login_required, permission_required
+from django.shortcuts import get_object_or_404
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
 
 from .forms import UsuarioCreationForm, UsuarioUpdateForm
 
@@ -51,3 +55,27 @@ class UsuarioDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView)
         context = super().get_context_data(**kwargs)
         context['titulo'] = f'Eliminar usuario {self.object.email}'
         return context
+
+
+@login_required
+@permission_required('usuarios.change_usuario', raise_exception=True)
+@require_http_methods(["POST"])
+def toggle_usuario_status(request, pk):
+    """Vista AJAX para cambiar el estado activo/inactivo de un usuario"""
+    try:
+        usuario = get_object_or_404(Usuario, pk=pk)
+        
+        usuario.activo = not usuario.activo
+        usuario.save()
+        
+        status_text = "activado" if usuario.activo else "desactivado"
+        return JsonResponse({
+            'success': True,
+            'message': f'Usuario {status_text} exitosamente.',
+            'nueva_estado': usuario.activo
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al cambiar el estado: {str(e)}'
+        })
