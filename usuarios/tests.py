@@ -48,7 +48,7 @@ class UsuarioModelTestCase(TestCase):
         )
         self.assertTrue(user.is_staff)
         self.assertFalse(user.is_superuser)
-        self.assertTrue(user.activo)
+        self.assertTrue(user.es_activo)
         # Verificar que está en el grupo de administradores
         admin_group = user.groups.filter(name='Admin').first()
         self.assertIsNotNone(admin_group)
@@ -194,7 +194,7 @@ class UsuarioFormsTestCase(TestCase):
             'apellido': 'User',
             'is_staff': True,
             'is_superuser': False,
-            'activo': True
+            'es_activo': True
         }
         
         form = UsuarioUpdateForm(data=form_data, instance=user)

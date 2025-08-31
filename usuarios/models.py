@@ -34,7 +34,13 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100, blank=True)
     fecha_nacimiento = models.DateField(verbose_name="Fecha de Nacimiento", null=True, blank=True)
+    
+    # Para verificar correo
     activo = models.BooleanField(default=True)
+
+    # Para indicar si el usuario esta activo o inactivo
+    es_activo = models.BooleanField(default=True)
+
     is_staff = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
