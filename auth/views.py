@@ -18,7 +18,7 @@ def login_view(request):
 
                 send_mail(
                     'Tu Código de Verificación',
-                    f'Tu código de verificación es {verification_code}.',
+                    f'Tu código de verificación es {verification_code}',
                     settings.DEFAULT_FROM_EMAIL,
                     [user.email],
                     fail_silently=False,
