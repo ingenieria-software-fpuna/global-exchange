@@ -3,7 +3,7 @@ from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, CreateView, UpdateView
 from django.urls import reverse_lazy
 from django.db.models import Q
 from django.core.paginator import Paginator
@@ -93,28 +93,7 @@ class GroupUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
         context['titulo'] = f'Editar Grupo: {self.object.group.name}'
         return context
 
-# Vista para eliminar grupo
-class GroupDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
-    model = Grupo
-    template_name = 'grupos/group_confirm_delete.html'
-    success_url = reverse_lazy('grupos:group_list')
-    permission_required = 'auth.delete_group'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['titulo'] = f'Eliminar grupo {self.object.group.name}'
-        return context
-
-    def delete(self, request, *args, **kwargs):
-        # Eliminar también el grupo de Django asociado
-        self.object = self.get_object()
-        django_group = self.object.group
-        messages.success(request, f"Grupo '{django_group.name}' eliminado exitosamente.")
-        # Eliminar primero nuestro modelo personalizado
-        super().delete(request, *args, **kwargs)
-        # Luego eliminar el grupo de Django
-        django_group.delete()
-        return redirect(self.success_url)
 
 # Vista para gestionar permisos de un grupo
 class GroupPermissionsView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
