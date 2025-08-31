@@ -54,7 +54,7 @@ def verify_code_view(request):
             
             if code_entered == code_sent:
                 user = get_object_or_404(User, id=user_id)
-                login(request, user)
+                login(request, user, backend='grupos.backends.GrupoActivoBackend')
                 
                 # Limpiar los datos de la sesión
                 del request.session['verification_code']
@@ -138,7 +138,7 @@ def verificar_registro_view(request):
                 del request.session['user_id_to_verify']
                 
                 # Iniciar sesión automáticamente
-                login(request, user)
+                login(request, user, backend='grupos.backends.GrupoActivoBackend')
                 
                 messages.success(request, '¡Cuenta verificada exitosamente! Has iniciado sesión.')
                 return redirect('auth:dashboard')
