@@ -54,7 +54,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     
     # Apps del proyecto
-    'grupos', 'usuarios', 'auth.apps.AuthConfig', 'clientes', 'monedas',
+    'grupos', 'usuarios', 'auth.apps.AuthConfig', 'clientes', 'monedas', 'tasa_cambio',
 ]
 
 MIDDLEWARE = [
