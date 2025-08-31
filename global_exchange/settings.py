@@ -150,6 +150,13 @@ STATICFILES_DIRS = [
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'usuarios.Usuario'
 
+# Backends de autenticación personalizados
+AUTHENTICATION_BACKENDS = [
+    'grupos.backends.GrupoActivoBackend',  # Backend personalizado para grupos activos
+    # Por alguna razón si no comento esta linea django toma su backend como el default y no funcionan permisos de grupos activos
+    #'django.contrib.auth.backends.ModelBackend',  # Backend por defecto como fallback
+]
+
 # Configuración de Correo Electrónico
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
