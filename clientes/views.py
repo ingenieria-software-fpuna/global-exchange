@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, CreateView, UpdateView
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth.decorators import login_required, permission_required
@@ -40,15 +40,7 @@ class TipoClienteUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateV
         messages.success(self.request, 'Tipo de cliente actualizado exitosamente.')
         return super().form_valid(form)
 
-class TipoClienteDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
-    model = TipoCliente
-    template_name = 'clientes/tipocliente_confirm_delete.html'
-    success_url = reverse_lazy('clientes:tipocliente_list')
-    permission_required = 'clientes.delete_tipocliente'
-    
-    def delete(self, request, *args, **kwargs):
-        messages.success(request, 'Tipo de cliente eliminado exitosamente.')
-        return super().delete(request, *args, **kwargs)
+
 
 # Vistas para Clientes
 class ClienteListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
@@ -135,15 +127,7 @@ class ClienteUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView)
         messages.success(self.request, 'Cliente actualizado exitosamente.')
         return super().form_valid(form)
 
-class ClienteDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
-    model = Cliente
-    template_name = 'clientes/cliente_confirm_delete.html'
-    success_url = reverse_lazy('clientes:cliente_list')
-    permission_required = 'clientes.delete_cliente'
-    
-    def delete(self, request, *args, **kwargs):
-        messages.success(request, 'Cliente eliminado exitosamente.')
-        return super().delete(request, *args, **kwargs)
+
 
 
 @login_required
@@ -162,6 +146,30 @@ def toggle_cliente_status(request, pk):
             'success': True,
             'message': f'Cliente {status_text} exitosamente.',
             'nueva_estado': cliente.activo
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al cambiar el estado: {str(e)}'
+        })
+
+
+@login_required
+@permission_required('clientes.change_tipocliente', raise_exception=True)
+@require_http_methods(["POST"])
+def toggle_tipocliente_status(request, pk):
+    """Vista AJAX para cambiar el estado activo/inactivo de un tipo de cliente"""
+    try:
+        tipo_cliente = get_object_or_404(TipoCliente, pk=pk)
+        
+        tipo_cliente.activo = not tipo_cliente.activo
+        tipo_cliente.save()
+        
+        status_text = "activado" if tipo_cliente.activo else "desactivado"
+        return JsonResponse({
+            'success': True,
+            'message': f'Tipo de cliente {status_text} exitosamente.',
+            'nueva_estado': tipo_cliente.activo
         })
     except Exception as e:
         return JsonResponse({
