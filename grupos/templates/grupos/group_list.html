@@ -123,12 +123,6 @@
                                         {% endif %}
                                     </button>
                                     {% endif %}
-                                    {% if perms.auth.delete_group %}
-                                    <a href="{% url 'grupos:group_delete' group.pk %}" 
-                                       class="btn btn-sm btn-outline-danger" title="Eliminar">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                    {% endif %}
                                 </div>
                             </td>
                         </tr>
