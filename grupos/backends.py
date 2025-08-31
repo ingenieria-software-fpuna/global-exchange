@@ -24,6 +24,10 @@ class GrupoActivoBackend(ModelBackend):
         if not user_obj.is_active or user_obj.is_anonymous:
             return set()
         
+        # Verificar si el usuario está activo (es_activo=True)
+        if hasattr(user_obj, 'es_activo') and not user_obj.es_activo:
+            return set()
+        
         # Obtener todos los grupos del usuario
         user_groups = user_obj.groups.all()
         
@@ -53,6 +57,10 @@ class GrupoActivoBackend(ModelBackend):
         if not user_obj.is_active or user_obj.is_anonymous:
             return set()
         
+        # Verificar si el usuario está activo (es_activo=True)
+        if hasattr(user_obj, 'es_activo') and not user_obj.es_activo:
+            return set()
+        
         # Permisos directos del usuario
         user_permissions = self.get_user_permissions(user_obj, obj)
         
@@ -70,6 +78,10 @@ class GrupoActivoBackend(ModelBackend):
         Solo considera permisos de grupos activos.
         """
         if not user_obj.is_active:
+            return False
+        
+        # Verificar si el usuario está activo (es_activo=True)
+        if hasattr(user_obj, 'es_activo') and not user_obj.es_activo:
             return False
         
         # Verificar permisos directos del usuario
@@ -98,6 +110,10 @@ class GrupoActivoBackend(ModelBackend):
         Solo considera permisos de grupos activos.
         """
         if not user_obj.is_active:
+            return False
+        
+        # Verificar si el usuario está activo (es_activo=True)
+        if hasattr(user_obj, 'es_activo') and not user_obj.es_activo:
             return False
         
         all_permissions = self.get_all_permissions(user_obj)
