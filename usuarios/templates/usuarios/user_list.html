@@ -65,7 +65,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if usuario.activo %}
+                                        {% if usuario.es_activo %}
                                             <span class="badge bg-success">
                                                 <i class="fas fa-check me-1"></i>Activo
                                             </span>
@@ -95,11 +95,11 @@
                                             {% endif %}
                                             {% if can_edit_usuarios %}
                                             <button type="button" 
-                                                    class="btn btn-sm {% if usuario.activo %}btn-outline-warning{% else %}btn-outline-success{% endif %} toggle-status-btn" 
-                                                    title="{% if usuario.activo %}Desactivar{% else %}Activar{% endif %}"
+                                                    class="btn btn-sm {% if usuario.es_activo %}btn-outline-warning{% else %}btn-outline-success{% endif %} toggle-status-btn" 
+                                                    title="{% if usuario.es_activo %}Desactivar{% else %}Activar{% endif %}"
                                                     data-usuario-id="{{ usuario.pk }}"
-                                                    data-current-status="{% if usuario.activo %}true{% else %}false{% endif %}">
-                                                {% if usuario.activo %}
+                                                    data-current-status="{% if usuario.es_activo %}true{% else %}false{% endif %}">
+                                                {% if usuario.es_activo %}
                                                     <i class="fas fa-eye-slash"></i>
                                                 {% else %}
                                                     <i class="fas fa-eye"></i>

@@ -65,14 +65,14 @@ def toggle_usuario_status(request, pk):
     try:
         usuario = get_object_or_404(Usuario, pk=pk)
         
-        usuario.activo = not usuario.activo
+        usuario.es_activo = not usuario.es_activo
         usuario.save()
         
-        status_text = "activado" if usuario.activo else "desactivado"
+        status_text = "activado" if usuario.es_activo else "desactivado"
         return JsonResponse({
             'success': True,
             'message': f'Usuario {status_text} exitosamente.',
-            'nueva_estado': usuario.activo
+            'nueva_estado': usuario.es_activo
         })
     except Exception as e:
         return JsonResponse({
