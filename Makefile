@@ -25,6 +25,14 @@ check-admin-group:
 	@echo "Verificando grupo Admin del sistema..."
 	poetry run python scripts/check_admin_group.py
 
+migrate-groups:
+	@echo "Migrando grupos existentes al nuevo modelo..."
+	poetry run python manage.py migrate_grupos_existentes
+
+test-grupo-permisos:
+	@echo "Probando funcionalidad de permisos con grupos activos/inactivos..."
+	poetry run python manage.py test_grupo_permisos --create-test-data
+
 app-setup:
 	@echo "Configurando el proyecto Django..."
 	make db-clean
@@ -69,7 +77,9 @@ help:
 	@echo "  app-run           - Correr el proyecto Django"
 	@echo "  app-migrate       - Aplicar migraciones de la base de datos"
 	@echo "  app-test          - Ejecutar todos los tests del proyecto"
-	@echo "  app-setup         - Configurar el proyecto (db + migraciones)"
+	@echo "  app-setup         - Configurar el proyecto (db + migraciones + grupos)"
+	@echo "  migrate-groups    - Migrar grupos existentes al nuevo modelo"
+	@echo "  test-grupo-permisos - Probar funcionalidad de permisos con grupos activos/inactivos"
 	@echo "  user [username] [-f] - Crear usuario de desarrollo (interactivo o con username)"
 	@echo "  user-fast [username] - Crear usuario rápido con valores predeterminados"
 	@echo "  app-reset         - Reset completo (db + migraciones + permisos)"

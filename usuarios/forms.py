@@ -77,7 +77,7 @@ class UsuarioUpdateForm(forms.ModelForm):
     )
     class Meta:
         model = Usuario
-        fields = ('email', 'nombre', 'apellido', 'cedula', 'fecha_nacimiento', 'is_staff', 'activo', 'groups')
+        fields = ('email', 'nombre', 'apellido', 'cedula', 'fecha_nacimiento', 'is_staff', 'es_activo', 'groups')
         widgets = {
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),

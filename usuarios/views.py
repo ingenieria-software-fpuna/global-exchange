@@ -1,8 +1,12 @@
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, CreateView, UpdateView
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.decorators import login_required, permission_required
+from django.shortcuts import get_object_or_404
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
 
 from .forms import UsuarioCreationForm, UsuarioUpdateForm
 
@@ -40,14 +44,28 @@ class UsuarioUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView)
         messages.success(self.request, "Usuario actualizado exitosamente.")
         return super().form_valid(form)
 
-# Vista para eliminar un usuario
-class UsuarioDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
-    model = Usuario
-    template_name = 'usuarios/user_confirm_delete.html'
-    success_url = reverse_lazy('usuarios:user_list')
-    permission_required = 'usuarios.delete_usuario'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['titulo'] = f'Eliminar usuario {self.object.email}'
-        return context
+
+
+@login_required
+@permission_required('usuarios.change_usuario', raise_exception=True)
+@require_http_methods(["POST"])
+def toggle_usuario_status(request, pk):
+    """Vista AJAX para cambiar el estado activo/inactivo de un usuario"""
+    try:
+        usuario = get_object_or_404(Usuario, pk=pk)
+        
+        usuario.es_activo = not usuario.es_activo
+        usuario.save()
+        
+        status_text = "activado" if usuario.es_activo else "desactivado"
+        return JsonResponse({
+            'success': True,
+            'message': f'Usuario {status_text} exitosamente.',
+            'nueva_estado': usuario.es_activo
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al cambiar el estado: {str(e)}'
+        })

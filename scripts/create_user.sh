@@ -207,23 +207,34 @@ except Exception as e:
             
             poetry run python manage.py shell -c "
 from usuarios.models import Usuario
-from django.contrib.auth.models import Permission
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Permission, Group
+from grupos.models import Grupo
 
 try:
     usuario = Usuario.objects.get(email='$EMAIL')
     
-    # Obtener o crear el grupo Admin
+    # Obtener o crear el grupo Admin de Django
     admin_group, created = Group.objects.get_or_create(name='Admin')
     if created:
-        print('✅ Grupo Admin creado')
-        # Asignar todos los permisos al grupo nuevo
-        from django.contrib.auth.models import Permission
-        all_permissions = Permission.objects.all()
-        admin_group.permissions.set(all_permissions)
-        print(f'✅ {all_permissions.count()} permisos asignados al grupo Admin')
+        print('✅ Grupo Admin de Django creado')
     else:
-        print('✅ Grupo Admin ya existe')
+        print('✅ Grupo Admin de Django ya existe')
+    
+    # Crear o obtener la extensión personalizada del grupo
+    try:
+        grupo_extension = Grupo.objects.get(group=admin_group)
+        print('✅ Extensión personalizada del grupo ya existe')
+    except Grupo.DoesNotExist:
+        grupo_extension = Grupo.objects.create(
+            group=admin_group,
+            es_activo=True
+        )
+        print('✅ Extensión personalizada del grupo creada')
+    
+    # Asignar todos los permisos al grupo
+    all_permissions = Permission.objects.all()
+    admin_group.permissions.set(all_permissions)
+    print(f'✅ {all_permissions.count()} permisos asignados al grupo Admin')
     
     # Agregar usuario al grupo Admin
     usuario.groups.add(admin_group)
