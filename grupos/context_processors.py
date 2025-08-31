@@ -93,6 +93,11 @@ def permissions_context(request):
         context['can_create_monedas'] = request.user.has_perm('monedas.add_moneda')
         context['can_edit_monedas'] = request.user.has_perm('monedas.change_moneda')
         
+        # Permisos específicos para tasas de cambio
+        context['can_view_tasacambio'] = request.user.has_perm('tasa_cambio.view_tasacambio')
+        context['can_create_tasacambio'] = request.user.has_perm('tasa_cambio.add_tasacambio')
+        context['can_edit_tasacambio'] = request.user.has_perm('tasa_cambio.change_tasacambio')
+        
         # Dashboard
         context['can_view_dashboard'] = (
             context['is_admin'] or 
@@ -100,7 +105,8 @@ def permissions_context(request):
             context['can_view_usuarios'] or
             context['can_view_groups'] or
             context['can_view_cliente'] or
-            context['can_view_monedas']
+            context['can_view_monedas'] or
+            context['can_view_tasacambio']
         )
         
     else:
@@ -134,6 +140,9 @@ def permissions_context(request):
         context['can_view_monedas'] = False
         context['can_create_monedas'] = False
         context['can_edit_monedas'] = False
+        context['can_view_tasacambio'] = False
+        context['can_create_tasacambio'] = False
+        context['can_edit_tasacambio'] = False
         context['can_view_dashboard'] = False
     
     return context

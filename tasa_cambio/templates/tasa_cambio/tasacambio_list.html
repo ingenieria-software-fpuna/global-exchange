@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Cotizaciones - Global Exchange{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Breadcrumbs -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'auth:dashboard' %}">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-chart-line me-1"></i>Cotizaciones
+            </li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h2">
+                    <i class="fas fa-chart-line text-primary me-2"></i>
+                    Cotizaciones
+                </h1>
+                {% if perms.tasa_cambio.add_tasacambio %}
+                <a href="{% url 'tasa_cambio:tasacambio_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Nueva Cotización
+                </a>
+                {% endif %}
+            </div>
+
+            <!-- Filtros y búsqueda -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="q" class="form-label">Buscar</label>
+                            <input type="text" class="form-control" id="q" name="q" 
+                                   value="{{ q }}" placeholder="Moneda, código o símbolo...">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="moneda" class="form-label">Moneda</label>
+                            {{ search_form.moneda }}
+                        </div>
+                        <div class="col-md-2">
+                            <label for="estado" class="form-label">Estado</label>
+                            {{ search_form.estado }}
+                        </div>
+                        <div class="col-md-2">
+                            <label for="fecha_desde" class="form-label">Desde</label>
+                            {{ search_form.fecha_desde }}
+                        </div>
+                        <div class="col-md-2">
+                            <label for="fecha_hasta" class="form-label">Hasta</label>
+                            {{ search_form.fecha_hasta }}
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {% if tasas_cambio %}
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Moneda</th>
+                                    <th>Tasa Compra</th>
+                                    <th>Tasa Venta</th>
+                                    <th>Spread</th>
+                                    <th>Vigencia</th>
+                                    <th>Estado</th>
+                                    <th>Fecha Creación</th>
+                                    <th class="text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tasacambio in tasas_cambio %}
+                                <tr>
+                                    <td>
+                                        <div>
+                                            <strong>{{ tasacambio.moneda.nombre }}</strong>
+                                            <br>
+                                            <code class="fs-6">{{ tasacambio.moneda.codigo }}</code>
+                                            <span class="badge bg-light text-dark ms-2">
+                                                {{ tasacambio.moneda.simbolo }}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success text-white fs-6">
+                                            {{ tasacambio.tasa_compra }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-danger text-white fs-6">
+                                            {{ tasacambio.tasa_venta }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <span class="badge bg-info text-white">
+                                                {{ tasacambio.spread|floatformat:4 }}
+                                            </span>
+                                            <br>
+                                            <small class="text-muted">
+                                                {{ tasacambio.spread_porcentual|floatformat:2 }}%
+                                            </small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ tasacambio.fecha_vigencia|date:"d/m/Y H:i" }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        {% if tasacambio.es_activa %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check me-1"></i>Activa
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-times me-1"></i>Inactiva
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ tasacambio.fecha_creacion|date:"d/m/Y H:i" }}
+                                        </small>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group" role="group">
+                                            {% if perms.tasa_cambio.change_tasacambio %}
+                                            <button type="button" 
+                                                    class="btn btn-sm {% if tasacambio.es_activa %}btn-outline-warning{% else %}btn-outline-success{% endif %} toggle-status-btn" 
+                                                    title="{% if tasacambio.es_activa %}Desactivar{% else %}Activar{% endif %}"
+                                                    data-tasacambio-id="{{ tasacambio.pk }}"
+                                                    data-current-status="{% if tasacambio.es_activa %}true{% else %}false{% endif %}">
+                                                {% if tasacambio.es_activa %}
+                                                    <i class="fas fa-eye-slash"></i>
+                                                {% else %}
+                                                    <i class="fas fa-eye"></i>
+                                                {% endif %}
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Paginación -->
+                    {% if is_paginated %}
+                    <nav aria-label="Navegación de páginas" class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=1{% if q %}&q={{ q }}{% endif %}{% if moneda %}&moneda={{ moneda }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}">
+                                        <i class="fas fa-angle-double-left"></i>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if moneda %}&moneda={{ moneda }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}">
+                                        <i class="fas fa-angle-left"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+
+                            <li class="page-item active">
+                                <span class="page-link">
+                                    Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                                </span>
+                            </li>
+
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if moneda %}&moneda={{ moneda }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}">
+                                        <i class="fas fa-angle-right"></i>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if q %}&q={{ q }}{% endif %}{% if moneda %}&moneda={{ moneda }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}">
+                                        <i class="fas fa-angle-double-right"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="card shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                    <h4 class="text-muted">No hay cotizaciones registradas</h4>
+                    <p class="text-muted">
+                        {% if q or moneda or estado or fecha_desde or fecha_hasta %}
+                            No se encontraron cotizaciones que coincidan con los criterios de búsqueda.
+                        {% else %}
+                            Comienza creando la primera cotización para el sistema de cambio.
+                        {% endif %}
+                    </p>
+                    {% if perms.tasa_cambio.add_tasacambio %}
+                    <a href="{% url 'tasa_cambio:tasacambio_create' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Crear Primera Cotización
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal para confirmación de cambio de estado -->
+<div class="modal fade" id="statusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Cambio de Estado</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="statusMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmStatusChange">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentTasaCambioId = null;
+let currentAction = null;
+
+// Event listener para los botones de toggle status
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.toggle-status-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const tasacambioId = this.getAttribute('data-tasacambio-id');
+            const currentStatus = this.getAttribute('data-current-status');
+            const newStatus = currentStatus === 'true' ? 'false' : 'true';
+            
+            toggleTasaCambioStatus(tasacambioId, newStatus);
+        });
+    });
+});
+
+function toggleTasaCambioStatus(tasacambioId, newStatus) {
+    currentTasaCambioId = tasacambioId;
+    currentAction = newStatus;
+    
+    const action = newStatus === 'true' ? 'activar' : 'desactivar';
+    document.getElementById('statusMessage').textContent = 
+        `¿Estás seguro de que quieres ${action} esta cotización?`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('statusModal'));
+    modal.show();
+}
+
+document.getElementById('confirmStatusChange').addEventListener('click', function() {
+    if (currentTasaCambioId && currentAction !== null) {
+        fetch(`/tasa-cambio/toggle-status/${currentTasaCambioId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                'es_activa': currentAction === 'true'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error al cambiar el estado de la cotización: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al cambiar el estado de la cotización');
+        });
+        
+        bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide();
+    }
+});
+</script>
+
+{% csrf_token %}
+{% endblock %}

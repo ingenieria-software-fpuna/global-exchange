@@ -55,6 +55,7 @@ urlpatterns = [
     path('grupos/', include('grupos.urls', namespace='grupos')),
     path('clientes/', include('clientes.urls', namespace='clientes')),
     path('monedas/', include('monedas.urls', namespace='monedas')),
+    path('tasa-cambio/', include('tasa_cambio.urls', namespace='tasa_cambio')),
     path('docs/', docs_view, name='docs_index'),
     path('docs/<path:path>', docs_view, name='docs'),
 ]
