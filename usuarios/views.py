@@ -1,5 +1,5 @@
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, CreateView, UpdateView
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -44,17 +44,7 @@ class UsuarioUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView)
         messages.success(self.request, "Usuario actualizado exitosamente.")
         return super().form_valid(form)
 
-# Vista para eliminar un usuario
-class UsuarioDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
-    model = Usuario
-    template_name = 'usuarios/user_confirm_delete.html'
-    success_url = reverse_lazy('usuarios:user_list')
-    permission_required = 'usuarios.delete_usuario'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['titulo'] = f'Eliminar usuario {self.object.email}'
-        return context
 
 
 @login_required
