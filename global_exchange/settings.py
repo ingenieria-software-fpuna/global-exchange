@@ -63,8 +63,8 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'auth.middleware.UsuarioActivoMiddleware',  # Verificar usuario activo
     'django.contrib.messages.middleware.MessageMiddleware',
+    'auth.middleware.UsuarioActivoMiddleware',  # Verificar usuario activo
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
