@@ -20,18 +20,27 @@
     <div class="card shadow mb-4">
         <div class="card-body">
             <form method="get" class="row g-3">
-                <div class="col-md-6">
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="q" value="{{ request.GET.q }}" 
-                               placeholder="Buscar grupos o permisos...">
-                        <button class="btn btn-outline-secondary" type="submit">
-                            <i class="fas fa-search"></i>
-                        </button>
-                    </div>
+                <div class="col-md-4">
+                    <label for="q" class="form-label">Buscar</label>
+                    <input type="text" class="form-control" id="q" name="q" 
+                           value="{{ q }}" placeholder="Nombre del grupo o permisos...">
                 </div>
-                <div class="col-md-6 text-end">
-                    <a href="{% url 'grupos:group_list' %}" class="btn btn-outline-secondary">
-                        <i class="fas fa-times"></i> Limpiar
+                <div class="col-md-3">
+                    <label for="estado" class="form-label">Estado</label>
+                    <select class="form-select" id="estado" name="estado">
+                        <option value="">Todos los estados</option>
+                        <option value="activo" {% if estado_filter == 'activo' %}selected{% endif %}>Activo</option>
+                        <option value="inactivo" {% if estado_filter == 'inactivo' %}selected{% endif %}>Inactivo</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-1"></i>Filtrar
+                    </button>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <a href="{% url 'grupos:group_list' %}" class="btn btn-outline-secondary w-100">
+                        <i class="fas fa-times me-1"></i>Limpiar
                     </a>
                 </div>
             </form>
@@ -54,6 +63,7 @@
                             <th>Nombre</th>
                             <th>Permisos</th>
                             <th>Usuarios</th>
+                            <th>Estado</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
@@ -76,6 +86,17 @@
                                 <span class="badge bg-secondary">{{ group.user_set.count }}</span>
                             </td>
                             <td>
+                                {% if group.es_activo %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>Activo
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-times me-1"></i>Inactivo
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
                                 <div class="btn-group" role="group">
                                     {% if perms.auth.view_group %}
                                     <a href="{% url 'grupos:group_permissions' group.pk %}" 
@@ -88,6 +109,19 @@
                                        class="btn btn-sm btn-outline-warning" title="Editar">
                                         <i class="fas fa-edit"></i>
                                     </a>
+                                    {% endif %}
+                                    {% if perms.auth.change_group %}
+                                    <button type="button" 
+                                            class="btn btn-sm {% if group.es_activo %}btn-outline-warning{% else %}btn-outline-success{% endif %} toggle-status-btn" 
+                                            title="{% if group.es_activo %}Desactivar{% else %}Activar{% endif %}"
+                                            data-group-id="{{ group.pk }}"
+                                            data-current-status="{% if group.es_activo %}true{% else %}false{% endif %}">
+                                        {% if group.es_activo %}
+                                            <i class="fas fa-eye-slash"></i>
+                                        {% else %}
+                                            <i class="fas fa-eye"></i>
+                                        {% endif %}
+                                    </button>
                                     {% endif %}
                                     {% if perms.auth.delete_group %}
                                     <a href="{% url 'grupos:group_delete' group.pk %}" 
@@ -157,4 +191,84 @@
         </div>
     </div>
 </div>
+
+<!-- Modal para confirmación de cambio de estado -->
+<div class="modal fade" id="statusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Cambio de Estado</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="statusMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmStatusChange">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentGroupId = null;
+let currentAction = null;
+
+// Event listener para los botones de toggle status
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.toggle-status-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const groupId = this.getAttribute('data-group-id');
+            const currentStatus = this.getAttribute('data-current-status');
+            const newStatus = currentStatus === 'true' ? 'false' : 'true';
+            
+            toggleGroupStatus(groupId, newStatus);
+        });
+    });
+});
+
+function toggleGroupStatus(groupId, newStatus) {
+    currentGroupId = groupId;
+    currentAction = newStatus;
+    
+    const action = newStatus === 'true' ? 'activar' : 'desactivar';
+    document.getElementById('statusMessage').textContent = 
+        `¿Estás seguro de que quieres ${action} este grupo?`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('statusModal'));
+    modal.show();
+}
+
+document.getElementById('confirmStatusChange').addEventListener('click', function() {
+    if (currentGroupId && currentAction !== null) {
+        fetch(`/grupos/toggle-status/${currentGroupId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                'es_activo': currentAction === 'true'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error al cambiar el estado del grupo: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al cambiar el estado del grupo');
+        });
+        
+        bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide();
+    }
+});
+</script>
+
+{% csrf_token %}
 {% endblock %}

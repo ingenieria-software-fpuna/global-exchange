@@ -25,6 +25,13 @@
                         <h6>Información del Grupo:</h6>
                         <ul class="mb-0">
                             <li><strong>Nombre:</strong> {{ object.name }}</li>
+                            <li><strong>Estado:</strong> 
+                                {% if object.es_activo %}
+                                    <span class="badge bg-success">Activo</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Inactivo</span>
+                                {% endif %}
+                            </li>
                             <li><strong>Permisos:</strong> {{ object.permissions.count }}</li>
                             <li><strong>Usuarios:</strong> {{ object.user_set.count }}</li>
                         </ul>

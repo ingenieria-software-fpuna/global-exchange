@@ -2,6 +2,7 @@
 """
 Script para verificar y crear el grupo 'Admin' si no existe.
 Este grupo reemplaza la funcionalidad de superuser.
+Ahora usa el modelo personalizado Grupo.
 """
 
 import os
@@ -14,17 +15,30 @@ django.setup()
 
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
+from grupos.models import Grupo
 
 def main():
     print("🔍 Verificando grupo 'Admin'...")
     
-    # Verificar si existe el grupo
+    # Verificar si existe el grupo de Django
     admin_group, created = Group.objects.get_or_create(name='Admin')
     
     if created:
-        print("✅ Grupo 'Admin' creado exitosamente")
+        print("✅ Grupo 'Admin' de Django creado exitosamente")
     else:
-        print("✅ Grupo 'Admin' ya existe")
+        print("✅ Grupo 'Admin' de Django ya existe")
+    
+    # Verificar si existe la extensión personalizada
+    try:
+        grupo_extension = Grupo.objects.get(group=admin_group)
+        print("✅ Extensión personalizada del grupo ya existe")
+    except Grupo.DoesNotExist:
+        print("🔄 Creando extensión personalizada del grupo...")
+        grupo_extension = Grupo.objects.create(
+            group=admin_group,
+            es_activo=True
+        )
+        print("✅ Extensión personalizada creada")
     
     # Verificar que tenga todos los permisos
     all_permissions = Permission.objects.all()
@@ -40,8 +54,10 @@ def main():
     # Mostrar información del grupo
     print(f"\n📊 Información del grupo:")
     print(f"   Nombre: {admin_group.name}")
+    print(f"   Estado: {'Activo' if grupo_extension.es_activo else 'Inactivo'}")
     print(f"   Permisos: {admin_group.permissions.count()}")
     print(f"   Usuarios: {admin_group.user_set.count()}")
+    print(f"   Fecha creación: {grupo_extension.fecha_creacion.strftime('%d/%m/%Y %H:%M')}")
     
     if admin_group.user_set.count() > 0:
         print(f"\n👥 Usuarios en el grupo:")
