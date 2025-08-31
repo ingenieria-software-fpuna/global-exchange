@@ -25,6 +25,18 @@ check-admin-group:
 	@echo "Verificando grupo Admin del sistema..."
 	poetry run python scripts/check_admin_group.py
 
+migrate-groups:
+	@echo "Migrando grupos existentes al nuevo modelo..."
+	@echo "from django.contrib.auth.models import Group" > /tmp/migrate_groups.py
+	@echo "from grupos.models import Grupo" >> /tmp/migrate_groups.py
+	@echo "migrated = 0" >> /tmp/migrate_groups.py
+	@echo "for group in Group.objects.filter(grupo_extension__isnull=True):" >> /tmp/migrate_groups.py
+	@echo "    Grupo.objects.get_or_create(group=group, defaults={'es_activo': True})" >> /tmp/migrate_groups.py
+	@echo "    migrated += 1" >> /tmp/migrate_groups.py
+	@echo "print(f'✅ {migrated} grupos migrados al nuevo modelo')" >> /tmp/migrate_groups.py
+	poetry run python manage.py shell < /tmp/migrate_groups.py
+	@rm -f /tmp/migrate_groups.py
+
 app-setup:
 	@echo "Configurando el proyecto Django..."
 	make db-clean
@@ -69,7 +81,8 @@ help:
 	@echo "  app-run           - Correr el proyecto Django"
 	@echo "  app-migrate       - Aplicar migraciones de la base de datos"
 	@echo "  app-test          - Ejecutar todos los tests del proyecto"
-	@echo "  app-setup         - Configurar el proyecto (db + migraciones)"
+	@echo "  app-setup         - Configurar el proyecto (db + migraciones + grupos)"
+	@echo "  migrate-groups    - Migrar grupos existentes al nuevo modelo"
 	@echo "  user [username] [-f] - Crear usuario de desarrollo (interactivo o con username)"
 	@echo "  user-fast [username] - Crear usuario rápido con valores predeterminados"
 	@echo "  app-reset         - Reset completo (db + migraciones + permisos)"

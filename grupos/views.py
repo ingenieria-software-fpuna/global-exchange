@@ -1,79 +1,132 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 from django.db.models import Q
 from django.core.paginator import Paginator
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from .models import Grupo
 
 # Vista para listar grupos
 class GroupListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
-    model = Group
+    model = Grupo
     template_name = 'grupos/group_list.html'
     context_object_name = 'groups'
     permission_required = 'auth.view_group'
     paginate_by = 20
 
     def get_queryset(self):
-        queryset = Group.objects.all().prefetch_related('permissions')
+        queryset = Grupo.objects.select_related('group').prefetch_related('group__permissions')
         
         # Filtro de búsqueda
         q = self.request.GET.get('q')
         if q:
             queryset = queryset.filter(
-                Q(name__icontains=q) |
-                Q(permissions__name__icontains=q)
+                Q(group__name__icontains=q) |
+                Q(group__permissions__name__icontains=q)
             ).distinct()
         
-        return queryset.order_by('name')
+        # Filtro por estado
+        estado = self.request.GET.get('estado')
+        if estado == 'activo':
+            queryset = queryset.filter(es_activo=True)
+        elif estado == 'inactivo':
+            queryset = queryset.filter(es_activo=False)
+        
+        return queryset.order_by('group__name')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['q'] = self.request.GET.get('q', '')
+        context['estado_filter'] = self.request.GET.get('estado', '')
+        return context
 
 # Vista para crear grupo
 class GroupCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
-    model = Group
+    model = Grupo
     template_name = 'grupos/group_form.html'
-    fields = ['name']
+    fields = ['es_activo']
     success_url = reverse_lazy('grupos:group_list')
     permission_required = 'auth.add_group'
 
     def form_valid(self, form):
+        # Crear el grupo de Django primero
+        group_name = self.request.POST.get('name')
+        if not group_name:
+            messages.error(self.request, "El nombre del grupo es requerido.")
+            return self.form_invalid(form)
+        
+        django_group = Group.objects.create(name=group_name)
+        form.instance.group = django_group
         messages.success(self.request, "Grupo creado exitosamente.")
         return super().form_valid(form)
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = 'Crear Nuevo Grupo'
+        return context
+
 # Vista para editar grupo
 class GroupUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
-    model = Group
+    model = Grupo
     template_name = 'grupos/group_form.html'
-    fields = ['name']
+    fields = ['es_activo']
     success_url = reverse_lazy('grupos:group_list')
     permission_required = 'auth.change_group'
 
     def form_valid(self, form):
+        # Actualizar el nombre del grupo de Django si se proporciona
+        group_name = self.request.POST.get('name')
+        if group_name and group_name != self.object.group.name:
+            self.object.group.name = group_name
+            self.object.group.save()
+        
         messages.success(self.request, "Grupo actualizado exitosamente.")
         return super().form_valid(form)
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = f'Editar Grupo: {self.object.group.name}'
+        return context
+
 # Vista para eliminar grupo
 class GroupDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
-    model = Group
+    model = Grupo
     template_name = 'grupos/group_confirm_delete.html'
     success_url = reverse_lazy('grupos:group_list')
     permission_required = 'auth.delete_group'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['titulo'] = f'Eliminar grupo {self.object.name}'
+        context['titulo'] = f'Eliminar grupo {self.object.group.name}'
         return context
+
+    def delete(self, request, *args, **kwargs):
+        # Eliminar también el grupo de Django asociado
+        self.object = self.get_object()
+        django_group = self.object.group
+        messages.success(request, f"Grupo '{django_group.name}' eliminado exitosamente.")
+        # Eliminar primero nuestro modelo personalizado
+        super().delete(request, *args, **kwargs)
+        # Luego eliminar el grupo de Django
+        django_group.delete()
+        return redirect(self.success_url)
 
 # Vista para gestionar permisos de un grupo
 class GroupPermissionsView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
-    model = Group
+    model = Grupo
     template_name = 'grupos/group_permissions.html'
     fields = []
     permission_required = 'auth.change_group'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        group = self.get_object()
+        grupo = self.get_object()
+        group = grupo.group  # El grupo de Django
         
         # Obtener todos los permisos agrupados por app
         permissions = Permission.objects.all().select_related('content_type')
@@ -87,10 +140,12 @@ class GroupPermissionsView(LoginRequiredMixin, PermissionRequiredMixin, UpdateVi
         
         context['permissions_by_app'] = permissions_by_app
         context['group_permissions'] = group.permissions.all()
+        context['titulo'] = f'Permisos del Grupo: {group.name}'
         return context
     
     def post(self, request, *args, **kwargs):
-        group = self.get_object()
+        grupo = self.get_object()
+        group = grupo.group  # El grupo de Django
         permission_ids = request.POST.getlist('permissions')
         
         # Actualizar permisos del grupo
@@ -110,3 +165,27 @@ class PermissionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
 
     def get_queryset(self):
         return Permission.objects.all().select_related('content_type').order_by('content_type__app_label', 'content_type__model', 'codename')
+
+
+@login_required
+@permission_required('auth.change_group', raise_exception=True)
+@require_http_methods(["POST"])
+def toggle_group_status(request, pk):
+    """Vista AJAX para cambiar el estado activo/inactivo de un grupo"""
+    try:
+        grupo = get_object_or_404(Grupo, pk=pk)
+        
+        grupo.es_activo = not grupo.es_activo
+        grupo.save()
+        
+        status_text = "activado" if grupo.es_activo else "desactivado"
+        return JsonResponse({
+            'success': True,
+            'message': f'Grupo {status_text} exitosamente.',
+            'nueva_estado': grupo.es_activo
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al cambiar el estado: {str(e)}'
+        })
