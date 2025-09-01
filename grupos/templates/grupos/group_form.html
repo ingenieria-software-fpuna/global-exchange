@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if titulo %}{{ titulo }}{% else %}{% if form.instance.pk %}Editar Grupo{% else %}Nuevo Grupo{% endif %}{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-layer-group"></i>
+                        {% if titulo %}{{ titulo }}{% else %}
+                            {% if form.instance.pk %}
+                                Editar Grupo: {{ form.instance.name }}
+                            {% else %}
+                                Crear Nuevo Grupo
+                            {% endif %}
+                        {% endif %}
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="name" class="form-label">
+                                <strong>Nombre del Grupo *</strong>
+                            </label>
+                            <input type="text" class="form-control" id="name" name="name" 
+                                   value="{% if form.instance.pk %}{{ form.instance.name }}{% endif %}" 
+                                   required>
+                            <div class="form-text">Ingrese un nombre único para el grupo.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.es_activo.id_for_label }}" class="form-label">
+                                <strong>Estado</strong>
+                            </label>
+                            <div class="form-check">
+                                {{ form.es_activo }}
+                                <label class="form-check-label" for="{{ form.es_activo.id_for_label }}">
+                                    Grupo activo
+                                </label>
+                            </div>
+                            {% if form.es_activo.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.es_activo.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            {% if form.es_activo.help_text %}
+                            <div class="form-text">{{ form.es_activo.help_text }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'grupos:group_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Volver
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i>
+                                {% if form.instance.pk %}Actualizar{% else %}Crear{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Marcar campos con error
+    {% if form.es_activo.errors %}
+    document.getElementById('{{ form.es_activo.id_for_label }}').classList.add('is-invalid');
+    {% endif %}
+</script>
+{% endblock %}

@@ -28,17 +28,17 @@
             </div>
         </div>
         {% endif %}
-        {% if can_view_roles %}
+        {% if can_view_groups %}
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
-                    <i class="fas fa-user-tag fa-3x text-info mb-3"></i>
-                    <h5 class="card-title">Roles</h5>
-                    <p class="card-text">Gestiona los roles y permisos para controlar el acceso a la aplicación.</p>
+                    <i class="fas fa-layer-group fa-3x text-info mb-3"></i>
+                    <h5 class="card-title">Grupos</h5>
+                    <p class="card-text">Gestiona los grupos y permisos para controlar el acceso a la aplicación.</p>
                 </div>
                 <div class="card-footer bg-light">
-                    <a href="{% url 'roles:rol_list' %}" class="btn btn-info w-100 text-white">
-                        Ir a Roles
+                    <a href="{% url 'grupos:group_list' %}" class="btn btn-info w-100 text-white">
+                        Ir a Grupos
                     </a>
                 </div>
             </div>
@@ -76,17 +76,33 @@
             </div>
         </div>
         {% endif %}
-        {% if is_admin_role %}
+        {% if can_view_monedas %}
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
-                    <i class="fas fa-link fa-3x text-secondary mb-3"></i>
-                    <h5 class="card-title">Asignaciones</h5>
-                    <p class="card-text">Asigna usuarios a roles y clientes para definir sus relaciones.</p>
+                    <i class="fas fa-coins fa-3x text-success mb-3"></i>
+                    <h5 class="card-title">Monedas</h5>
+                    <p class="card-text">Gestiona las monedas del sistema para las operaciones de cambio.</p>
                 </div>
                 <div class="card-footer bg-light">
-                    <a href="#" class="btn btn-secondary w-100 disabled" aria-disabled="true">
-                        Ir a Asignaciones
+                    <a href="{% url 'monedas:moneda_list' %}" class="btn btn-success w-100 text-white">
+                        Ir a Monedas
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% if can_view_tasacambio %}
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <i class="fas fa-chart-line fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">Tasas de Cambio</h5>
+                    <p class="card-text">Administra las cotizaciones y tasas de cambio para todas las monedas.</p>
+                </div>
+                <div class="card-footer bg-light">
+                    <a href="{% url 'tasa_cambio:tasacambio_list' %}" class="btn btn-primary w-100">
+                        Ir a Tasas de Cambio
                     </a>
                 </div>
             </div>
