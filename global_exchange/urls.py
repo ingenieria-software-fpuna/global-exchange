@@ -52,8 +52,10 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('auth/', include('auth.urls', namespace='auth')),
     path('usuarios/', include('usuarios.urls', namespace='usuarios')),
-    path('roles/', include('roles.urls', namespace='roles')),
+    path('grupos/', include('grupos.urls', namespace='grupos')),
     path('clientes/', include('clientes.urls', namespace='clientes')),
+    path('monedas/', include('monedas.urls', namespace='monedas')),
+    path('tasa-cambio/', include('tasa_cambio.urls', namespace='tasa_cambio')),
     path('docs/', docs_view, name='docs_index'),
     path('docs/<path:path>', docs_view, name='docs'),
 ]

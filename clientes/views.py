@@ -1,82 +1,54 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, CreateView, UpdateView
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import PermissionDenied
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.decorators import login_required, permission_required
 from django.db.models import Q
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
 from .models import TipoCliente, Cliente
-from roles.decorators import requiere_permiso
-from roles.services import RolesService
 
 # Create your views here.
 
-class TipoClienteListView(LoginRequiredMixin, ListView):
+class TipoClienteListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     model = TipoCliente
     template_name = 'clientes/tipocliente_list.html'
     context_object_name = 'tipos_cliente'
     paginate_by = 10
-    
-    def dispatch(self, request, *args, **kwargs):
-        if not RolesService.usuario_tiene_permiso(request.user, 'tipocliente_leer'):
-            raise PermissionDenied("No tienes permisos para ver tipos de cliente")
-        return super().dispatch(request, *args, **kwargs)
+    permission_required = 'clientes.view_tipocliente'
 
-class TipoClienteCreateView(LoginRequiredMixin, CreateView):
+class TipoClienteCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = TipoCliente
     template_name = 'clientes/tipocliente_form.html'
     fields = ['nombre', 'descripcion', 'descuento', 'activo']
     success_url = reverse_lazy('clientes:tipocliente_list')
-    
-    def dispatch(self, request, *args, **kwargs):
-        if not RolesService.usuario_tiene_permiso(request.user, 'tipocliente_crear'):
-            raise PermissionDenied("No tienes permisos para crear tipos de cliente")
-        return super().dispatch(request, *args, **kwargs)
+    permission_required = 'clientes.add_tipocliente'
     
     def form_valid(self, form):
         messages.success(self.request, 'Tipo de cliente creado exitosamente.')
         return super().form_valid(form)
 
-class TipoClienteUpdateView(LoginRequiredMixin, UpdateView):
+class TipoClienteUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = TipoCliente
     template_name = 'clientes/tipocliente_form.html'
     fields = ['nombre', 'descripcion', 'descuento', 'activo']
     success_url = reverse_lazy('clientes:tipocliente_list')
-    
-    def dispatch(self, request, *args, **kwargs):
-        if not RolesService.usuario_tiene_permiso(request.user, 'tipocliente_editar'):
-            raise PermissionDenied("No tienes permisos para editar tipos de cliente")
-        return super().dispatch(request, *args, **kwargs)
+    permission_required = 'clientes.change_tipocliente'
     
     def form_valid(self, form):
         messages.success(self.request, 'Tipo de cliente actualizado exitosamente.')
         return super().form_valid(form)
 
-class TipoClienteDeleteView(LoginRequiredMixin, DeleteView):
-    model = TipoCliente
-    template_name = 'clientes/tipocliente_confirm_delete.html'
-    success_url = reverse_lazy('clientes:tipocliente_list')
-    
-    def dispatch(self, request, *args, **kwargs):
-        if not RolesService.usuario_tiene_permiso(request.user, 'tipocliente_eliminar'):
-            raise PermissionDenied("No tienes permisos para eliminar tipos de cliente")
-        return super().dispatch(request, *args, **kwargs)
-    
-    def delete(self, request, *args, **kwargs):
-        messages.success(request, 'Tipo de cliente eliminado exitosamente.')
-        return super().delete(request, *args, **kwargs)
+
 
 # Vistas para Clientes
-class ClienteListView(LoginRequiredMixin, ListView):
+class ClienteListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     model = Cliente
     template_name = 'clientes/cliente_list.html'
     context_object_name = 'clientes'
     paginate_by = 10
-    
-    def dispatch(self, request, *args, **kwargs):
-        if not RolesService.usuario_tiene_permiso(request.user, 'cliente_leer'):
-            raise PermissionDenied("No tienes permisos para ver clientes")
-        return super().dispatch(request, *args, **kwargs)
+    permission_required = 'clientes.view_cliente'
     
     def get_queryset(self):
         queryset = Cliente.objects.select_related('tipo_cliente').prefetch_related('usuarios_asociados')
@@ -111,7 +83,7 @@ class ClienteListView(LoginRequiredMixin, ListView):
         context['estado_filter'] = self.request.GET.get('estado', '')
         return context
 
-class ClienteCreateView(LoginRequiredMixin, CreateView):
+class ClienteCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = Cliente
     template_name = 'clientes/cliente_form.html'
     fields = [
@@ -119,11 +91,7 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
         'numero_telefono', 'tipo_cliente', 'usuarios_asociados', 'activo'
     ]
     success_url = reverse_lazy('clientes:cliente_list')
-    
-    def dispatch(self, request, *args, **kwargs):
-        if not RolesService.usuario_tiene_permiso(request.user, 'cliente_crear'):
-            raise PermissionDenied("No tienes permisos para crear clientes")
-        return super().dispatch(request, *args, **kwargs)
+    permission_required = 'clientes.add_cliente'
     
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
@@ -137,7 +105,7 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
         messages.success(self.request, 'Cliente creado exitosamente.')
         return super().form_valid(form)
 
-class ClienteUpdateView(LoginRequiredMixin, UpdateView):
+class ClienteUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = Cliente
     template_name = 'clientes/cliente_form.html'
     fields = [
@@ -145,11 +113,7 @@ class ClienteUpdateView(LoginRequiredMixin, UpdateView):
         'numero_telefono', 'tipo_cliente', 'usuarios_asociados', 'activo'
     ]
     success_url = reverse_lazy('clientes:cliente_list')
-    
-    def dispatch(self, request, *args, **kwargs):
-        if not RolesService.usuario_tiene_permiso(request.user, 'cliente_editar'):
-            raise PermissionDenied("No tienes permisos para editar clientes")
-        return super().dispatch(request, *args, **kwargs)
+    permission_required = 'clientes.change_cliente'
     
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
@@ -163,16 +127,52 @@ class ClienteUpdateView(LoginRequiredMixin, UpdateView):
         messages.success(self.request, 'Cliente actualizado exitosamente.')
         return super().form_valid(form)
 
-class ClienteDeleteView(LoginRequiredMixin, DeleteView):
-    model = Cliente
-    template_name = 'clientes/cliente_confirm_delete.html'
-    success_url = reverse_lazy('clientes:cliente_list')
-    
-    def dispatch(self, request, *args, **kwargs):
-        if not RolesService.usuario_tiene_permiso(request.user, 'cliente_eliminar'):
-            raise PermissionDenied("No tienes permisos para eliminar clientes")
-        return super().dispatch(request, *args, **kwargs)
-    
-    def delete(self, request, *args, **kwargs):
-        messages.success(request, 'Cliente eliminado exitosamente.')
-        return super().delete(request, *args, **kwargs)
+
+
+
+@login_required
+@permission_required('clientes.change_cliente', raise_exception=True)
+@require_http_methods(["POST"])
+def toggle_cliente_status(request, pk):
+    """Vista AJAX para cambiar el estado activo/inactivo de un cliente"""
+    try:
+        cliente = get_object_or_404(Cliente, pk=pk)
+        
+        cliente.activo = not cliente.activo
+        cliente.save()
+        
+        status_text = "activado" if cliente.activo else "desactivado"
+        return JsonResponse({
+            'success': True,
+            'message': f'Cliente {status_text} exitosamente.',
+            'nueva_estado': cliente.activo
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al cambiar el estado: {str(e)}'
+        })
+
+
+@login_required
+@permission_required('clientes.change_tipocliente', raise_exception=True)
+@require_http_methods(["POST"])
+def toggle_tipocliente_status(request, pk):
+    """Vista AJAX para cambiar el estado activo/inactivo de un tipo de cliente"""
+    try:
+        tipo_cliente = get_object_or_404(TipoCliente, pk=pk)
+        
+        tipo_cliente.activo = not tipo_cliente.activo
+        tipo_cliente.save()
+        
+        status_text = "activado" if tipo_cliente.activo else "desactivado"
+        return JsonResponse({
+            'success': True,
+            'message': f'Tipo de cliente {status_text} exitosamente.',
+            'nueva_estado': tipo_cliente.activo
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al cambiar el estado: {str(e)}'
+        })

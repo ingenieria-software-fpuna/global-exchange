@@ -200,32 +200,55 @@ except Exception as e:
         echo ""
         echo "🎉 Usuario creado correctamente!"
         
-        # Preguntar si quiere asignar rol de administrador
-        read -p "¿Desea asignar el rol de administrador a este usuario? (y/N): " ASSIGN_ADMIN
+        # Preguntar si quiere asignar al grupo Admin
+        read -p "¿Desea asignar este usuario al grupo 'Admin'? (y/N): " ASSIGN_ADMIN
         if [[ $ASSIGN_ADMIN =~ ^[Yy]$ ]]; then
-            echo "Asignando rol de administrador..."
+            echo "Asignando usuario al grupo Admin..."
             
             poetry run python manage.py shell -c "
 from usuarios.models import Usuario
-from roles.models import Rol, UsuarioRol
+from django.contrib.auth.models import Permission, Group
+from grupos.models import Grupo
 
 try:
     usuario = Usuario.objects.get(email='$EMAIL')
-    admin_rol = Rol.objects.get(codigo='admin')
     
-    usuario_rol, created = UsuarioRol.objects.get_or_create(
-        usuario=usuario,
-        rol=admin_rol,
-        defaults={'asignado_por': 'script_desarrollo'}
-    )
-    
+    # Obtener o crear el grupo Admin de Django
+    admin_group, created = Group.objects.get_or_create(name='Admin')
     if created:
-        print('✅ Rol de administrador asignado correctamente')
+        print('✅ Grupo Admin de Django creado')
     else:
-        print('ℹ️  El usuario ya tenía el rol de administrador')
+        print('✅ Grupo Admin de Django ya existe')
+    
+    # Crear o obtener la extensión personalizada del grupo
+    try:
+        grupo_extension = Grupo.objects.get(group=admin_group)
+        print('✅ Extensión personalizada del grupo ya existe')
+    except Grupo.DoesNotExist:
+        grupo_extension = Grupo.objects.create(
+            group=admin_group,
+            es_activo=True
+        )
+        print('✅ Extensión personalizada del grupo creada')
+    
+    # Asignar todos los permisos al grupo
+    all_permissions = Permission.objects.all()
+    admin_group.permissions.set(all_permissions)
+    print(f'✅ {all_permissions.count()} permisos asignados al grupo Admin')
+    
+    # Agregar usuario al grupo Admin
+    usuario.groups.add(admin_group)
+    print('✅ Usuario agregado al grupo Admin')
+    
+    # También marcar como staff (opcional, para acceso a ciertas funcionalidades)
+    usuario.is_staff = True
+    usuario.save()
+    print('✅ Usuario marcado como staff')
+    
+    print('🎉 Usuario configurado como administrador del sistema')
         
 except Exception as e:
-    print(f'❌ Error al asignar rol: {e}')
+    print(f'❌ Error al configurar permisos: {e}')
 "
         fi
     else

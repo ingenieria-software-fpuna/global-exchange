@@ -1,0 +1,185 @@
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.decorators import login_required, permission_required
+from django.contrib import messages
+from django.views.generic import ListView, CreateView
+from django.urls import reverse_lazy
+from django.db.models import Q
+from django.core.paginator import Paginator
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
+import json
+
+from .models import TasaCambio
+from .forms import TasaCambioForm, TasaCambioSearchForm
+
+
+class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    """Vista para listar todas las tasas de cambio"""
+    model = TasaCambio
+    template_name = 'tasa_cambio/tasacambio_list.html'
+    context_object_name = 'tasas_cambio'
+    permission_required = 'tasa_cambio.view_tasacambio'
+    paginate_by = 20
+
+    def get_queryset(self):
+        queryset = TasaCambio.objects.select_related('moneda').all()
+        
+        # Filtro de búsqueda
+        q = self.request.GET.get('q')
+        if q:
+            queryset = queryset.filter(
+                Q(moneda__nombre__icontains=q) |
+                Q(moneda__codigo__icontains=q) |
+                Q(moneda__simbolo__icontains=q)
+            )
+        
+        # Filtro por moneda específica
+        moneda_id = self.request.GET.get('moneda')
+        if moneda_id:
+            queryset = queryset.filter(moneda_id=moneda_id)
+        
+        # Filtro por estado activo/inactivo
+        estado = self.request.GET.get('estado')
+        if estado == 'activo':
+            queryset = queryset.filter(es_activa=True)
+        elif estado == 'inactivo':
+            queryset = queryset.filter(es_activa=False)
+        
+        # Filtro por fecha desde
+        fecha_desde = self.request.GET.get('fecha_desde')
+        if fecha_desde:
+            queryset = queryset.filter(fecha_vigencia__date__gte=fecha_desde)
+        
+        # Filtro por fecha hasta
+        fecha_hasta = self.request.GET.get('fecha_hasta')
+        if fecha_hasta:
+            queryset = queryset.filter(fecha_vigencia__date__lte=fecha_hasta)
+        
+        return queryset.order_by('-fecha_vigencia', 'moneda__nombre')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = 'Gestión de Cotizaciones'
+        context['search_form'] = TasaCambioSearchForm(self.request.GET)
+        context['q'] = self.request.GET.get('q', '')
+        context['moneda'] = self.request.GET.get('moneda', '')
+        context['estado'] = self.request.GET.get('estado', '')
+        context['fecha_desde'] = self.request.GET.get('fecha_desde', '')
+        context['fecha_hasta'] = self.request.GET.get('fecha_hasta', '')
+        return context
+
+
+class TasaCambioCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    """Vista para crear una nueva tasa de cambio"""
+    model = TasaCambio
+    form_class = TasaCambioForm
+    template_name = 'tasa_cambio/tasacambio_form.html'
+    success_url = reverse_lazy('tasa_cambio:tasacambio_list')
+    permission_required = 'tasa_cambio.add_tasacambio'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = 'Crear Nueva Cotización'
+        context['accion'] = 'Crear'
+        return context
+
+    def form_valid(self, form):
+        # Establecer fecha de vigencia si no se especifica
+        if not form.cleaned_data.get('fecha_vigencia'):
+            form.instance.fecha_vigencia = timezone.now()
+        
+        # Verificar si había una cotización anterior para mostrar mensaje informativo
+        moneda = form.instance.moneda
+        
+        # Usar la información del formulario si está disponible
+        cotizacion_existente = form.cleaned_data.get('cotizacion_existente')
+        
+        if cotizacion_existente:
+            messages.info(
+                self.request,
+                f"Ya existía una cotización activa para {moneda.nombre} "
+                f"(Compra: {cotizacion_existente.tasa_compra}, "
+                f"Venta: {cotizacion_existente.tasa_venta}). "
+                f"La cotización anterior ha sido desactivada automáticamente."
+            )
+        
+        messages.success(
+            self.request, 
+            f"Cotización para {moneda.nombre} creada exitosamente."
+        )
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        messages.error(
+            self.request, 
+            "Error al crear la cotización. Verifique los datos ingresados."
+        )
+        return super().form_invalid(form)
+
+
+@login_required
+@permission_required('tasa_cambio.change_tasacambio', raise_exception=True)
+@require_http_methods(["POST"])
+def toggle_tasacambio_status(request, pk):
+    """Vista AJAX para cambiar el estado activo/inactivo de una cotización"""
+    try:
+        tasacambio = get_object_or_404(TasaCambio, pk=pk)
+        
+        tasacambio.es_activa = not tasacambio.es_activa
+        tasacambio.save()
+        
+        status_text = "activada" if tasacambio.es_activa else "desactivada"
+        return JsonResponse({
+            'success': True,
+            'message': f'Cotización {status_text} exitosamente.',
+            'nueva_estado': tasacambio.es_activa
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al cambiar el estado: {str(e)}'
+        })
+
+
+@login_required
+@permission_required('tasa_cambio.view_tasacambio', raise_exception=True)
+def tasacambio_detail_api(request, pk):
+    """API para obtener detalles de una cotización (para uso en JavaScript)"""
+    try:
+        tasacambio = get_object_or_404(TasaCambio, pk=pk)
+        data = {
+            'id': tasacambio.id,
+            'moneda_nombre': tasacambio.moneda.nombre,
+            'moneda_codigo': tasacambio.moneda.codigo,
+            'moneda_simbolo': tasacambio.moneda.simbolo,
+            'tasa_compra': float(tasacambio.tasa_compra),
+            'tasa_venta': float(tasacambio.tasa_venta),
+            'spread': float(tasacambio.spread),
+            'spread_porcentual': round(tasacambio.spread_porcentual, 2),
+            'es_activa': tasacambio.es_activa,
+            'fecha_vigencia': tasacambio.fecha_vigencia.strftime('%d/%m/%Y %H:%M'),
+            'fecha_creacion': tasacambio.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+            'fecha_actualizacion': tasacambio.fecha_actualizacion.strftime('%d/%m/%Y %H:%M'),
+        }
+        return JsonResponse({'success': True, 'data': data})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)})
+
+
+@login_required
+@permission_required('tasa_cambio.view_tasacambio', raise_exception=True) 
+def dashboard_tasacambio(request):
+    """Vista del dashboard específico para tasas de cambio"""
+    context = {
+        'titulo': 'Dashboard de Cotizaciones',
+        'total_cotizaciones': TasaCambio.objects.count(),
+        'cotizaciones_activas': TasaCambio.objects.filter(es_activa=True).count(),
+        'cotizaciones_inactivas': TasaCambio.objects.filter(es_activa=False).count(),
+        'cotizaciones_recientes': TasaCambio.objects.select_related('moneda').order_by('-fecha_creacion')[:5],
+        'monedas_con_cotizacion': TasaCambio.objects.filter(es_activa=True).select_related('moneda').count(),
+    }
+    
+    return render(request, 'tasa_cambio/dashboard.html', context)

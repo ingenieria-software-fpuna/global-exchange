@@ -14,7 +14,6 @@ fi
 
 echo "[entrypoint] Applying database migrations..."
 python manage.py migrate --noinput
-python manage.py loaddata roles/fixtures/initial_permissions.json
 
 # Optionally create a development user from env vars
 if [ -n "${INIT_USER_EMAIL:-}" ]; then
@@ -55,19 +54,30 @@ try:
 
     if make_admin:
         try:
-            from roles.models import Rol, UsuarioRol
-            admin_role = Rol.objects.get(codigo='admin')
-            _, assigned = UsuarioRol.objects.get_or_create(
-                usuario=user,
-                rol=admin_role,
-                defaults={'asignado_por': 'entrypoint'}
-            )
-            if assigned:
-                print('✅ Rol admin asignado')
+            from django.contrib.auth.models import Permission, Group
+            
+            # Crear grupo de administradores si no existe
+            admin_group, created = Group.objects.get_or_create(name='Admin')
+            if created:
+                print('✅ Grupo Admin creado')
+                # Asignar todos los permisos al grupo nuevo
+                all_permissions = Permission.objects.all()
+                admin_group.permissions.set(all_permissions)
+                print(f'✅ {all_permissions.count()} permisos asignados al grupo Admin')
             else:
-                print('ℹ️  Usuario ya tiene rol admin')
+                print('✅ Grupo Admin ya existe')
+            
+            # Agregar usuario al grupo Admin
+            user.groups.add(admin_group)
+            print('✅ Usuario agregado al grupo Admin')
+            
+            # También marcar como staff
+            user.is_staff = True
+            user.save()
+            print('✅ Usuario marcado como staff')
+            
         except Exception as e:
-            print(f"⚠️  No se pudo asignar rol admin: {e}")
+            print(f"⚠️  No se pudo configurar permisos admin: {e}")
 except IntegrityError as e:
     print(f"❌ Error de integridad: {e}")
 except Exception as e:

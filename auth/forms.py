@@ -21,6 +21,11 @@ class LoginForm(forms.Form):
             user_model =get_user_model()
             try:
                 user = user_model.objects.get(email=email)
+                
+                # Verificar si el usuario está activo
+                if not user.es_activo:
+                    raise forms.ValidationError("Tu cuenta está desactivada. Contacta al administrador.")
+                
                 self.user_cache = authenticate(username=user.email, password=password)
                 
                 if self.user_cache is None:

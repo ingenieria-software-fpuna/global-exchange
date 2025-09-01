@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Lista de Permisos{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-key"></i> Lista de Permisos del Sistema
+        </h1>
+        <a href="{% url 'grupos:group_list' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Volver a Grupos
+        </a>
+    </div>
+
+    <div class="card shadow">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                Permisos Disponibles ({{ permissions|length }})
+            </h6>
+        </div>
+        <div class="card-body">
+            {% if permissions %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Aplicación</th>
+                            <th>Modelo</th>
+                            <th>Permiso</th>
+                            <th>Código</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for permission in permissions %}
+                        <tr>
+                            <td>
+                                <span class="badge bg-primary">{{ permission.content_type.app_label }}</span>
+                            </td>
+                            <td>
+                                <strong>{{ permission.content_type.model }}</strong>
+                            </td>
+                            <td>
+                                {{ permission.name }}
+                            </td>
+                            <td>
+                                <code>{{ permission.codename }}</code>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginación -->
+            {% if is_paginated %}
+            <nav aria-label="Paginación de permisos">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1">
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-key fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No hay permisos disponibles</h5>
+                <p class="text-muted">Los permisos se crean automáticamente cuando se definen modelos.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Información adicional -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">
+                        <i class="fas fa-info-circle"></i> Tipos de Permisos
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p>Django crea automáticamente 4 permisos para cada modelo:</p>
+                    <ul>
+                        <li><strong>add:</strong> Crear nuevos registros</li>
+                        <li><strong>change:</strong> Modificar registros existentes</li>
+                        <li><strong>delete:</strong> Eliminar registros</li>
+                        <li><strong>view:</strong> Ver registros</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">
+                        <i class="fas fa-lightbulb"></i> Cómo Usar
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p>Para usar estos permisos en tu código:</p>
+                    <ul>
+                        <li><strong>En vistas:</strong> <code>@permission_required('app.model_action')</code></li>
+                        <li><strong>En plantillas:</strong> <code>{% if perms.app.model_action %}</code></li>
+                        <li><strong>En código:</strong> <code>user.has_perm('app.model_action')</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -54,7 +54,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     
     # Apps del proyecto
-    'roles', 'usuarios', 'auth.apps.AuthConfig', 'clientes',
+    'grupos', 'usuarios', 'auth.apps.AuthConfig', 'clientes', 'monedas', 'tasa_cambio',
 ]
 
 MIDDLEWARE = [
@@ -64,6 +64,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'auth.middleware.UsuarioActivoMiddleware',  # Verificar usuario activo
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -79,7 +80,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'roles.context_processors.permissions_context',
+                'grupos.context_processors.permissions_context',
             ],
         },
     },
@@ -149,6 +150,13 @@ STATICFILES_DIRS = [
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'usuarios.Usuario'
+
+# Backends de autenticación personalizados
+AUTHENTICATION_BACKENDS = [
+    'grupos.backends.GrupoActivoBackend',  # Backend personalizado para grupos activos
+    # Por alguna razón si no comento esta linea django toma su backend como el default y no funcionan permisos de grupos activos
+    #'django.contrib.auth.backends.ModelBackend',  # Backend por defecto como fallback
+]
 
 # Configuración de Correo Electrónico
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
