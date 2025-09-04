@@ -16,7 +16,9 @@ urlpatterns = [
     
     # API AJAX para Tipos de Cliente
     path('tipos/toggle-status/<int:pk>/', views.toggle_tipocliente_status, name='tipocliente_toggle_status'),
+    path('tipos/relations/<int:pk>/', views.get_tipocliente_relations, name='tipocliente_get_relations'),
     
     # API AJAX para Clientes
     path('toggle-status/<int:pk>/', views.toggle_cliente_status, name='toggle_status'),
+    path('relations/<int:pk>/', views.get_cliente_relations, name='get_relations'),
 ]

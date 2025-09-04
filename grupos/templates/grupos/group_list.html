@@ -5,6 +5,20 @@
 
 {% block content %}
 <div class="container-fluid">
+    <!-- Breadcrumbs -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'auth:dashboard' %}">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-layer-group me-1"></i>Grupos
+            </li>
+        </ol>
+    </nav>
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0 text-gray-800">
             <i class="fas fa-layer-group"></i> Gestión de Grupos
@@ -98,7 +112,7 @@
                             </td>
                             <td>
                                 <div class="btn-group" role="group">
-                                    {% if perms.auth.view_group %}
+                                    {% if perms.auth.change_permission %}
                                     <a href="{% url 'grupos:group_permissions' group.pk %}" 
                                        class="btn btn-sm btn-outline-primary" title="Gestionar Permisos">
                                         <i class="fas fa-key"></i>
@@ -196,6 +210,12 @@
             </div>
             <div class="modal-body">
                 <p id="statusMessage"></p>
+                <div id="relationsInfo" class="mt-3" style="display: none;">
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Relaciones Asociadas:</h6>
+                        <ul id="relationsList" class="mb-0"></ul>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -229,6 +249,30 @@ function toggleGroupStatus(groupId, newStatus) {
     const action = newStatus === 'true' ? 'activar' : 'desactivar';
     document.getElementById('statusMessage').textContent = 
         `¿Estás seguro de que quieres ${action} este grupo?`;
+    
+    // Ocultar información de relaciones inicialmente
+    document.getElementById('relationsInfo').style.display = 'none';
+    
+    // Solo mostrar relaciones si se va a desactivar
+    if (newStatus === 'false') {
+        fetch(`/grupos/relations/${groupId}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.has_relations) {
+                    const relationsList = document.getElementById('relationsList');
+                    relationsList.innerHTML = '';
+                    data.relations.forEach(relation => {
+                        const li = document.createElement('li');
+                        li.textContent = relation;
+                        relationsList.appendChild(li);
+                    });
+                    document.getElementById('relationsInfo').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error al obtener relaciones:', error);
+            });
+    }
     
     const modal = new bootstrap.Modal(document.getElementById('statusModal'));
     modal.show();

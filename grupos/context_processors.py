@@ -53,7 +53,6 @@ def permissions_context(request):
         context['can_manage_permissions'] = (
             context['is_admin'] or 
             request.user.is_staff or
-            request.user.has_perm('auth.change_group') or
             request.user.has_perm('auth.change_permission')
         )
         
