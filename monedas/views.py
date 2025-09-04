@@ -99,6 +99,31 @@ class MonedaUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
 
 
 @login_required
+@permission_required('monedas.view_moneda', raise_exception=True)
+def get_moneda_relations(request, pk):
+    """API para obtener información sobre las relaciones de una moneda"""
+    try:
+        moneda = get_object_or_404(Moneda, pk=pk)
+        
+        # Contar tasas de cambio asociadas
+        tasas_count = moneda.tasas_cambio.count()
+        
+        relations_info = []
+        if tasas_count > 0:
+            relations_info.append(f"Esta moneda tiene {tasas_count} tasa{'s' if tasas_count != 1 else ''} de cambio asociada{'s' if tasas_count != 1 else ''}")
+        
+        return JsonResponse({
+            'success': True,
+            'relations': relations_info,
+            'has_relations': len(relations_info) > 0
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al obtener relaciones: {str(e)}'
+        })
+
+@login_required
 @permission_required('monedas.change_moneda', raise_exception=True)
 @require_http_methods(["POST"])
 def toggle_moneda_status(request, pk):

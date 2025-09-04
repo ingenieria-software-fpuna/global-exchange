@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     GroupListView, GroupCreateView, GroupUpdateView,
-    GroupPermissionsView, PermissionListView, toggle_group_status
+    GroupPermissionsView, PermissionListView, toggle_group_status, get_group_relations
 )
 
 app_name = 'grupos'
@@ -15,6 +15,7 @@ urlpatterns = [
     
     # API AJAX para Grupos
     path('toggle-status/<int:pk>/', toggle_group_status, name='toggle_status'),
+    path('relations/<int:pk>/', get_group_relations, name='get_relations'),
     
     # URLs para Permisos
     path('permisos/', PermissionListView.as_view(), name='permission_list'),

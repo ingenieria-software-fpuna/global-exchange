@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import UsuarioListView, UsuarioCreateView, UsuarioUpdateView, toggle_usuario_status
+from .views import UsuarioListView, UsuarioCreateView, UsuarioUpdateView, toggle_usuario_status, get_usuario_relations
 
 app_name = 'usuarios' 
 urlpatterns = [
@@ -9,6 +9,7 @@ urlpatterns = [
     
     # API AJAX para Usuarios
     path('usuarios/toggle-status/<int:pk>/', toggle_usuario_status, name='toggle_status'),
+    path('usuarios/relations/<int:pk>/', get_usuario_relations, name='get_relations'),
 ]
 
 
