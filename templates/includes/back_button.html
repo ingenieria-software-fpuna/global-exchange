@@ -1,0 +1,11 @@
+{% comment %}
+Componente reutilizable para botón de navegación atrás
+Uso: {% include 'includes/back_button.html' with text="Texto opcional" %}
+{% endcomment %}
+
+<div class="d-flex justify-content-start mb-3">
+    <button type="button" class="btn btn-outline-secondary" onclick="goBack()" title="Volver a la página anterior">
+        <i class="fas fa-arrow-left me-2"></i>
+        {{ text|default:"Atrás" }}
+    </button>
+</div>
