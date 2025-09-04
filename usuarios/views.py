@@ -48,6 +48,31 @@ class UsuarioUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView)
 
 
 @login_required
+@permission_required('usuarios.view_usuario', raise_exception=True)
+def get_usuario_relations(request, pk):
+    """API para obtener información sobre las relaciones de un usuario"""
+    try:
+        usuario = get_object_or_404(Usuario, pk=pk)
+        
+        # Contar clientes asociados
+        clientes_count = usuario.cliente_set.count()
+        
+        relations_info = []
+        if clientes_count > 0:
+            relations_info.append(f"Este usuario tiene {clientes_count} cliente{'s' if clientes_count != 1 else ''} asociado{'s' if clientes_count != 1 else ''}")
+        
+        return JsonResponse({
+            'success': True,
+            'relations': relations_info,
+            'has_relations': len(relations_info) > 0
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al obtener relaciones: {str(e)}'
+        })
+
+@login_required
 @permission_required('usuarios.change_usuario', raise_exception=True)
 @require_http_methods(["POST"])
 def toggle_usuario_status(request, pk):

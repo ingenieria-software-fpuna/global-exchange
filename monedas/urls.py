@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     MonedaListView, MonedaCreateView, MonedaUpdateView,
-    toggle_moneda_status, moneda_detail_api, dashboard_monedas
+    toggle_moneda_status, moneda_detail_api, dashboard_monedas, get_moneda_relations
 )
 
 app_name = 'monedas'
@@ -18,4 +18,5 @@ urlpatterns = [
     # APIs AJAX
     path('toggle-status/<int:pk>/', toggle_moneda_status, name='toggle_status'),
     path('api/detalle/<int:pk>/', moneda_detail_api, name='moneda_detail_api'),
+    path('relations/<int:pk>/', get_moneda_relations, name='get_relations'),
 ]
