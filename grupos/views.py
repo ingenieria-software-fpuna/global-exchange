@@ -100,7 +100,7 @@ class GroupPermissionsView(LoginRequiredMixin, PermissionRequiredMixin, UpdateVi
     model = Grupo
     template_name = 'grupos/group_permissions.html'
     fields = []
-    permission_required = 'auth.change_group'
+    permission_required = 'auth.change_permission'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -145,6 +145,31 @@ class PermissionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     def get_queryset(self):
         return Permission.objects.all().select_related('content_type').order_by('content_type__app_label', 'content_type__model', 'codename')
 
+
+@login_required
+@permission_required('auth.view_group', raise_exception=True)
+def get_group_relations(request, pk):
+    """API para obtener información sobre las relaciones de un grupo"""
+    try:
+        grupo = get_object_or_404(Grupo, pk=pk)
+        
+        # Contar usuarios asociados
+        usuarios_count = grupo.group.user_set.count()
+        
+        relations_info = []
+        if usuarios_count > 0:
+            relations_info.append(f"Este grupo tiene {usuarios_count} usuario{'s' if usuarios_count != 1 else ''} asociado{'s' if usuarios_count != 1 else ''}")
+        
+        return JsonResponse({
+            'success': True,
+            'relations': relations_info,
+            'has_relations': len(relations_info) > 0
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al obtener relaciones: {str(e)}'
+        })
 
 @login_required
 @permission_required('auth.change_group', raise_exception=True)
