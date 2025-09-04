@@ -100,7 +100,7 @@ class GroupPermissionsView(LoginRequiredMixin, PermissionRequiredMixin, UpdateVi
     model = Grupo
     template_name = 'grupos/group_permissions.html'
     fields = []
-    permission_required = 'auth.change_group'
+    permission_required = 'auth.change_permission'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

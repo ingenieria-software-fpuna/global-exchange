@@ -112,7 +112,7 @@
                             </td>
                             <td>
                                 <div class="btn-group" role="group">
-                                    {% if perms.auth.view_group %}
+                                    {% if perms.auth.change_permission %}
                                     <a href="{% url 'grupos:group_permissions' group.pk %}" 
                                        class="btn btn-sm btn-outline-primary" title="Gestionar Permisos">
                                         <i class="fas fa-key"></i>
