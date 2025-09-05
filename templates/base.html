@@ -177,6 +177,20 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Navegación atrás global -->
+    <script>
+    function goBack() {
+        // Verificar si hay historial de navegación
+        if (window.history.length > 1) {
+            window.history.back();
+        } else {
+            // Si no hay historial, redirigir al dashboard
+            window.location.href = "{% url 'auth:dashboard' %}";
+        }
+    }
+    </script>
+    
     {% block extra_js %}{% endblock %}
 </body>
 </html>
