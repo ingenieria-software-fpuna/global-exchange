@@ -1,2 +1,3 @@
-# Panel de administración deshabilitado
-# Toda la funcionalidad de códigos de verificación funciona sin admin
+from django.contrib import admin
+
+# Register your models here.
