@@ -19,6 +19,12 @@
                         {% endfor %}
                     {% endif %}
                     <p class="text-center">Por favor, introduce el código de 6 dígitos que hemos enviado a tu correo.</p>
+                    
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-clock"></i> 
+                        <strong>Importante:</strong> El código expirará en 5 minutos desde que fue enviado.
+                        Si no lo has recibido, revisa tu carpeta de spam.
+                    </div>
                     <form action="{% url 'auth:verify_code' %}" method="post">
                         {% csrf_token %}
                         <div class="mb-3">
@@ -30,7 +36,11 @@
                     <hr>
                     <p class="text-center">
                         <small>
-                            ¿No has recibido el código?
+                            ¿No has recibido el código?<br>
+                            <a href="{% url 'auth:reenviar_codigo' %}" class="btn btn-outline-secondary btn-sm mt-2">
+                                <i class="fas fa-redo"></i> Reenviar código
+                            </a>
+                            <br><br>
                             <a href="{% url 'auth:login' %}">Volver e intentar de nuevo</a>
                         </small>
                     </p>

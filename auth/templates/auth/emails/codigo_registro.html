@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificación de Registro</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #000000 !important;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            color: #000000 !important;
+        }
+        .header {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #28a745;
+            margin-bottom: 30px;
+        }
+        .header h2 {
+            color: #000000 !important;
+            margin: 0;
+        }
+        p {
+            color: #000000 !important;
+            margin: 15px 0;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+            margin-bottom: 10px;
+        }
+        .welcome-banner {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .code-container {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: #ffffff !important;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 30px 0;
+        }
+        .code-container * {
+            color: #ffffff !important;
+        }
+        .code {
+            font-size: 36px;
+            font-weight: bold;
+            letter-spacing: 8px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            color: #ffffff !important;
+        }
+        .expiration {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+            color: #000000 !important;
+        }
+        .expiration * {
+            color: #000000 !important;
+        }
+        .expiration strong {
+            color: #000000 !important;
+        }
+        .expiration small {
+            color: #000000 !important;
+        }
+        .next-steps {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            margin-top: 30px;
+            font-size: 12px;
+            color: #666;
+        }
+        .celebration {
+            font-size: 48px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .info-text {
+            color: #000000 !important;
+            margin: 5px 0;
+        }
+        .next-steps h4 {
+            color: #000000 !important;
+        }
+        ul li, ol li {
+            color: #000000 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🎉 {{ sitio_web }}</div>
+            <h2>¡Bienvenido! Verifica tu Cuenta</h2>
+        </div>
+        
+        <div class="welcome-banner">
+            <div class="celebration">🚀</div>
+            <h3>¡Tu registro está casi completo!</h3>
+        </div>
+        
+        <p>Hola <strong>{{ usuario.nombre }}</strong>,</p>
+        
+        <p>¡Gracias por registrarte en <strong>{{ sitio_web }}</strong>! Estás a un paso de completar tu registro.</p>
+        
+        <p>Para activar tu cuenta, utiliza el siguiente código de verificación:</p>
+        
+        <div class="code-container">
+            <div>Tu código de verificación es:</div>
+            <div class="code">{{ codigo }}</div>
+        </div>
+        
+        <div class="expiration">
+            ⏰ <strong>Este código expirará en {{ minutos_expiracion }} minutos</strong><br>
+            <small>Fecha de expiración: {{ fecha_expiracion|date:"d/m/Y H:i" }}</small><br>
+            <small>Código solicitado: {{ codigo_obj.fecha_creacion|date:"d/m/Y H:i" }}</small>
+        </div>
+        
+        <div class="next-steps">
+            <h4>📋 Próximos Pasos:</h4>
+            <ol>
+                <li>Ingresa el código de verificación en la página de registro</li>
+                <li>Tu cuenta será activada automáticamente</li>
+                <li>Podrás acceder a todas las funcionalidades de {{ sitio_web }}</li>
+            </ol>
+        </div>
+        
+        <p>Una vez verificada tu cuenta, podrás:</p>
+        <ul>
+            <li>✅ Gestionar tus datos personales</li>
+            <li>✅ Acceder a todas las funcionalidades</li>
+            <li>✅ Recibir notificaciones importantes</li>
+        </ul>
+        
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p style="margin: 0;"><strong>⚠️ Importante:</strong> Si no completaste este registro, ignora este mensaje. Tu dirección de email no será utilizada.</p>
+        </div>
+        
+        <div class="footer">
+            <p>Este es un mensaje automático, por favor no respondas a este email.</p>
+            <p>© {{ sitio_web }} - Sistema de Registro Seguro</p>
+        </div>
+    </div>
+</body>
+</html>

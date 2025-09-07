@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Código de Verificación</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #000000 !important;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            color: #000000 !important;
+        }
+        .header {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #007bff;
+            margin-bottom: 30px;
+        }
+        .header h2 {
+            color: #000000 !important;
+            margin: 0;
+        }
+        p {
+            color: #000000 !important;
+            margin: 15px 0;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+        .code-container {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: #ffffff !important;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 30px 0;
+        }
+        .code-container * {
+            color: #ffffff !important;
+        }
+        .code {
+            font-size: 36px;
+            font-weight: bold;
+            letter-spacing: 8px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            color: #ffffff !important;
+        }
+        .expiration {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+            color: #000000 !important;
+        }
+        .expiration * {
+            color: #000000 !important;
+        }
+        .expiration strong {
+            color: #000000 !important;
+        }
+        .expiration small {
+            color: #000000 !important;
+        }
+        .security-info {
+            background: #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            margin-top: 30px;
+            font-size: 12px;
+            color: #666;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .warning {
+            color: #dc3545 !important;
+            font-weight: bold;
+        }
+        .info-text {
+            color: #000000 !important;
+            margin: 5px 0;
+        }
+        .security-info h4 {
+            color: #000000 !important;
+        }
+        .next-steps h4 {
+            color: #000000 !important;
+        }
+        ul li, ol li {
+            color: #000000 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🔐 {{ sitio_web }}</div>
+            <h2>Código de Verificación de Inicio de Sesión</h2>
+        </div>
+        
+        <p>Hola <strong>{{ usuario.nombre }}</strong>,</p>
+        
+        <p>Hemos recibido una solicitud de inicio de sesión en tu cuenta. Para completar el proceso, utiliza el siguiente código de verificación:</p>
+        
+        <div class="code-container">
+            <div>Tu código de verificación es:</div>
+            <div class="code">{{ codigo }}</div>
+        </div>
+        
+        <div class="expiration">
+            ⏰ <strong>Este código expirará en {{ minutos_expiracion }} minutos</strong><br>
+            <small>Fecha de expiración: {{ fecha_expiracion|date:"d/m/Y H:i" }}</small>
+        </div>
+        
+        <div class="security-info">
+            <h4>🛡️ Información de Seguridad</h4>
+            <p class="info-text"><strong>Hora de solicitud:</strong> {{ codigo_obj.fecha_creacion|date:"d/m/Y H:i" }}</p>
+            {% if ip_address %}
+            <p class="info-text"><strong>Dirección IP:</strong> {{ ip_address }}</p>
+            {% endif %}
+            <p class="warning">⚠️ Si no solicitaste este código, ignora este mensaje y considera cambiar tu contraseña.</p>
+        </div>
+        
+        <p>Una vez que ingreses este código, podrás acceder a tu cuenta de forma segura.</p>
+        
+        <div class="footer">
+            <p>Este es un mensaje automático, por favor no respondas a este email.</p>
+            <p>© {{ sitio_web }} - Sistema de Autenticación Segura</p>
+        </div>
+    </div>
+</body>
+</html>
