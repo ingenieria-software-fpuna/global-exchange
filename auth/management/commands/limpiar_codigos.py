@@ -34,11 +34,11 @@ class Command(BaseCommand):
             )
         else:
             # Ejecutar limpieza real
-            deleted_count, _ = CodigoVerificacion.limpiar_codigos_expirados()
+            deleted_count, deleted_details = CodigoVerificacion.limpiar_codigos_expirados()
             
             self.stdout.write(
                 self.style.SUCCESS(
-                    f'Se eliminaron {deleted_count[0]} códigos de verificación expirados'
+                    f'Se eliminaron {deleted_count} códigos de verificación expirados'
                 )
             )
             
