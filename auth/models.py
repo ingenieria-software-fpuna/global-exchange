@@ -114,12 +114,11 @@ class CodigoVerificacion(models.Model):
     
     @classmethod
     def limpiar_codigos_expirados(cls):
-        """Elimina códigos expirados o usados más antiguos que 24 horas"""
-        fecha_limite = timezone.now() - timedelta(hours=24)
+        """Elimina códigos expirados (después de 5 minutos) y códigos usados más antiguos que 1 hora"""
+        fecha_limite_usados = timezone.now() - timedelta(hours=1)
         return cls.objects.filter(
-            models.Q(fecha_expiracion__lt=timezone.now()) |
-            models.Q(usado=True),
-            fecha_creacion__lt=fecha_limite
+            models.Q(fecha_expiracion__lt=timezone.now()) |  # Códigos que ya expiraron (después de 5 min)
+            models.Q(usado=True, fecha_creacion__lt=fecha_limite_usados)  # Códigos usados más antiguos que 1h
         ).delete()
     
     @classmethod
