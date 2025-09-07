@@ -19,16 +19,11 @@
                         {% endfor %}
                     {% endif %}
                     
+                      <p class="text-center">Por favor, introduce el código de 6 dígitos que hemos enviado a tu correo.</p>
                     <div class="alert alert-info" role="alert">
-                        <i class="fas fa-info-circle"></i>
-                        Se ha enviado un código de verificación a tu correo electrónico. 
-                        Por favor, revisa tu bandeja de entrada e ingresa el código a continuación.
-                    </div>
-                    
-                    <div class="alert alert-warning" role="alert">
                         <i class="fas fa-clock"></i> 
-                        <strong>Tiempo límite:</strong> El código expirará en 5 minutos desde que fue enviado.
-                        Si el código expira, tendrás que registrarte nuevamente.
+                        <strong>Importante:</strong> El código expirará en 5 minutos desde que fue enviado.
+                        Si no lo has recibido, revisa tu carpeta de spam.
                     </div>
                     
                     <form method="post">
@@ -39,11 +34,10 @@
                                    class="form-control" 
                                    id="code" 
                                    name="code" 
-                                   placeholder="Ingresa el código de 6 dígitos"
+                                   placeholder="Código de verificación"
                                    maxlength="6"
                                    pattern="[0-9]{6}"
                                    required>
-                            <div class="form-text">Ingresa el código de 6 dígitos que recibiste por email</div>
                         </div>
                         
                         <button type="submit" class="btn btn-info w-100">Verificar Cuenta</button>

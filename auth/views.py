@@ -34,7 +34,7 @@ def login_view(request):
                 exito, mensaje = EmailService.enviar_codigo_verificacion(user, codigo_obj, request)
                 
                 if exito:
-                    messages.success(request, 'Se ha enviado un código de verificación a tu correo')
+                    messages.success(request, 'Se ha enviado un código de verificación a tu correo electrónico.')
                     return redirect('auth:verify_code')
                 else:
                     messages.error(request, f'Error al enviar el código: {mensaje}')
