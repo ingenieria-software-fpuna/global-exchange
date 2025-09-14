@@ -531,8 +531,45 @@ class AuthFormsTestCase(TestCase):
             'password2': 'newpass123'
         }
         form = RegistroForm(data=form_data)
-        # Dependiendo de la validación, esto podría fallar
-        # Por ahora asumimos que pasa
+        self.assertFalse(form.is_valid())
+        self.assertIn('fecha_nacimiento', form.errors)
+        self.assertIn('Debes ser mayor de 18 años para registrarte.', form.errors['fecha_nacimiento'][0])
+
+    def test_registro_form_under_18_age(self):
+        """Test formulario de registro con usuario menor de 18 años"""
+        from datetime import date, timedelta
+        birth_date = date.today() - timedelta(days=17*365 + 100)  # Aproximadamente 17 años
+        
+        form_data = {
+            'email': 'younguser@example.com',
+            'cedula': '11111111',
+            'nombre': 'Young',
+            'apellido': 'User',
+            'fecha_nacimiento': birth_date,
+            'password1': 'youngpass123',
+            'password2': 'youngpass123'
+        }
+        form = RegistroForm(data=form_data)
+        self.assertFalse(form.is_valid())
+        self.assertIn('fecha_nacimiento', form.errors)
+        self.assertIn('Debes ser mayor de 18 años para registrarte.', form.errors['fecha_nacimiento'][0])
+
+    def test_registro_form_exactly_18_age(self):
+        """Test formulario de registro con usuario exactamente de 18 años"""
+        from datetime import date
+        today = date.today()
+        birth_date = date(today.year - 18, today.month, today.day)
+        
+        form_data = {
+            'email': 'exactly18@example.com',
+            'cedula': '22222222',
+            'nombre': 'Exactly',
+            'apellido': 'Eighteen',
+            'fecha_nacimiento': birth_date,
+            'password1': 'ValidPass123!',
+            'password2': 'ValidPass123!'
+        }
+        form = RegistroForm(data=form_data)
         self.assertTrue(form.is_valid())
 
 
