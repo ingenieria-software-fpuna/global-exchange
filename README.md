@@ -82,6 +82,7 @@ Una vez instaladas las dependencias, puedes ejecutar el proyecto con los siguien
 ```bash
 make app-setup  # Configuración (limpiar DB, levantar DB, aplicar migraciones)
 make user # Crear un usuario para usar el sistema
+make create-currencies # Crea monedas y tasas de cambio de prueba
 make app-run    # Correr el proyecto
 ```
 
