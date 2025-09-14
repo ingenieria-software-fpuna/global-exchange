@@ -37,11 +37,23 @@ test-grupo-permisos:
 	@echo "Probando funcionalidad de permisos con grupos activos/inactivos..."
 	poetry run python manage.py test_grupo_permisos --create-test-data
 
+limpiar-codigos:
+	@echo "Limpiando códigos de verificación expirados..."
+	poetry run python manage.py limpiar_codigos
+
+limpiar-codigos-dry:
+	@echo "Simulando limpieza de códigos de verificación expirados..."
+	poetry run python manage.py limpiar_codigos --dry-run
+
 app-setup:
 	@echo "Configurando el proyecto Django..."
 	make db-clean
 	make db-up
+ifeq ($(OS),Windows_NT)
+	timeout /t 5 /nobreak > nul
+else
 	sleep 5
+endif
 	make app-migrate
 	make check-admin-group
 	make create-currencies
@@ -86,6 +98,8 @@ help:
 	@echo "  create-currencies - Poblar base de datos con monedas y tasas de ejemplo"
 	@echo "  migrate-groups    - Migrar grupos existentes al nuevo modelo"
 	@echo "  test-grupo-permisos - Probar funcionalidad de permisos con grupos activos/inactivos"
+	@echo "  limpiar-codigos   - Limpiar códigos de verificación expirados"
+	@echo "  limpiar-codigos-dry - Simular limpieza de códigos (modo prueba)"
 	@echo "  user [username] [-f] - Crear usuario de desarrollo (interactivo o con username)"
 	@echo "  user-fast [username] - Crear usuario rápido con valores predeterminados"
 	@echo "  app-reset         - Reset completo (db + migraciones + permisos)"
