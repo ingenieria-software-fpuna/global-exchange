@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load moneda_extras %}
 
 {% block title %}Global Exchange - Casa de Cambios{% endblock %}
 
@@ -57,29 +58,45 @@
 </section>
 
 <!-- Ticker de tasas en movimiento -->
+{% if monedas_con_tasas %}
 <section class="py-3">
   <div class="container">
     <div class="ticker shadow-soft" role="region" aria-label="Tasas de cambio en movimiento">
       <div class="ticker__track">
         <!-- Bloque 1 -->
-        <span class="ticker__item"><i class="fas fa-dollar-sign text-primary"></i><span class="ticker__label">USD</span><span class="ticker__value">7.250</span><span class="text-muted">Compra 7.200 · Venta 7.300</span></span>
-        <span class="ticker__item"><i class="fas fa-euro-sign text-primary"></i><span class="ticker__label">EUR</span><span class="ticker__value">7.850</span><span class="text-muted">Compra 7.800 · Venta 7.900</span></span>
-        <span class="ticker__item"><i class="fas fa-brazilian-real-sign text-primary"></i><span class="ticker__label">BRL</span><span class="ticker__value">1.450</span><span class="text-muted">Compra 1.430 · Venta 1.470</span></span>
-        <span class="ticker__item"><i class="fas fa-peso-sign text-primary"></i><span class="ticker__label">ARS</span><span class="ticker__value">8,50</span><span class="text-muted">Compra 8,40 · Venta 8,60</span></span>
+        {% for item in monedas_con_tasas %}
+        <span class="ticker__item">
+          <i class="{{ item.moneda.codigo|get_icono_moneda }} text-primary"></i>
+          <span class="ticker__label">{{ item.moneda.codigo }}</span>
+          <span class="ticker__value">{{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}</span>
+          <span class="text-muted">
+            Compra {{ item.tasa.tasa_compra|formatear_tasa_para_display:item.moneda.decimales }} · 
+            Venta {{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}
+          </span>
+        </span>
+        {% endfor %}
 
         <!-- Bloque 2 (duplicado para desplazamiento infinito) -->
-        <span class="ticker__item"><i class="fas fa-dollar-sign text-primary"></i><span class="ticker__label">USD</span><span class="ticker__value">7.250</span><span class="text-muted">Compra 7.200 · Venta 7.300</span></span>
-        <span class="ticker__item"><i class="fas fa-euro-sign text-primary"></i><span class="ticker__label">EUR</span><span class="ticker__value">7.850</span><span class="text-muted">Compra 7.800 · Venta 7.900</span></span>
-        <span class="ticker__item"><i class="fas fa-brazilian-real-sign text-primary"></i><span class="ticker__label">BRL</span><span class="ticker__value">1.450</span><span class="text-muted">Compra 1.430 · Venta 1.470</span></span>
-        <span class="ticker__item"><i class="fas fa-peso-sign text-primary"></i><span class="ticker__label">ARS</span><span class="ticker__value">8,50</span><span class="text-muted">Compra 8,40 · Venta 8,60</span></span>
+        {% for item in monedas_con_tasas %}
+        <span class="ticker__item">
+          <i class="{{ item.moneda.codigo|get_icono_moneda }} text-primary"></i>
+          <span class="ticker__label">{{ item.moneda.codigo }}</span>
+          <span class="ticker__value">{{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}</span>
+          <span class="text-muted">
+            Compra {{ item.tasa.tasa_compra|formatear_tasa_para_display:item.moneda.decimales }} · 
+            Venta {{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}
+          </span>
+        </span>
+        {% endfor %}
       </div>
     </div>
   </div>
   <div class="bg-white" style="height: 16px;"></div>
-  
 </section>
+{% endif %}
 
 <!-- Tasas de cambio -->
+{% if monedas_con_tasas %}
 <section class="py-5">
     <div class="container">
         <div class="text-center mb-5">
@@ -88,61 +105,26 @@
         </div>
 
         <div class="row g-4 justify-content-center">
+            {% for item in monedas_con_tasas %}
             <div class="col-12 col-sm-6 col-md-4 col-lg-3">
                 <div class="card h-100">
                     <div class="card-body text-center">
-                        <div class="display-6 text-primary mb-2"><i class="fas fa-dollar-sign"></i></div>
-                        <h5 class="card-title">Dólar Americano</h5>
+                        <div class="display-6 text-primary mb-2">
+                            <i class="{{ item.moneda.codigo|get_icono_moneda }}"></i>
+                        </div>
+                        <h5 class="card-title">{{ item.moneda.nombre }}</h5>
                         <p class="mb-1">
-                            <span class="h4 text-success">7,250</span>
-                            <small class="text-muted"> PYG/USD</small>
+                            <span class="h4 text-success">{{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}</span>
+                            <small class="text-muted"> PYG/{{ item.moneda.codigo }}</small>
                         </p>
-                        <small class="text-muted">Compra: 7,200 · Venta: 7,300</small>
+                        <small class="text-muted">
+                            Compra: {{ item.tasa.tasa_compra|formatear_tasa_para_display:item.moneda.decimales }} · 
+                            Venta: {{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}
+                        </small>
                     </div>
                 </div>
             </div>
-
-            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <div class="display-6 text-primary mb-2"><i class="fas fa-euro-sign"></i></div>
-                        <h5 class="card-title">Euro</h5>
-                        <p class="mb-1">
-                            <span class="h4 text-success">7,850</span>
-                            <small class="text-muted"> PYG/EUR</small>
-                        </p>
-                        <small class="text-muted">Compra: 7,800 · Venta: 7,900</small>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <div class="display-6 text-primary mb-2"><i class="fas fa-brazilian-real-sign"></i></div>
-                        <h5 class="card-title">Real Brasileño</h5>
-                        <p class="mb-1">
-                            <span class="h4 text-success">1,450</span>
-                            <small class="text-muted"> PYG/BRL</small>
-                        </p>
-                        <small class="text-muted">Compra: 1,430 · Venta: 1,470</small>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <div class="display-6 text-primary mb-2"><i class="fas fa-peso-sign"></i></div>
-                        <h5 class="card-title">Peso Argentino</h5>
-                        <p class="mb-1">
-                            <span class="h4 text-success">8.50</span>
-                            <small class="text-muted"> PYG/ARS</small>
-                        </p>
-                        <small class="text-muted">Compra: 8.40 · Venta: 8.60</small>
-                    </div>
-                </div>
-            </div>
+            {% endfor %}
         </div>
 
         <div class="row mt-5">
@@ -156,6 +138,20 @@
     </div>
     <div class="bg-white" style="height: 24px; clip-path: polygon(0 0, 100% 40%, 100% 100%, 0 100%);"></div>
 </section>
+{% else %}
+<!-- Mensaje cuando no hay monedas disponibles -->
+<section class="py-5">
+    <div class="container">
+        <div class="text-center">
+            <div class="alert alert-warning shadow-sm" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>No hay tasas de cambio disponibles</strong>
+                <p class="mb-0 mt-2">Por favor, contacta con el administrador para configurar las monedas y sus tasas de cambio.</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
 
 <!-- Características -->
 <section class="py-5 bg-light">

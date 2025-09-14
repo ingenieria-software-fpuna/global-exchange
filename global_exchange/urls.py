@@ -26,7 +26,30 @@ import os
 
 def welcome_view(request):
     """Vista para la pantalla de bienvenida con tasas de cambio"""
-    return render(request, 'welcome.html')
+    from monedas.models import Moneda
+    from tasa_cambio.models import TasaCambio
+    
+    # Obtener monedas activas con sus tasas de cambio activas
+    monedas_con_tasas = []
+    monedas_activas = Moneda.objects.filter(es_activa=True).order_by('nombre')
+    
+    for moneda in monedas_activas:
+        tasa_activa = TasaCambio.objects.filter(
+            moneda=moneda,
+            es_activa=True
+        ).first()
+        
+        if tasa_activa:
+            monedas_con_tasas.append({
+                'moneda': moneda,
+                'tasa': tasa_activa
+            })
+    
+    context = {
+        'monedas_con_tasas': monedas_con_tasas
+    }
+    
+    return render(request, 'welcome.html', context)
 
 def docs_view(request, path=''):
     """Vista para servir la documentación Sphinx"""
