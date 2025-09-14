@@ -40,6 +40,20 @@ def login_view(request):
                     messages.error(request, f'Error al enviar el código: {mensaje}')
             else:
                 messages.error(request, "Correo electrónico o contraseña inválidos.")
+        else:
+            # Verificar si hay un usuario no verificado
+            unverified_user = form.get_unverified_user()
+            if unverified_user:
+                # Guardar información en sesión para reenvío de verificación
+                request.session['user_id_to_verify'] = unverified_user.id
+                request.session['verification_type'] = 'registro'
+                
+                
+                return render(request, 'auth/login.html', {
+                    'form': form,
+                    'show_resend_verification': True,
+                    'user_email': unverified_user.email
+                })
     else:
         form = LoginForm()
 
@@ -118,7 +132,8 @@ def registro_view(request):
         if form.is_valid():
             # Crear el usuario
             user = form.save(commit=False)
-            user.activo = False  # El usuario no estará activo hasta verificar el email
+            user.activo = False  # Email no verificado hasta confirmar
+            user.es_activo = True  # Usuario habilitado para el sistema
             user.save()
             
             # Limpiar códigos expirados
@@ -144,16 +159,20 @@ def registro_view(request):
                     messages.success(request, '¡Registro exitoso! Se ha enviado un código de verificación a tu correo electrónico.')
                     return redirect('auth:verificar_registro')
                 else:
-                    # Si falla el envío de email, eliminar el usuario y mostrar error
-                    user.delete()
-                    messages.error(request, f'Error al enviar el email de verificación: {mensaje}')
-                    return redirect('auth:registro')
+                    # Si falla el envío de email, mantener usuario inactivo y permitir reenvío
+                    user.activo = False  # Email no verificado
+                    user.es_activo = True  # Usuario habilitado para reenvío
+                    user.save()
+                    messages.error(request, f'Error al enviar el email de verificación: {mensaje}. Puedes intentar reenviar el código.')
+                    return redirect('auth:verificar_registro')  # Ir a página de verificación
                     
             except Exception as e:
-                # Si falla el envío de email, eliminar el usuario y mostrar error
-                user.delete()
-                messages.error(request, 'Error inesperado al enviar el email de verificación. Por favor, intenta de nuevo.')
-                return redirect('auth:registro')
+                # Si falla el envío de email, mantener usuario inactivo y permitir reenvío
+                user.activo = False  # Email no verificado
+                user.es_activo = True  # Usuario habilitado para reenvío
+                user.save()
+                messages.error(request, 'Error inesperado al enviar el email de verificación. Puedes intentar reenviar el código.')
+                return redirect('auth:verificar_registro')  # Ir a página de verificación
     else:
         form = RegistroForm()
     
@@ -183,8 +202,8 @@ def verificar_registro_view(request):
                 )
                 
                 if es_valido:
-                    # Activar el usuario
-                    user.activo = True
+                    # Activar verificación de email
+                    user.activo = True  # Email verificado
                     user.save()
                     
                     # Limpiar la sesión
@@ -210,14 +229,8 @@ def verificar_registro_view(request):
                         if codigos_usuario.usado:
                             messages.error(request, 'Este código ya ha sido utilizado.')
                         else:
-                            messages.error(request, 'El código de verificación ha expirado. Por favor, regístrate de nuevo.')
-                            # Eliminar usuario si el código expiró
-                            user.delete()
-                            if 'user_id_to_verify' in request.session:
-                                del request.session['user_id_to_verify']
-                            if 'verification_type' in request.session:
-                                del request.session['verification_type']
-                            return redirect('auth:registro')
+                            messages.error(request, 'El código de verificación ha expirado. Puedes solicitar un nuevo código.')
+                            return redirect('auth:verificar_registro')
                     else:
                         messages.error(request, 'Código de verificación incorrecto.')
                         
@@ -278,3 +291,48 @@ def reenviar_codigo_view(request):
         return redirect('auth:verificar_registro')
     else:
         return redirect('auth:verify_code')
+
+def reenviar_verificacion_login_view(request):
+    """Vista para reenviar código de verificación desde login"""
+    user_id = request.session.get('user_id_to_verify')
+    
+    if not user_id:
+        messages.error(request, 'No hay una sesión de verificación activa.')
+        return redirect('auth:login')
+    
+    try:
+        User = get_user_model()
+        user = User.objects.get(id=user_id)
+        
+        # Verificar que el usuario realmente necesita verificación
+        if user.activo:
+            messages.info(request, 'Tu cuenta ya está verificada. Puedes iniciar sesión normalmente.')
+            return redirect('auth:login')
+        
+        # Limpiar códigos expirados
+        CodigoVerificacion.limpiar_codigos_expirados()
+        
+        # Crear nuevo código de verificación para registro
+        codigo_obj = CodigoVerificacion.crear_codigo(
+            usuario=user,
+            tipo='registro',
+            request=request,
+            minutos_expiracion=5
+        )
+        
+        # Actualizar sesión
+        request.session['verification_type'] = 'registro'
+        
+        # Enviar email
+        exito, mensaje = EmailService.enviar_codigo_verificacion(user, codigo_obj, request)
+        
+        if exito:
+            messages.success(request, 'Se ha enviado un nuevo código de verificación a tu correo.')
+            return redirect('auth:verificar_registro')
+        else:
+            messages.error(request, f'Error al reenviar el código: {mensaje}')
+            return redirect('auth:login')
+            
+    except User.DoesNotExist:
+        messages.error(request, 'Usuario no encontrado.')
+        return redirect('auth:login')

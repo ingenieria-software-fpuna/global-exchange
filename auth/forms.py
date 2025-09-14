@@ -18,18 +18,28 @@ class LoginForm(forms.Form):
         password = cleaned_data.get('password')
         
         if email and password:
-            user_model =get_user_model()
+            user_model = get_user_model()
             try:
                 user = user_model.objects.get(email=email)
                 
-                # Verificar si el usuario está activo
+                # PRIMERO: Verificar la contraseña antes que nada
+                authenticated_user = authenticate(username=user.email, password=password)
+                
+                if authenticated_user is None:
+                    raise forms.ValidationError("Contraseña incorrecta")
+                
+                # SEGUNDO: Verificar si el usuario está activo
                 if not user.es_activo:
                     raise forms.ValidationError("Tu cuenta está desactivada. Contacta al administrador.")
                 
-                self.user_cache = authenticate(username=user.email, password=password)
+                # TERCERO: Verificar que el email está verificado
+                if not user.activo:
+                    # Guardar el usuario para poder reenviar verificación
+                    self.unverified_user = user
+                    raise forms.ValidationError("Debes verificar tu correo electrónico antes de iniciar sesión.")
                 
-                if self.user_cache is None:
-                    raise forms.ValidationError("Contraseña incorrecta")
+                # Todo OK, guardar el usuario autenticado
+                self.user_cache = authenticated_user
                     
             except user_model.DoesNotExist:
                 raise forms.ValidationError("El correo electrónico no existe")
@@ -37,7 +47,10 @@ class LoginForm(forms.Form):
         return cleaned_data
         
     def get_user(self):
-        return self.user_cache
+        return getattr(self, 'user_cache', None)
+    
+    def get_unverified_user(self):
+        return getattr(self, 'unverified_user', None)
 class VerificationCodeForm(forms.Form):
     code = forms.CharField(
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Código de verificación'}),
