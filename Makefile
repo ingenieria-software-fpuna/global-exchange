@@ -1,4 +1,4 @@
-.PHONY: db-up db-clean app-run app-migrate check-admin-group app-setup user user-fast app-reset help docs-html docs-clean docs-live app-test
+.PHONY: db-up db-clean app-run app-migrate check-admin-group app-setup user user-fast app-reset help docs-html docs-clean docs-live app-test create-currencies
 
 #-------------- Operaciones de base de datos ----------------#
 db-up:
@@ -25,6 +25,10 @@ check-admin-group:
 	@echo "Verificando grupo Admin del sistema..."
 	poetry run python scripts/check_admin_group.py
 
+create-currencies:
+	@echo "Poblando base de datos con monedas y tasas de cambio de ejemplo..."
+	poetry run python scripts/create_currencies_test.py
+
 migrate-groups:
 	@echo "Migrando grupos existentes al nuevo modelo..."
 	poetry run python manage.py migrate_grupos_existentes
@@ -40,6 +44,7 @@ app-setup:
 	sleep 5
 	make app-migrate
 	make check-admin-group
+	make create-currencies
 
 #-------------- Comandos de administración ----------------#
 
@@ -77,7 +82,8 @@ help:
 	@echo "  app-run           - Correr el proyecto Django"
 	@echo "  app-migrate       - Aplicar migraciones de la base de datos"
 	@echo "  app-test          - Ejecutar todos los tests del proyecto"
-	@echo "  app-setup         - Configurar el proyecto (db + migraciones + grupos)"
+	@echo "  app-setup         - Configurar el proyecto (db + migraciones + grupos + datos ejemplo)"
+	@echo "  create-currencies - Poblar base de datos con monedas y tasas de ejemplo"
 	@echo "  migrate-groups    - Migrar grupos existentes al nuevo modelo"
 	@echo "  test-grupo-permisos - Probar funcionalidad de permisos con grupos activos/inactivos"
 	@echo "  user [username] [-f] - Crear usuario de desarrollo (interactivo o con username)"
