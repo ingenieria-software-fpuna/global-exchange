@@ -2,6 +2,7 @@
 from django import forms
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.models import Group
+from datetime import date
 class LoginForm(forms.Form):
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Correo electrónico'}),
@@ -54,6 +55,17 @@ class UsuarioCreationForm(forms.ModelForm):
         if password and password2 and password != password2:
             raise forms.ValidationError("Las contraseñas no coinciden.")
         return cleaned_data
+    
+    def clean_fecha_nacimiento(self):
+        fecha_nacimiento = self.cleaned_data.get('fecha_nacimiento')
+        if fecha_nacimiento:
+            today = date.today()
+            age = today.year - fecha_nacimiento.year
+            if today.month < fecha_nacimiento.month or (today.month == fecha_nacimiento.month and today.day < fecha_nacimiento.day):
+                age -= 1
+            if age < 18:
+                raise forms.ValidationError("El usuario debe ser mayor de 18 años.")
+        return fecha_nacimiento
 
     def save(self, commit=True):
         user = super().save(commit=False)
@@ -86,6 +98,18 @@ class UsuarioUpdateForm(forms.ModelForm):
             'fecha_nacimiento': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }
     
+    def clean_fecha_nacimiento(self):
+        fecha_nacimiento = self.cleaned_data.get('fecha_nacimiento')
+        if fecha_nacimiento:
+            today = date.today()
+            # Calcular edad de manera más precisa
+            age = today.year - fecha_nacimiento.year
+            if today.month < fecha_nacimiento.month or (today.month == fecha_nacimiento.month and today.day < fecha_nacimiento.day):
+                age -= 1
+            if age < 18:
+                raise forms.ValidationError("El usuario debe ser mayor de 18 años.")
+        return fecha_nacimiento
+
     def get_user(self):
         return self.user_cache
 
