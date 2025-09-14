@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.forms import UserCreationForm
 from usuarios.models import Usuario
+from datetime import date
 class LoginForm(forms.Form):
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Correo electrónico'}),
@@ -104,3 +105,14 @@ class RegistroForm(UserCreationForm):
         if len(cedula) < 5:
             raise forms.ValidationError("La cédula debe tener al menos 5 dígitos.")
         return cedula
+    
+    def clean_fecha_nacimiento(self):
+        fecha_nacimiento = self.cleaned_data.get('fecha_nacimiento')
+        if fecha_nacimiento:
+            today = date.today()
+            age = today.year - fecha_nacimiento.year
+            if today.month < fecha_nacimiento.month or (today.month == fecha_nacimiento.month and today.day < fecha_nacimiento.day):
+                age -= 1
+            if age < 18:
+                raise forms.ValidationError("Debes ser mayor de 18 años para registrarte.")
+        return fecha_nacimiento
