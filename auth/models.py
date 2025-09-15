@@ -136,3 +136,87 @@ class CodigoVerificacion(models.Model):
             return True, codigo_obj
         except cls.DoesNotExist:
             return False, None
+
+
+class PasswordResetToken(models.Model):
+    """Modelo para tokens de reset de contraseña"""
+    
+    usuario = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        verbose_name="Usuario"
+    )
+    token = models.CharField(
+        max_length=64,
+        unique=True,
+        verbose_name="Token"
+    )
+    fecha_creacion = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de Creación"
+    )
+    fecha_expiracion = models.DateTimeField(
+        verbose_name="Fecha de Expiración"
+    )
+    usado = models.BooleanField(
+        default=False,
+        verbose_name="Usado"
+    )
+    ip_address = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        verbose_name="Dirección IP"
+    )
+    
+    class Meta:
+        verbose_name = "Token de Reset de Contraseña"
+        verbose_name_plural = "Tokens de Reset de Contraseña"
+    
+    def __str__(self):
+        return f"Token para {self.usuario.email} - {self.fecha_creacion}"
+    
+    def save(self, *args, **kwargs):
+        if not self.token:
+            self.token = self.generar_token()
+        if not self.fecha_expiracion:
+            # Token válido por 1 hora
+            self.fecha_expiracion = timezone.now() + timedelta(hours=1)
+        super().save(*args, **kwargs)
+    
+    def generar_token(self):
+        """Genera un token único"""
+        while True:
+            token = ''.join(random.choices(string.ascii_letters + string.digits, k=64))
+            if not PasswordResetToken.objects.filter(token=token).exists():
+                return token
+    
+    def marcar_como_usado(self):
+        """Marca el token como usado"""
+        self.usado = True
+        self.save()
+    
+    def es_valido(self):
+        """Verifica si el token es válido"""
+        return not self.usado and self.fecha_expiracion > timezone.now()
+    
+    @classmethod
+    def limpiar_tokens_expirados(cls):
+        """Limpia tokens expirados y usados antiguos"""
+        fecha_limite = timezone.now() - timedelta(hours=24)
+        cls.objects.filter(
+            models.Q(fecha_expiracion__lt=timezone.now()) |
+            models.Q(usado=True, fecha_creacion__lt=fecha_limite)
+        ).delete()
+    
+    @classmethod
+    def crear_token(cls, usuario, request=None):
+        """Crea un nuevo token para el usuario"""
+        # Limpiar tokens anteriores del usuario
+        cls.objects.filter(usuario=usuario).delete()
+        
+        # Crear nuevo token
+        token = cls.objects.create(
+            usuario=usuario,
+            ip_address=request.META.get('REMOTE_ADDR') if request else None
+        )
+        return token

@@ -13,4 +13,9 @@ urlpatterns = [
     path('verificar-registro/', views.verificar_registro_view, name='verificar_registro'),
     path('reenviar-codigo/', views.reenviar_codigo_view, name='reenviar_codigo'),
     path('reenviar-verificacion-login/', views.reenviar_verificacion_login_view, name='reenviar_verificacion_login'),
+    
+    # URLs para reset de contraseña
+    path('olvide-mi-contrasena/', views.password_reset_request_view, name='password_reset_request'),
+    path('reset-contrasena/<str:token>/', views.password_reset_confirm_view, name='password_reset_confirm'),
+    path('contrasena-cambiada/', views.password_reset_complete_view, name='password_reset_complete'),
 ]
