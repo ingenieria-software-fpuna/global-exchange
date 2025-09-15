@@ -14,6 +14,8 @@ import json
 
 from .models import TasaCambio
 from .forms import TasaCambioForm, TasaCambioSearchForm
+from monedas.models import Moneda
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 
 class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
@@ -170,9 +172,12 @@ def tasacambio_detail_api(request, pk):
 
 
 @login_required
-@permission_required('tasa_cambio.view_tasacambio', raise_exception=True) 
+@permission_required('tasa_cambio.view_tasacambio', raise_exception=True)
 def dashboard_tasacambio(request):
     """Vista del dashboard específico para tasas de cambio"""
+    # Monedas activas para el simulador (todas las activas)
+    monedas_activas = Moneda.objects.filter(es_activa=True).order_by('nombre')
+
     context = {
         'titulo': 'Dashboard de Cotizaciones',
         'total_cotizaciones': TasaCambio.objects.count(),
@@ -180,6 +185,103 @@ def dashboard_tasacambio(request):
         'cotizaciones_inactivas': TasaCambio.objects.filter(es_activa=False).count(),
         'cotizaciones_recientes': TasaCambio.objects.select_related('moneda').order_by('-fecha_creacion')[:5],
         'monedas_con_cotizacion': TasaCambio.objects.filter(es_activa=True).select_related('moneda').count(),
+        'monedas': monedas_activas,
     }
     
     return render(request, 'tasa_cambio/dashboard.html', context)
+
+
+def simular_cambio_api(request):
+    """
+    API para simular un cambio entre dos monedas usando las tasas activas.
+
+    Reglas:
+    - Base operativa: PYG (Guaraní). Si ninguna de las dos es PYG, se cruza vía PYG.
+    - De moneda -> PYG: se usa tasa_compra de la moneda origen.
+    - De PYG -> moneda: se usa tasa_venta de la moneda destino.
+    - De A -> B (ambas distintas de PYG): resultado = monto * tasa_compra_A / tasa_venta_B.
+    - Si origen == destino, resultado = monto.
+    """
+    codigo_origen = request.GET.get('origen')
+    codigo_destino = request.GET.get('destino')
+    monto_str = request.GET.get('monto')
+
+    if not codigo_origen or not codigo_destino or not monto_str:
+        return JsonResponse({'success': False, 'message': 'Parámetros requeridos: origen, destino, monto.'}, status=400)
+
+    try:
+        monto = Decimal(monto_str)
+        if monto <= 0:
+            raise InvalidOperation
+    except Exception:
+        return JsonResponse({'success': False, 'message': 'Monto inválido.'}, status=400)
+
+    BASE = 'PYG'
+
+    # Validar que exactamente uno de los dos sea PYG
+    origen_es_pyg = codigo_origen.upper() == BASE
+    destino_es_pyg = codigo_destino.upper() == BASE
+    if origen_es_pyg and destino_es_pyg:
+        return JsonResponse({'success': False, 'message': 'Seleccione una moneda distinta de PYG en uno de los lados.'}, status=400)
+    if not origen_es_pyg and not destino_es_pyg:
+        return JsonResponse({'success': False, 'message': 'No se permiten cruces entre monedas. Use PYG como origen o destino.'}, status=400)
+
+    # Cargar la moneda no-PYG desde BD
+    otro_codigo = codigo_destino if origen_es_pyg else codigo_origen
+    try:
+        moneda_no_pyg = Moneda.objects.get(codigo__iexact=otro_codigo, es_activa=True)
+    except Moneda.DoesNotExist:
+        return JsonResponse({'success': False, 'message': f'Moneda {otro_codigo.upper()} no encontrada o inactiva.'}, status=404)
+
+    # Helper para obtener la tasa activa de una moneda
+    def get_tasa_activa(moneda: Moneda):
+        return TasaCambio.objects.filter(moneda=moneda, es_activa=True).first()
+
+    # Conversión según combinaciones
+    detalle = ''
+    tasa_origen_usada = None
+    tasa_destino_usada = None
+    resultado = Decimal('0')
+
+    # Caso: origen es PYG
+    if origen_es_pyg:
+        destino = moneda_no_pyg
+        tasa_destino = get_tasa_activa(destino)
+        if not tasa_destino:
+            return JsonResponse({'success': False, 'message': f'No hay tasa activa para {destino.codigo}.'}, status=404)
+        # De PYG a destino: usar tasa_venta del destino
+        resultado = (monto / Decimal(tasa_destino.tasa_venta)).quantize(Decimal('1.' + '0'*max(destino.decimales, 0)), rounding=ROUND_HALF_UP)
+        tasa_destino_usada = {
+            'moneda': destino.codigo,
+            'tipo': 'venta',
+            'valor': float(tasa_destino.tasa_venta),
+        }
+        detalle = f"PYG -> {destino.codigo} usando tasa de venta"
+        resultado_formateado = destino.mostrar_monto(resultado)
+
+    else:
+        # destino_es_pyg
+        origen = moneda_no_pyg
+        tasa_origen = get_tasa_activa(origen)
+        if not tasa_origen:
+            return JsonResponse({'success': False, 'message': f'No hay tasa activa para {origen.codigo}.'}, status=404)
+        # De origen a PYG: usar tasa_compra del origen
+        resultado = (monto * Decimal(tasa_origen.tasa_compra)).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+        tasa_origen_usada = {
+            'moneda': origen.codigo,
+            'tipo': 'compra',
+            'valor': float(tasa_origen.tasa_compra),
+        }
+        detalle = f"{origen.codigo} -> PYG usando tasa de compra"
+        resultado_formateado = f"PYG {int(resultado)}"
+
+    return JsonResponse({
+        'success': True,
+        'data': {
+            'resultado': float(resultado),
+            'resultado_formateado': resultado_formateado,
+            'detalle': detalle,
+            'tasa_origen': tasa_origen_usada,
+            'tasa_destino': tasa_destino_usada,
+        }
+    })

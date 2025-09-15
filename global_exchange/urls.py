@@ -46,7 +46,8 @@ def welcome_view(request):
             })
     
     context = {
-        'monedas_con_tasas': monedas_con_tasas
+        'monedas_con_tasas': monedas_con_tasas,
+        'monedas': monedas_activas,
     }
     
     return render(request, 'welcome.html', context)
