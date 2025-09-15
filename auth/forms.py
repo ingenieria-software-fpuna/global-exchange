@@ -129,3 +129,61 @@ class RegistroForm(UserCreationForm):
             if age < 18:
                 raise forms.ValidationError("Debes ser mayor de 18 años para registrarte.")
         return fecha_nacimiento
+
+
+class PasswordResetRequestForm(forms.Form):
+    """Formulario para solicitar reset de contraseña"""
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control', 
+            'placeholder': 'Correo electrónico'
+        }),
+        label="Correo electrónico",
+        help_text="Ingresa tu correo electrónico para recibir las instrucciones de restablecimiento."
+    )
+    
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        user_model = get_user_model()
+        try:
+            user = user_model.objects.get(email=email)
+            if not user.es_activo:
+                raise forms.ValidationError("Tu cuenta está desactivada. Contacta al administrador.")
+            if not user.activo:
+                raise forms.ValidationError("Tu cuenta no está verificada. Verifica tu correo primero.")
+            self.user_cache = user
+        except user_model.DoesNotExist:
+            raise forms.ValidationError("No existe una cuenta con este correo electrónico.")
+        return email
+    
+    def get_user(self):
+        return getattr(self, 'user_cache', None)
+
+
+class PasswordResetForm(forms.Form):
+    """Formulario para establecer nueva contraseña"""
+    password1 = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control', 
+            'placeholder': 'Nueva contraseña'
+        }),
+        label="Nueva contraseña",
+        min_length=8,
+        help_text="La contraseña debe tener al menos 8 caracteres."
+    )
+    password2 = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control', 
+            'placeholder': 'Confirmar nueva contraseña'
+        }),
+        label="Confirmar nueva contraseña"
+    )
+    
+    def clean_password2(self):
+        password1 = self.cleaned_data.get('password1')
+        password2 = self.cleaned_data.get('password2')
+        
+        if password1 and password2 and password1 != password2:
+            raise forms.ValidationError("Las contraseñas no coinciden.")
+        
+        return password2
