@@ -80,6 +80,7 @@ urlpatterns = [
     path('clientes/', include('clientes.urls', namespace='clientes')),
     path('monedas/', include('monedas.urls', namespace='monedas')),
     path('tasa-cambio/', include('tasa_cambio.urls', namespace='tasa_cambio')),
+    path('metodos-pago/', include('metodo_pago.urls', namespace='metodo_pago')),
     path('docs/', docs_view, name='docs_index'),
     path('docs/<path:path>', docs_view, name='docs'),
 ]

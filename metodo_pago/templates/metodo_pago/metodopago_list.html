@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Métodos de Pago - Global Exchange{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'auth:dashboard' %}">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-credit-card me-1"></i>Métodos de Pago
+            </li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-start mb-3">
+        <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='{% url "auth:dashboard" %}'">
+            <i class="fas fa-arrow-left me-2"></i>Volver al Dashboard
+        </button>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-credit-card text-primary me-2"></i>
+            Métodos de Pago
+        </h1>
+        {% if can_create_metodopago %}
+        <a href="{% url 'metodo_pago:metodopago_create' %}" class="btn btn-success">
+            <i class="fas fa-plus me-2"></i>Nuevo Método
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-6">
+                    <label for="q" class="form-label">Buscar</label>
+                    <input type="text" id="q" name="q" class="form-control" value="{{ q }}" placeholder="Nombre o descripción..." />
+                </div>
+                <div class="col-md-3">
+                    <label for="estado" class="form-label">Estado</label>
+                    <select id="estado" name="estado" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="activo" {% if estado == 'activo' %}selected{% endif %}>Activos</option>
+                        <option value="inactivo" {% if estado == 'inactivo' %}selected{% endif %}>Inactivos</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-1"></i>Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if metodos %}
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Descripción</th>
+                            <th>Comisión</th>
+                            <th>Estado</th>
+                            <th>Creado</th>
+                            <th>Actualizado</th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in metodos %}
+                        <tr>
+                            <td><strong>{{ m.nombre }}</strong></td>
+                            <td class="text-muted">{{ m.descripcion|default:"-" }}</td>
+                            <td><span class="badge bg-info text-dark">{{ m.comision }}%</span></td>
+                            <td>
+                                {% if m.es_activo %}
+                                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Activo</span>
+                                {% else %}
+                                <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Inactivo</span>
+                                {% endif %}
+                            </td>
+                            <td><small class="text-muted">{{ m.fecha_creacion|date:"d/m/Y H:i" }}</small></td>
+                            <td><small class="text-muted">{{ m.fecha_actualizacion|date:"d/m/Y H:i" }}</small></td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group">
+                                    {% if can_edit_metodopago %}
+                                    <a href="{% url 'metodo_pago:metodopago_update' m.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button type="button"
+                                            class="btn btn-sm {% if m.es_activo %}btn-outline-warning{% else %}btn-outline-success{% endif %} toggle-status-btn"
+                                            data-id="{{ m.pk }}"
+                                            title="{% if m.es_activo %}Desactivar{% else %}Activar{% endif %}">
+                                        {% if m.es_activo %}<i class="fas fa-eye-slash"></i>{% else %}<i class="fas fa-eye"></i>{% endif %}
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if is_paginated %}
+            <nav aria-label="Navegación de páginas" class="mt-3">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page=1{% if q %}&q={{ q }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}"><i class="fas fa-angle-double-left"></i></a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}"><i class="fas fa-angle-left"></i></a></li>
+                    {% endif %}
+                    <li class="page-item active"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+                    {% if page_obj.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}"><i class="fas fa-angle-right"></i></a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if q %}&q={{ q }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}"><i class="fas fa-angle-double-right"></i></a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        No se encontraron métodos de pago.
+    </div>
+    {% endif %}
+ </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.toggle-status-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      try {
+        const resp = await fetch(`{% url 'metodo_pago:toggle_status' 0 %}`.replace('/0/', `/${id}/`), {
+          method: 'POST',
+          headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        });
+        const data = await resp.json();
+        if (data.success) { window.location.reload(); }
+        else { alert(data.message || 'Error al cambiar estado'); }
+      } catch (e) { alert('Error de red'); }
+    });
+  });
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+});
+</script>
+{% endblock %}
+
