@@ -15,73 +15,91 @@ fi
 echo "[entrypoint] Applying database migrations..."
 python manage.py migrate --noinput
 
-# Optionally create a development user from env vars
+# Optionally create development users from env vars
 if [ -n "${INIT_USER_EMAIL:-}" ]; then
-  echo "[entrypoint] Creating init user ${INIT_USER_EMAIL} (if not exists)..."
+  echo "[entrypoint] Creating init users from ${INIT_USER_EMAIL}..."
   python - <<'PY'
 import os
 import django
+import random
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'global_exchange.settings')
 django.setup()
 
 from django.db import IntegrityError
 from usuarios.models import Usuario
+from django.contrib.auth.models import Permission, Group
 
-email = os.environ.get('INIT_USER_EMAIL')
-nombre = os.environ.get('INIT_USER_NOMBRE', 'Usuario')
-apellido = os.environ.get('INIT_USER_APELLIDO', 'Prueba')
-cedula = os.environ.get('INIT_USER_CEDULA', '12345678')
-fecha_nacimiento = os.environ.get('INIT_USER_FECHA_NACIMIENTO', '1990-01-01')
+# Get comma-separated emails
+emails_str = os.environ.get('INIT_USER_EMAIL', '')
+emails = [email.strip() for email in emails_str.split(',') if email.strip()]
+
+if not emails:
+    print("❌ No hay emails válidos en INIT_USER_EMAIL")
+    exit()
+
 password = os.environ.get('INIT_USER_PASSWORD', '123456')
-make_admin = os.environ.get('INIT_USER_ADMIN', 'false').lower() == 'true'
+make_admin = os.environ.get('INIT_USER_ADMIN', 'true').lower() == 'true'
 
-try:
-    user, created = Usuario.objects.get_or_create(
-        email=email,
-        defaults={
-            'nombre': nombre,
-            'apellido': apellido,
-            'cedula': cedula,
-            'fecha_nacimiento': fecha_nacimiento,
-        }
-    )
+# Crear grupo de administradores si no existe (una sola vez)
+if make_admin:
+    admin_group, created = Group.objects.get_or_create(name='Admin')
     if created:
-        user.set_password(password)
-        user.save()
-        print(f"✅ Usuario creado: {user.email}")
+        print('✅ Grupo Admin creado')
+        # Asignar todos los permisos al grupo nuevo
+        all_permissions = Permission.objects.all()
+        admin_group.permissions.set(all_permissions)
+        print(f'✅ {all_permissions.count()} permisos asignados al grupo Admin')
     else:
-        print(f"ℹ️  Usuario ya existe: {user.email}")
+        print('✅ Grupo Admin ya existe')
 
-    if make_admin:
-        try:
-            from django.contrib.auth.models import Permission, Group
-            
-            # Crear grupo de administradores si no existe
-            admin_group, created = Group.objects.get_or_create(name='Admin')
-            if created:
-                print('✅ Grupo Admin creado')
-                # Asignar todos los permisos al grupo nuevo
-                all_permissions = Permission.objects.all()
-                admin_group.permissions.set(all_permissions)
-                print(f'✅ {all_permissions.count()} permisos asignados al grupo Admin')
-            else:
-                print('✅ Grupo Admin ya existe')
-            
-            # Agregar usuario al grupo Admin
-            user.groups.add(admin_group)
-            print('✅ Usuario agregado al grupo Admin')
-            
-            # También marcar como staff
-            user.is_staff = True
+for email in emails:
+    try:
+        # Extract name from email (part before @)
+        email_prefix = email.split('@')[0]
+        # Use email prefix as both nombre and apellido for simplicity
+        nombre = email_prefix.capitalize()
+        apellido = "Admin"
+        
+        # Generate a simple cedula based on email (just for uniqueness)
+        cedula = str(abs(hash(email)) % 100000000).zfill(8)
+        fecha_nacimiento = '1990-01-01'
+        
+        user, created = Usuario.objects.get_or_create(
+            email=email,
+            defaults={
+                'nombre': nombre,
+                'apellido': apellido,
+                'cedula': cedula,
+                'fecha_nacimiento': fecha_nacimiento,
+            }
+        )
+        
+        if created:
+            user.set_password(password)
             user.save()
-            print('✅ Usuario marcado como staff')
-            
-        except Exception as e:
-            print(f"⚠️  No se pudo configurar permisos admin: {e}")
-except IntegrityError as e:
-    print(f"❌ Error de integridad: {e}")
-except Exception as e:
-    print(f"❌ Error creando usuario: {e}")
+            print(f"✅ Usuario creado: {user.email} ({nombre} {apellido})")
+        else:
+            print(f"ℹ️  Usuario ya existe: {user.email}")
+
+        if make_admin:
+            try:
+                # Agregar usuario al grupo Admin
+                user.groups.add(admin_group)
+                
+                # También marcar como staff
+                user.is_staff = True
+                user.save()
+                print(f'✅ Usuario {user.email} configurado como admin')
+                
+            except Exception as e:
+                print(f"⚠️  No se pudo configurar permisos admin para {email}: {e}")
+                
+    except IntegrityError as e:
+        print(f"❌ Error de integridad para {email}: {e}")
+    except Exception as e:
+        print(f"❌ Error creando usuario {email}: {e}")
+
+print(f"✅ Procesamiento completado para {len(emails)} email(s)")
 PY
 fi
 
