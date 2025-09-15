@@ -111,5 +111,13 @@ if [ "${CREATE_CURRENCIES:-false}" = "true" ]; then
   }
 fi
 
+# Optionally create payment methods from env var
+if [ "${CREATE_PAYMENT_METHODS:-false}" = "true" ]; then
+  echo "[entrypoint] Creating payment methods..."
+  PYTHONPATH=/app python scripts/create_metodos_pago_test.py || {
+    echo "⚠️  Error creating payment methods, but continuing..."
+  }
+fi
+
 echo "[entrypoint] Starting Django dev server on 0.0.0.0:${PORT}"
 exec python manage.py runserver 0.0.0.0:"${PORT}"

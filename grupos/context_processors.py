@@ -97,6 +97,11 @@ def permissions_context(request):
         context['can_create_tasacambio'] = request.user.has_perm('tasa_cambio.add_tasacambio')
         context['can_edit_tasacambio'] = request.user.has_perm('tasa_cambio.change_tasacambio')
         
+        # Permisos específicos para métodos de pago
+        context['can_view_metodopago'] = request.user.has_perm('metodo_pago.view_metodopago')
+        context['can_create_metodopago'] = request.user.has_perm('metodo_pago.add_metodopago')
+        context['can_edit_metodopago'] = request.user.has_perm('metodo_pago.change_metodopago')
+        
         # Dashboard
         context['can_view_dashboard'] = (
             context['is_admin'] or 
@@ -105,7 +110,8 @@ def permissions_context(request):
             context['can_view_groups'] or
             context['can_view_cliente'] or
             context['can_view_monedas'] or
-            context['can_view_tasacambio']
+            context['can_view_tasacambio'] or
+            context['can_view_metodopago']
         )
         
     else:
@@ -143,5 +149,8 @@ def permissions_context(request):
         context['can_create_tasacambio'] = False
         context['can_edit_tasacambio'] = False
         context['can_view_dashboard'] = False
+        context['can_view_metodopago'] = False
+        context['can_create_metodopago'] = False
+        context['can_edit_metodopago'] = False
     
     return context

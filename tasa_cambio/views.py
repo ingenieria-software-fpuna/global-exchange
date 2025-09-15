@@ -17,6 +17,7 @@ from clientes.models import Cliente
 from .forms import TasaCambioForm, TasaCambioSearchForm
 from monedas.models import Moneda
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from metodo_pago.models import MetodoPago
 
 
 class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
@@ -193,6 +194,7 @@ def dashboard_tasacambio(request):
         'monedas_con_cotizacion': TasaCambio.objects.filter(es_activa=True).select_related('moneda').count(),
         'monedas': monedas_activas,
         'clientes': clientes_usuario,
+        'metodos_pago': MetodoPago.objects.filter(es_activo=True).order_by('nombre'),
     }
     
     return render(request, 'tasa_cambio/dashboard.html', context)
@@ -213,6 +215,7 @@ def simular_cambio_api(request):
     codigo_destino = request.GET.get('destino')
     monto_str = request.GET.get('monto')
     cliente_id = request.GET.get('cliente_id')
+    metodo_pago_id = request.GET.get('metodo_pago_id')
 
     if not codigo_origen or not codigo_destino or not monto_str:
         return JsonResponse({'success': False, 'message': 'Parámetros requeridos: origen, destino, monto.'}, status=400)
@@ -271,6 +274,22 @@ def simular_cambio_api(request):
     tasa_origen_usada = None
     tasa_destino_usada = None
     resultado = Decimal('0')
+    resultado_formateado = ''
+
+    # Resolver método de pago y comisión
+    metodo_info = None
+    comision_pct = Decimal('0')
+    if metodo_pago_id:
+        try:
+            mp = MetodoPago.objects.get(pk=metodo_pago_id, es_activo=True)
+            comision_pct = Decimal(str(mp.comision))
+            metodo_info = {
+                'id': mp.id,
+                'nombre': mp.nombre,
+                'comision': float(comision_pct),
+            }
+        except MetodoPago.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Método de pago inválido o inactivo.'}, status=404)
 
     # Caso: origen es PYG
     if origen_es_pyg:
@@ -293,6 +312,13 @@ def simular_cambio_api(request):
         if descuento_pct > 0:
             detalle += f" con descuento {descuento_pct}%"
         resultado_formateado = destino.mostrar_monto(resultado)
+        # Calcular comisión y total neto sobre la moneda destino
+        subtotal = resultado
+        comision_monto = (subtotal * (comision_pct / Decimal('100'))).quantize(Decimal('1.' + '0'*max(destino.decimales, 0)), rounding=ROUND_HALF_UP)
+        total_neto = (subtotal - comision_monto).quantize(Decimal('1.' + '0'*max(destino.decimales, 0)), rounding=ROUND_HALF_UP)
+        subtotal_formateado = destino.mostrar_monto(subtotal)
+        comision_formateada = destino.mostrar_monto(comision_monto)
+        total_formateado = destino.mostrar_monto(total_neto)
 
     else:
         # destino_es_pyg
@@ -315,6 +341,18 @@ def simular_cambio_api(request):
         if descuento_pct > 0:
             detalle += f" con descuento {descuento_pct}%"
         resultado_formateado = f"PYG {int(resultado)}"
+        # Calcular comisión y total neto sobre PYG
+        subtotal = resultado
+        comision_monto = (subtotal * (comision_pct / Decimal('100'))).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+        total_neto = (subtotal - comision_monto).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+        subtotal_formateado = f"PYG {int(subtotal)}"
+        comision_formateada = f"PYG {int(comision_monto)}"
+        total_formateado = f"PYG {int(total_neto)}"
+
+    # Si hay método de pago, usar total neto como resultado principal
+    if comision_pct > 0:
+        resultado = total_neto
+        resultado_formateado = total_formateado
 
     return JsonResponse({
         'success': True,
@@ -325,5 +363,13 @@ def simular_cambio_api(request):
             'tasa_origen': tasa_origen_usada,
             'tasa_destino': tasa_destino_usada,
             'cliente': cliente_info,
+            'metodo_pago': metodo_info,
+            'subtotal': float(subtotal),
+            'subtotal_formateado': subtotal_formateado,
+            'comision_pct': float(comision_pct),
+            'comision_monto': float(comision_monto),
+            'comision_monto_formateado': comision_formateada,
+            'total_neto': float(total_neto),
+            'total_neto_formateado': total_formateado,
         }
     })
