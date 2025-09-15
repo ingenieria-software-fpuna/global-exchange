@@ -41,6 +41,13 @@
                             {{ form.password }}
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Iniciar Sesión</button>
+                        
+                        <!-- Enlace para olvidé mi contraseña -->
+                        <div class="text-center mt-3">
+                            <a href="{% url 'auth:password_reset_request' %}" class="text-muted small">
+                                <i class="fas fa-key me-1"></i>¿Olvidaste tu contraseña?
+                            </a>
+                        </div>
                     </form>
                     
                     {% if show_resend_verification %}

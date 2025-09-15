@@ -336,3 +336,95 @@ def reenviar_verificacion_login_view(request):
     except User.DoesNotExist:
         messages.error(request, 'Usuario no encontrado.')
         return redirect('auth:login')
+
+
+def password_reset_request_view(request):
+    """Vista para solicitar reset de contraseña"""
+    from .forms import PasswordResetRequestForm
+    from .models import PasswordResetToken
+    
+    if request.method == 'POST':
+        form = PasswordResetRequestForm(request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            
+            # Limpiar tokens expirados
+            PasswordResetToken.limpiar_tokens_expirados()
+            
+            # Crear nuevo token
+            token_obj = PasswordResetToken.crear_token(user, request)
+            
+            # Enviar email
+            exito, mensaje = EmailService.enviar_reset_password(user, token_obj, request)
+            
+            if exito:
+                messages.success(
+                    request, 
+                    'Se han enviado las instrucciones de restablecimiento a tu correo electrónico. '
+                    'Revisa tu bandeja de entrada y sigue las instrucciones.'
+                )
+                return redirect('auth:login')
+            else:
+                messages.error(request, f'Error al enviar el email: {mensaje}')
+    else:
+        form = PasswordResetRequestForm()
+    
+    return render(request, 'auth/password_reset_request.html', {'form': form})
+
+
+def password_reset_confirm_view(request, token):
+    """Vista para confirmar reset de contraseña con token"""
+    from .forms import PasswordResetForm
+    from .models import PasswordResetToken
+    
+    try:
+        token_obj = PasswordResetToken.objects.get(token=token)
+        
+        if not token_obj.es_valido():
+            messages.error(
+                request, 
+                'El enlace de restablecimiento ha expirado o ya ha sido usado. '
+                'Solicita uno nuevo.'
+            )
+            return redirect('auth:password_reset_request')
+        
+        if request.method == 'POST':
+            form = PasswordResetForm(request.POST)
+            if form.is_valid():
+                # Cambiar la contraseña
+                user = token_obj.usuario
+                new_password = form.cleaned_data['password1']
+                user.set_password(new_password)
+                user.save()
+                
+                # Marcar token como usado
+                token_obj.marcar_como_usado()
+                
+                messages.success(
+                    request, 
+                    '¡Tu contraseña ha sido restablecida exitosamente! '
+                    'Ya puedes iniciar sesión con tu nueva contraseña.'
+                )
+                return redirect('auth:password_reset_complete')
+        else:
+            form = PasswordResetForm()
+        
+        context = {
+            'form': form,
+            'token': token,
+            'user': token_obj.usuario
+        }
+        return render(request, 'auth/password_reset_confirm.html', context)
+        
+    except PasswordResetToken.DoesNotExist:
+        messages.error(
+            request, 
+            'El enlace de restablecimiento no es válido. '
+            'Verifica el enlace o solicita uno nuevo.'
+        )
+        return redirect('auth:password_reset_request')
+
+
+def password_reset_complete_view(request):
+    """Vista de confirmación de reset completado"""
+    return render(request, 'auth/password_reset_complete.html')
