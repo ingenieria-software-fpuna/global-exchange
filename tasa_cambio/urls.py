@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (
     TasaCambioListView, TasaCambioCreateView,
-    toggle_tasacambio_status, tasacambio_detail_api, dashboard_tasacambio
+    toggle_tasacambio_status, tasacambio_detail_api, dashboard_tasacambio,
+    simular_cambio_api,
 )
 
 app_name = 'tasa_cambio'
@@ -15,4 +16,5 @@ urlpatterns = [
     # APIs AJAX
     path('toggle-status/<int:pk>/', toggle_tasacambio_status, name='toggle_status'),
     path('api/detalle/<int:pk>/', tasacambio_detail_api, name='tasacambio_detail_api'),
+    path('api/simular/', simular_cambio_api, name='simular_cambio_api'),
 ]
