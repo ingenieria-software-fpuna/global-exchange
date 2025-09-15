@@ -8,6 +8,7 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from .models import TipoCliente, Cliente
+from .forms import ClienteForm
 
 # Create your views here.
 
@@ -85,47 +86,49 @@ class ClienteListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
 
 class ClienteCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = Cliente
+    form_class = ClienteForm
     template_name = 'clientes/cliente_form.html'
-    fields = [
-        'nombre_comercial', 'ruc', 'direccion', 'correo_electronico', 
-        'numero_telefono', 'tipo_cliente', 'usuarios_asociados', 'activo'
-    ]
     success_url = reverse_lazy('clientes:cliente_list')
     permission_required = 'clientes.add_cliente'
     
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        # Solo mostrar tipos de cliente activos
-        form.fields['tipo_cliente'].queryset = TipoCliente.objects.filter(activo=True)
-        # Solo mostrar usuarios activos
-        form.fields['usuarios_asociados'].queryset = self.request.user.__class__.objects.filter(activo=True)
-        return form
-    
     def form_valid(self, form):
-        messages.success(self.request, 'Cliente creado exitosamente.')
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        
+        # Verificar si el cliente se creó sin usuarios asociados
+        usuarios_asociados = form.cleaned_data.get('usuarios_asociados', [])
+        if not usuarios_asociados:
+            messages.warning(
+                self.request, 
+                'ATENCIÓN: El cliente se ha creado sin usuarios asociados. '
+                'Ningún usuario podrá operar en nombre de este cliente hasta que se asignen usuarios.'
+            )
+        else:
+            messages.success(self.request, 'Cliente creado exitosamente.')
+        
+        return response
 
 class ClienteUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = Cliente
+    form_class = ClienteForm
     template_name = 'clientes/cliente_form.html'
-    fields = [
-        'nombre_comercial', 'ruc', 'direccion', 'correo_electronico', 
-        'numero_telefono', 'tipo_cliente', 'usuarios_asociados', 'activo'
-    ]
     success_url = reverse_lazy('clientes:cliente_list')
     permission_required = 'clientes.change_cliente'
     
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        # Solo mostrar tipos de cliente activos
-        form.fields['tipo_cliente'].queryset = TipoCliente.objects.filter(activo=True)
-        # Solo mostrar usuarios activos
-        form.fields['usuarios_asociados'].queryset = self.request.user.__class__.objects.filter(activo=True)
-        return form
-    
     def form_valid(self, form):
-        messages.success(self.request, 'Cliente actualizado exitosamente.')
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        
+        # Verificar si el cliente se actualizó sin usuarios asociados
+        usuarios_asociados = form.cleaned_data.get('usuarios_asociados', [])
+        if not usuarios_asociados:
+            messages.warning(
+                self.request, 
+                'ATENCIÓN: El cliente se ha actualizado sin usuarios asociados. '
+                'Ningún usuario podrá operar en nombre de este cliente hasta que se asignen usuarios.'
+            )
+        else:
+            messages.success(self.request, 'Cliente actualizado exitosamente.')
+        
+        return response
 
 
 
