@@ -12,6 +12,21 @@
     </div>
     <hr>
     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4 text-center">
+        <!-- Simulador de cambio (acceso público) -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <i class="fas fa-calculator fa-3x text-secondary mb-3"></i>
+                    <h5 class="card-title">Simulador de Cambio</h5>
+                    <p class="card-text">Calcula cuánto recibes al cambiar entre monedas.</p>
+                </div>
+                <div class="card-footer bg-light">
+                    <a href="{% url 'tasa_cambio:dashboard' %}" class="btn btn-outline-secondary w-100">
+                        Abrir Simulador
+                    </a>
+                </div>
+            </div>
+        </div>
         {% if can_view_usuarios %}
         <div class="col">
             <div class="card h-100 shadow-sm">
