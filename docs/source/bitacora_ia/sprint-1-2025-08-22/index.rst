@@ -1,4 +1,4 @@
-22 de Agosto, 2025
+Sprint 1 - 22 de Agosto, 2025
 ==================
 
 Sesiones de IA del 22 de agosto de 2025.
