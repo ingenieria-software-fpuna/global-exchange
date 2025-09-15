@@ -1,0 +1,322 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestión de Grupos{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Breadcrumbs -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'auth:dashboard' %}">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-layer-group me-1"></i>Grupos
+            </li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-start mb-3">
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        onclick="window.location.href='{% url "auth:dashboard" %}'"
+                        title="Volver a la página anterior">
+                    <i class="fas fa-arrow-left me-2"></i>
+                    {{ text|default:"Volver al Dashboard" }}
+                </button>
+            </div>
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-layer-group"></i> Gestión de Grupos
+        </h1>
+        {% if perms.auth.add_group %}
+        <a href="{% url 'grupos:group_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Nuevo Grupo
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Filtros y búsqueda -->
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label for="q" class="form-label">Buscar</label>
+                    <input type="text" class="form-control" id="q" name="q" 
+                           value="{{ q }}" placeholder="Nombre del grupo o permisos...">
+                </div>
+                <div class="col-md-3">
+                    <label for="estado" class="form-label">Estado</label>
+                    <select class="form-select" id="estado" name="estado">
+                        <option value="">Todos los estados</option>
+                        <option value="activo" {% if estado_filter == 'activo' %}selected{% endif %}>Activo</option>
+                        <option value="inactivo" {% if estado_filter == 'inactivo' %}selected{% endif %}>Inactivo</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-1"></i>Filtrar
+                    </button>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <a href="{% url 'grupos:group_list' %}" class="btn btn-outline-secondary w-100">
+                        <i class="fas fa-times me-1"></i>Limpiar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de grupos -->
+    <div class="card shadow">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                Grupos del Sistema ({{ groups|length }})
+            </h6>
+        </div>
+        <div class="card-body">
+            {% if groups %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Permisos</th>
+                            <th>Usuarios</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for group in groups %}
+                        <tr>
+                            <td>
+                                <strong>{{ group.name }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ group.permissions.count }}</span>
+                                {% if group.permissions.count > 0 %}
+                                <small class="text-muted d-block">
+                                    {{ group.permissions.all|slice:":3"|join:", " }}
+                                    {% if group.permissions.count > 3 %}...{% endif %}
+                                </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ group.user_set.count }}</span>
+                            </td>
+                            <td>
+                                {% if group.es_activo %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>Activo
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-times me-1"></i>Inactivo
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    {% if perms.auth.change_permission %}
+                                    <a href="{% url 'grupos:group_permissions' group.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="Gestionar Permisos">
+                                        <i class="fas fa-key"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if perms.auth.change_group %}
+                                    <a href="{% url 'grupos:group_update' group.pk %}" 
+                                       class="btn btn-sm btn-outline-warning" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if perms.auth.change_group %}
+                                    <button type="button" 
+                                            class="btn btn-sm {% if group.es_activo %}btn-outline-warning{% else %}btn-outline-success{% endif %} toggle-status-btn" 
+                                            title="{% if group.es_activo %}Desactivar{% else %}Activar{% endif %}"
+                                            data-group-id="{{ group.pk }}"
+                                            data-current-status="{% if group.es_activo %}true{% else %}false{% endif %}">
+                                        {% if group.es_activo %}
+                                            <i class="fas fa-eye-slash"></i>
+                                        {% else %}
+                                            <i class="fas fa-eye"></i>
+                                        {% endif %}
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginación -->
+            {% if is_paginated %}
+            <nav aria-label="Paginación de grupos">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-layer-group fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No hay grupos creados</h5>
+                <p class="text-muted">Crea el primer grupo para comenzar a gestionar permisos.</p>
+                {% if perms.auth.add_group %}
+                <a href="{% url 'grupos:group_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Crear Primer Grupo
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal para confirmación de cambio de estado -->
+<div class="modal fade" id="statusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Cambio de Estado</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="statusMessage"></p>
+                <div id="relationsInfo" class="mt-3" style="display: none;">
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Relaciones Asociadas:</h6>
+                        <ul id="relationsList" class="mb-0"></ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmStatusChange">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentGroupId = null;
+let currentAction = null;
+
+// Event listener para los botones de toggle status
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.toggle-status-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const groupId = this.getAttribute('data-group-id');
+            const currentStatus = this.getAttribute('data-current-status');
+            const newStatus = currentStatus === 'true' ? 'false' : 'true';
+            
+            toggleGroupStatus(groupId, newStatus);
+        });
+    });
+});
+
+function toggleGroupStatus(groupId, newStatus) {
+    currentGroupId = groupId;
+    currentAction = newStatus;
+    
+    const action = newStatus === 'true' ? 'activar' : 'desactivar';
+    document.getElementById('statusMessage').textContent = 
+        `¿Estás seguro de que quieres ${action} este grupo?`;
+    
+    // Ocultar información de relaciones inicialmente
+    document.getElementById('relationsInfo').style.display = 'none';
+    
+    // Solo mostrar relaciones si se va a desactivar
+    if (newStatus === 'false') {
+        fetch(`/grupos/relations/${groupId}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.has_relations) {
+                    const relationsList = document.getElementById('relationsList');
+                    relationsList.innerHTML = '';
+                    data.relations.forEach(relation => {
+                        const li = document.createElement('li');
+                        li.textContent = relation;
+                        relationsList.appendChild(li);
+                    });
+                    document.getElementById('relationsInfo').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error al obtener relaciones:', error);
+            });
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('statusModal'));
+    modal.show();
+}
+
+document.getElementById('confirmStatusChange').addEventListener('click', function() {
+    if (currentGroupId && currentAction !== null) {
+        fetch(`/grupos/toggle-status/${currentGroupId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                'es_activo': currentAction === 'true'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error al cambiar el estado del grupo: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al cambiar el estado del grupo');
+        });
+        
+        bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide();
+    }
+});
+</script>
+
+{% csrf_token %}
+{% endblock %}

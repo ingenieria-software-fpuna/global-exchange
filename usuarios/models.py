@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin, Group
 
 class UsuarioManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -11,10 +11,22 @@ class UsuarioManager(BaseUserManager):
         usuario.save(using=self._db)
         return usuario
 
-    def create_superuser(self, email, password=None, **extra_fields):
+    def create_admin_user(self, email, password=None, **extra_fields):
+        """
+        Crea un usuario administrador del sistema.
+        Lo asigna al grupo 'Admin' en lugar de usar is_superuser.
+        """
         extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-        return self.create_user(email, password, **extra_fields)
+        extra_fields.setdefault('is_superuser', False)
+        
+        # Crear el usuario
+        usuario = self.create_user(email, password, **extra_fields)
+        
+        # Asignar al grupo de administradores
+        admin_group, created = Group.objects.get_or_create(name='Admin')
+        usuario.groups.add(admin_group)
+        
+        return usuario
 
 class Usuario(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
@@ -22,7 +34,13 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100, blank=True)
     fecha_nacimiento = models.DateField(verbose_name="Fecha de Nacimiento", null=True, blank=True)
+    
+    # Para verificar correo
     activo = models.BooleanField(default=True)
+
+    # Para indicar si el usuario esta activo o inactivo
+    es_activo = models.BooleanField(default=True)
+
     is_staff = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'

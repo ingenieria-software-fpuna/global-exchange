@@ -23,6 +23,8 @@
         </ol>
     </nav>
 
+    {% include 'includes/back_button.html' with text="Volver a Clientes" %}
+    
     <div class="row justify-content-center">
         <div class="col-lg-10">
             <div class="card shadow-sm">
@@ -138,18 +140,16 @@
                                 </h5>
                                 
                                 <div class="mb-3">
-                                    <label for="{{ form.usuarios_asociados.id_for_label }}" class="form-label">
-                                        <strong>Usuarios Asociados:</strong>
-                                    </label>
-                                    {{ form.usuarios_asociados }}
-                                    {% if form.usuarios_asociados.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.usuarios_asociados.errors.0 }}
+                                    <div class="border rounded p-3 bg-light">
+                                        {{ form.usuarios_asociados }}
+                                        {% if form.usuarios_asociados.errors %}
+                                            <div class="invalid-feedback d-block mt-2">
+                                                {{ form.usuarios_asociados.errors.0 }}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text mt-2">
+                                            {{ form.usuarios_asociados.help_text }}
                                         </div>
-                                    {% endif %}
-                                    <div class="form-text">
-                                        Usuarios que pueden operar en nombre de este cliente. 
-                                        Puedes seleccionar múltiples usuarios manteniendo presionada la tecla Ctrl (Cmd en Mac).
                                     </div>
                                 </div>
                             </div>
@@ -159,7 +159,7 @@
                         <div class="row mt-4">
                             <div class="col-12">
                                 <h5 class="text-success mb-3">
-                                    <i class="fas fa-toggle-on me-2"></i>Estado
+                                    <i class="fa-solid fa-shield-halved"></i> Estado
                                 </h5>
                                 
                                 <div class="mb-4">
@@ -179,12 +179,13 @@
                             </div>
                         </div>
 
-                        <div class="d-flex justify-content-between">
-                            <a href="{% url 'clientes:cliente_list' %}" class="btn btn-outline-secondary">
-                                <i class="fas fa-arrow-left me-2"></i>Cancelar
+                        <!-- Botones de acción -->
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <a href="{% url 'clientes:cliente_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
                             </a>
                             <button type="submit" class="btn btn-success">
-                                <i class="fas fa-save me-2"></i>
+                                <i class="fas fa-save"></i> 
                                 {% if form.instance.pk %}Actualizar{% else %}Crear{% endif %}
                             </button>
                         </div>

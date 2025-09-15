@@ -21,6 +21,16 @@
 
     <div class="row">
         <div class="col-12">
+            <div class="d-flex justify-content-start mb-3">
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        onclick="window.location.href='{% url "auth:dashboard" %}'"
+                        title="Volver a la página anterior">
+                    <i class="fas fa-arrow-left me-2"></i>
+                    {{ text|default:"Volver al Dashboard" }}
+                </button>
+            </div>
+            
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1 class="h2">
                     <i class="fas fa-tags text-warning me-2"></i>
@@ -91,13 +101,18 @@
                                                 <i class="fas fa-edit"></i>
                                             </a>
                                             {% endif %}
-                                            {% if can_delete_tipocliente %}
-                                            <a href="{% url 'clientes:tipocliente_delete' tipo.pk %}" 
-                                               class="btn btn-sm btn-outline-danger"
-                                               title="Eliminar"
-                                               onclick="return confirm('¿Estás seguro de que quieres eliminar este tipo de cliente?')">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
+                                            {% if can_edit_tipocliente %}
+                                            <button type="button" 
+                                                    class="btn btn-sm {% if tipo.activo %}btn-outline-warning{% else %}btn-outline-success{% endif %} toggle-status-btn" 
+                                                    title="{% if tipo.activo %}Desactivar{% else %}Activar{% endif %}"
+                                                    data-tipocliente-id="{{ tipo.pk }}"
+                                                    data-current-status="{% if tipo.activo %}true{% else %}false{% endif %}">
+                                                {% if tipo.activo %}
+                                                    <i class="fas fa-eye-slash"></i>
+                                                {% else %}
+                                                    <i class="fas fa-eye"></i>
+                                                {% endif %}
+                                            </button>
                                             {% endif %}
                                         </div>
                                     </td>
@@ -163,4 +178,114 @@
         </div>
     </div>
 </div>
+
+<!-- Modal para confirmación de cambio de estado -->
+<div class="modal fade" id="statusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Cambio de Estado</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="statusMessage"></p>
+                <div id="relationsInfo" class="mt-3" style="display: none;">
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Relaciones Asociadas:</h6>
+                        <ul id="relationsList" class="mb-0"></ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmStatusChange">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentTipoClienteId = null;
+let currentAction = null;
+
+// Event listener para los botones de toggle status
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.toggle-status-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const tipoClienteId = this.getAttribute('data-tipocliente-id');
+            const currentStatus = this.getAttribute('data-current-status');
+            const newStatus = currentStatus === 'true' ? 'false' : 'true';
+            
+            toggleTipoClienteStatus(tipoClienteId, newStatus);
+        });
+    });
+});
+
+function toggleTipoClienteStatus(tipoClienteId, newStatus) {
+    currentTipoClienteId = tipoClienteId;
+    currentAction = newStatus;
+    
+    const action = newStatus === 'true' ? 'activar' : 'desactivar';
+    document.getElementById('statusMessage').textContent = 
+        `¿Estás seguro de que quieres ${action} este tipo de cliente?`;
+    
+    // Ocultar información de relaciones inicialmente
+    document.getElementById('relationsInfo').style.display = 'none';
+    
+    // Solo mostrar relaciones si se va a desactivar
+    if (newStatus === 'false') {
+        fetch(`/clientes/tipos/relations/${tipoClienteId}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.has_relations) {
+                    const relationsList = document.getElementById('relationsList');
+                    relationsList.innerHTML = '';
+                    data.relations.forEach(relation => {
+                        const li = document.createElement('li');
+                        li.textContent = relation;
+                        relationsList.appendChild(li);
+                    });
+                    document.getElementById('relationsInfo').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error al obtener relaciones:', error);
+            });
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('statusModal'));
+    modal.show();
+}
+
+document.getElementById('confirmStatusChange').addEventListener('click', function() {
+    if (currentTipoClienteId && currentAction !== null) {
+        fetch(`/clientes/tipos/toggle-status/${currentTipoClienteId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                'activo': currentAction === 'true'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error al cambiar el estado del tipo de cliente: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al cambiar el estado del tipo de cliente');
+        });
+        
+        bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide();
+    }
+});
+</script>
+
+{% csrf_token %}
 {% endblock %}

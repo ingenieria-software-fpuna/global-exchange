@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load moneda_extras %}
 
 {% block title %}Global Exchange - Casa de Cambios{% endblock %}
 
@@ -20,6 +21,14 @@
   100% { transform: translateX(-50%); }
 }
 @media (prefers-reduced-motion: reduce) { .ticker__track { animation:none; } }
+
+/* Simulator styles */
+.sim-card { border: none; }
+.sim-header-badge { background: rgba(13,110,253,.08); color:#0d6efd; }
+.sim-result { background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%); border:1px solid rgba(0,0,0,.06); }
+.btn-swap { border-radius: 999px; height: 52px; display:flex; align-items:center; justify-content:center; font-size: 1.1rem; }
+.btn-swap i { transition: transform .2s ease; }
+.btn-swap:hover i { transform: rotate(180deg); }
 </style>
 {% endblock %}
 
@@ -56,30 +65,48 @@
     <div class="bg-white" style="height: 24px; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 60%);"></div>
 </section>
 
+
+
 <!-- Ticker de tasas en movimiento -->
+{% if monedas_con_tasas %}
 <section class="py-3">
   <div class="container">
     <div class="ticker shadow-soft" role="region" aria-label="Tasas de cambio en movimiento">
       <div class="ticker__track">
         <!-- Bloque 1 -->
-        <span class="ticker__item"><i class="fas fa-dollar-sign text-primary"></i><span class="ticker__label">USD</span><span class="ticker__value">7.250</span><span class="text-muted">Compra 7.200 · Venta 7.300</span></span>
-        <span class="ticker__item"><i class="fas fa-euro-sign text-primary"></i><span class="ticker__label">EUR</span><span class="ticker__value">7.850</span><span class="text-muted">Compra 7.800 · Venta 7.900</span></span>
-        <span class="ticker__item"><i class="fas fa-brazilian-real-sign text-primary"></i><span class="ticker__label">BRL</span><span class="ticker__value">1.450</span><span class="text-muted">Compra 1.430 · Venta 1.470</span></span>
-        <span class="ticker__item"><i class="fas fa-peso-sign text-primary"></i><span class="ticker__label">ARS</span><span class="ticker__value">8,50</span><span class="text-muted">Compra 8,40 · Venta 8,60</span></span>
+        {% for item in monedas_con_tasas %}
+        <span class="ticker__item">
+          <i class="{{ item.moneda.codigo|get_icono_moneda }} text-primary"></i>
+          <span class="ticker__label">{{ item.moneda.codigo }}</span>
+          <span class="ticker__value">{{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}</span>
+          <span class="text-muted">
+            Compra {{ item.tasa.tasa_compra|formatear_tasa_para_display:item.moneda.decimales }} · 
+            Venta {{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}
+          </span>
+        </span>
+        {% endfor %}
 
         <!-- Bloque 2 (duplicado para desplazamiento infinito) -->
-        <span class="ticker__item"><i class="fas fa-dollar-sign text-primary"></i><span class="ticker__label">USD</span><span class="ticker__value">7.250</span><span class="text-muted">Compra 7.200 · Venta 7.300</span></span>
-        <span class="ticker__item"><i class="fas fa-euro-sign text-primary"></i><span class="ticker__label">EUR</span><span class="ticker__value">7.850</span><span class="text-muted">Compra 7.800 · Venta 7.900</span></span>
-        <span class="ticker__item"><i class="fas fa-brazilian-real-sign text-primary"></i><span class="ticker__label">BRL</span><span class="ticker__value">1.450</span><span class="text-muted">Compra 1.430 · Venta 1.470</span></span>
-        <span class="ticker__item"><i class="fas fa-peso-sign text-primary"></i><span class="ticker__label">ARS</span><span class="ticker__value">8,50</span><span class="text-muted">Compra 8,40 · Venta 8,60</span></span>
+        {% for item in monedas_con_tasas %}
+        <span class="ticker__item">
+          <i class="{{ item.moneda.codigo|get_icono_moneda }} text-primary"></i>
+          <span class="ticker__label">{{ item.moneda.codigo }}</span>
+          <span class="ticker__value">{{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}</span>
+          <span class="text-muted">
+            Compra {{ item.tasa.tasa_compra|formatear_tasa_para_display:item.moneda.decimales }} · 
+            Venta {{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}
+          </span>
+        </span>
+        {% endfor %}
       </div>
     </div>
   </div>
   <div class="bg-white" style="height: 16px;"></div>
-  
 </section>
+{% endif %}
 
 <!-- Tasas de cambio -->
+{% if monedas_con_tasas %}
 <section class="py-5">
     <div class="container">
         <div class="text-center mb-5">
@@ -88,61 +115,26 @@
         </div>
 
         <div class="row g-4 justify-content-center">
+            {% for item in monedas_con_tasas %}
             <div class="col-12 col-sm-6 col-md-4 col-lg-3">
                 <div class="card h-100">
                     <div class="card-body text-center">
-                        <div class="display-6 text-primary mb-2"><i class="fas fa-dollar-sign"></i></div>
-                        <h5 class="card-title">Dólar Americano</h5>
+                        <div class="display-6 text-primary mb-2">
+                            <i class="{{ item.moneda.codigo|get_icono_moneda }}"></i>
+                        </div>
+                        <h5 class="card-title">{{ item.moneda.nombre }}</h5>
                         <p class="mb-1">
-                            <span class="h4 text-success">7,250</span>
-                            <small class="text-muted"> PYG/USD</small>
+                            <span class="h4 text-success">{{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}</span>
+                            <small class="text-muted"> PYG/{{ item.moneda.codigo }}</small>
                         </p>
-                        <small class="text-muted">Compra: 7,200 · Venta: 7,300</small>
+                        <small class="text-muted">
+                            Compra: {{ item.tasa.tasa_compra|formatear_tasa_para_display:item.moneda.decimales }} · 
+                            Venta: {{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}
+                        </small>
                     </div>
                 </div>
             </div>
-
-            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <div class="display-6 text-primary mb-2"><i class="fas fa-euro-sign"></i></div>
-                        <h5 class="card-title">Euro</h5>
-                        <p class="mb-1">
-                            <span class="h4 text-success">7,850</span>
-                            <small class="text-muted"> PYG/EUR</small>
-                        </p>
-                        <small class="text-muted">Compra: 7,800 · Venta: 7,900</small>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <div class="display-6 text-primary mb-2"><i class="fas fa-brazilian-real-sign"></i></div>
-                        <h5 class="card-title">Real Brasileño</h5>
-                        <p class="mb-1">
-                            <span class="h4 text-success">1,450</span>
-                            <small class="text-muted"> PYG/BRL</small>
-                        </p>
-                        <small class="text-muted">Compra: 1,430 · Venta: 1,470</small>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <div class="display-6 text-primary mb-2"><i class="fas fa-peso-sign"></i></div>
-                        <h5 class="card-title">Peso Argentino</h5>
-                        <p class="mb-1">
-                            <span class="h4 text-success">8.50</span>
-                            <small class="text-muted"> PYG/ARS</small>
-                        </p>
-                        <small class="text-muted">Compra: 8.40 · Venta: 8.60</small>
-                    </div>
-                </div>
-            </div>
+            {% endfor %}
         </div>
 
         <div class="row mt-5">
@@ -155,6 +147,82 @@
         </div>
     </div>
     <div class="bg-white" style="height: 24px; clip-path: polygon(0 0, 100% 40%, 100% 100%, 0 100%);"></div>
+</section>
+{% else %}
+<!-- Mensaje cuando no hay monedas disponibles -->
+<section class="py-5">
+    <div class="container">
+        <div class="text-center">
+            <div class="alert alert-warning shadow-sm" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>No hay tasas de cambio disponibles</strong>
+                <p class="mb-0 mt-2">Por favor, contacta con el administrador para configurar las monedas y sus tasas de cambio.</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<!-- Simulador público -->
+<section id="simulador" class="py-5 bg-light">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-12">
+        <div class="card sim-card shadow-soft">
+          <div class="card-body p-4 p-md-5">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+              <h3 class="h4 mb-0"><i class="fas fa-calculator text-primary me-2"></i>Simulador de cambio</h3>
+              <span class="badge sim-header-badge">Base: PYG</span>
+            </div>
+
+            <div class="row g-4 align-items-stretch">
+              <div class="col-12 col-lg-7">
+                <div class="row g-3 align-items-end">
+                  <div class="col-12 col-md-5">
+                    <label class="form-label">De</label>
+                    <select id="origen_pub" class="form-select form-select-lg">
+                      <option value="PYG" selected>Guaraní (PYG)</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-2 d-flex align-items-end justify-content-center">
+                    <button id="btnToggleDir_pub" type="button" class="btn btn-outline-secondary btn-swap w-100" title="Cambiar dirección" aria-label="Cambiar dirección">
+                      <i class="fas fa-right-left"></i>
+                    </button>
+                  </div>
+                  <div class="col-12 col-md-5">
+                    <label class="form-label">A</label>
+                    <select id="destino_pub" class="form-select form-select-lg">
+                      {% for m in monedas %}
+                        {% if m.codigo != 'PYG' %}
+                          <option value="{{ m.codigo }}" {% if m.codigo == 'USD' %}selected{% endif %}>{{ m.nombre }} ({{ m.codigo }})</option>
+                        {% endif %}
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+
+                <div class="row g-3 mt-1">
+                  <div class="col-12">
+                    <label class="form-label">Monto</label>
+                    <input id="monto_pub" type="number" class="form-control form-control-lg" placeholder="0,00" step="any" min="0" value="1000">
+                  </div>
+                </div>
+              </div>
+              <div class="col-12 col-lg-5">
+                <div id="resultado_pub" class="p-4 rounded sim-result">
+                  <div class="text-muted small mb-1">Resultado</div>
+                  <div class="fs-2 fw-bold" id="resultado_valor_pub">—</div>
+                  <div class="small text-muted" id="resultado_detalle_pub">Selecciona monedas y monto para simular.</div>
+                  <div class="small mt-2" id="resultado_tasas_pub"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="bg-white" style="height: 16px;"></div>
 </section>
 
 <!-- Características -->
@@ -217,4 +285,120 @@
         </div>
     </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function() {
+    const $monto = document.getElementById('monto_pub');
+    const $origen = document.getElementById('origen_pub');
+    const $destino = document.getElementById('destino_pub');
+    const $btnToggle = document.getElementById('btnToggleDir_pub');
+    const $resValor = document.getElementById('resultado_valor_pub');
+    const $resDetalle = document.getElementById('resultado_detalle_pub');
+    const $resTasas = document.getElementById('resultado_tasas_pub');
+
+    const MONEDAS = [
+      {% for m in monedas %}
+        { codigo: '{{ m.codigo }}', nombre: '{{ m.nombre|escapejs }}' }{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ].filter(m => m.codigo !== 'PYG');
+
+    function setOptions(el, options, selected) {
+      el.innerHTML = options.map(o => `<option value="${o.codigo}" ${o.codigo===selected?'selected':''}>${o.nombre} (${o.codigo})</option>`).join('');
+    }
+
+    let monedaToPYG = false; // false: PYG -> Moneda (default), true: Moneda -> PYG
+
+    function applyDirection(preserveCode) {
+      if (monedaToPYG) {
+        const prefer = preserveCode || 'USD';
+        setOptions($origen, MONEDAS, prefer);
+        $origen.disabled = false;
+        $destino.innerHTML = '<option value="PYG" selected>Guaraní (PYG)</option>';
+        $destino.disabled = true;
+      } else {
+        $origen.innerHTML = '<option value="PYG" selected>Guaraní (PYG)</option>';
+        $origen.disabled = true;
+        const prefer = preserveCode || 'USD';
+        const sel = MONEDAS.find(m => m.codigo === prefer) ? prefer : (MONEDAS[0]?.codigo || '');
+        setOptions($destino, MONEDAS, sel);
+        $destino.disabled = false;
+      }
+    }
+
+    function getCurrentNonPYG() {
+      if (monedaToPYG) return $origen.value;
+      return $destino.value;
+    }
+
+    function formatDisplayWithDots(str) {
+      if (!str) return str;
+      const m = String(str).match(/^(\D*)([-\d.,]+)(.*)$/);
+      if (!m) return str;
+      const prefix = m[1] || '';
+      const number = m[2] || '';
+      const suffix = m[3] || '';
+      const lastDot = number.lastIndexOf('.');
+      const lastComma = number.lastIndexOf(',');
+      let decSepIndex = Math.max(lastDot, lastComma);
+      let intPart = number;
+      let decPart = '';
+      let sep = '';
+      if (decSepIndex > -1) {
+        sep = number[decSepIndex];
+        intPart = number.slice(0, decSepIndex);
+        decPart = number.slice(decSepIndex + 1);
+      }
+      const neg = intPart.startsWith('-');
+      const intDigits = intPart.replace(/[^\d]/g, '');
+      const grouped = intDigits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      const intFinal = neg ? '-' + grouped : grouped;
+      const numFinal = decPart ? `${intFinal}${sep}${decPart}` : intFinal;
+      return `${prefix}${numFinal}${suffix}`;
+    }
+
+    function simulate() {
+      const monto = $monto.value;
+      const origen = $origen.value;
+      const destino = $destino.value;
+      if (!monto || !origen || !destino) return;
+      fetch(`{% url 'tasa_cambio:simular_cambio_api' %}?monto=${encodeURIComponent(monto)}&origen=${encodeURIComponent(origen)}&destino=${encodeURIComponent(destino)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success) {
+            $resValor.textContent = '—';
+            $resDetalle.textContent = data.message || 'Error en la simulación.';
+            $resTasas.textContent = '';
+            return;
+          }
+          const d = data.data;
+          $resValor.textContent = formatDisplayWithDots(d.resultado_formateado);
+          $resDetalle.textContent = d.detalle;
+          const t1 = d.tasa_origen ? `${d.tasa_origen.moneda} (${d.tasa_origen.tipo}): ${d.tasa_origen.valor}` : null;
+          const t2 = d.tasa_destino ? `${d.tasa_destino.moneda} (${d.tasa_destino.tipo}): ${d.tasa_destino.valor}` : null;
+          const parts = [t1, t2].filter(Boolean);
+          $resTasas.textContent = parts.length ? `Tasas usadas: ${parts.join(' · ')}` : '';
+        })
+        .catch(() => {
+          $resValor.textContent = '—';
+          $resDetalle.textContent = 'No se pudo simular.';
+          $resTasas.textContent = '';
+        });
+    }
+
+    $monto.addEventListener('input', simulate);
+    $origen.addEventListener('change', simulate);
+    $destino.addEventListener('change', simulate);
+    $btnToggle.addEventListener('click', () => {
+      const keep = getCurrentNonPYG();
+      monedaToPYG = !monedaToPYG;
+      applyDirection(keep);
+      simulate();
+    });
+
+    applyDirection();
+    simulate();
+  })();
+</script>
 {% endblock %}
