@@ -99,7 +99,11 @@ class GrupoActivoBackend(ModelBackend):
         
         # Verificar si el permiso está en la lista de permisos del usuario
         for permission in all_permissions:
-            if f"{permission.content_type.app_label}.{permission.codename}" == perm_str:
+            # Verificar que permission sea un objeto Permission, no un string
+            if hasattr(permission, 'content_type') and hasattr(permission, 'codename'):
+                if f"{permission.content_type.app_label}.{permission.codename}" == perm_str:
+                    return True
+            elif isinstance(permission, str) and permission == perm_str:
                 return True
         
         return False

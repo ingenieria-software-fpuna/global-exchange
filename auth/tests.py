@@ -30,10 +30,10 @@ class AuthViewsTestCase(TestCase):
         self.assertTemplateUsed(response, 'auth/login.html')
         self.assertIn('form', response.context)
 
-    @patch('auth.views.send_mail')
-    def test_login_view_post_valid(self, mock_send_mail):
+    @patch('auth.services.EmailService.enviar_codigo_verificacion')
+    def test_login_view_post_valid(self, mock_enviar_codigo):
         """Test login exitoso con envío de código de verificación"""
-        mock_send_mail.return_value = 1
+        mock_enviar_codigo.return_value = (True, "Email enviado exitosamente")
         
         response = self.client.post(reverse('auth:login'), {
             'email': 'test@example.com',
@@ -44,11 +44,10 @@ class AuthViewsTestCase(TestCase):
         self.assertRedirects(response, reverse('auth:verify_code'))
         
         # Verificar que se envió el email
-        mock_send_mail.assert_called_once()
+        mock_enviar_codigo.assert_called_once()
         
         # Verificar que se guardó el código en la sesión
         session = self.client.session
-        self.assertIn('verification_code', session)
         self.assertIn('user_id_to_verify', session)
 
     def test_login_view_post_invalid_credentials(self):
@@ -111,9 +110,22 @@ class AuthViewsTestCase(TestCase):
 
     def test_verify_code_view_post_valid(self):
         """Test verificación exitosa del código"""
+        # Crear código de verificación en la base de datos
+        from auth.models import CodigoVerificacion
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        codigo_obj = CodigoVerificacion.objects.create(
+            usuario=self.user,
+            codigo='123456',
+            tipo='login',
+            fecha_expiracion=timezone.now() + timedelta(minutes=5),
+            ip_address='127.0.0.1'
+        )
+        
         # Configurar sesión con código de verificación
         session = self.client.session
-        session['verification_code'] = '123456'
+        session['verification_type'] = 'login'
         session['user_id_to_verify'] = self.user.id
         session.save()
         
@@ -131,7 +143,7 @@ class AuthViewsTestCase(TestCase):
     def test_verify_code_view_post_invalid_code(self):
         """Test verificación con código inválido"""
         session = self.client.session
-        session['verification_code'] = '123456'
+        session['verification_type'] = 'login'
         session['user_id_to_verify'] = self.user.id
         session.save()
         
@@ -180,10 +192,10 @@ class AuthViewsTestCase(TestCase):
         # Se puede habilitar cuando se implemente protección de autenticación
         pass
 
-    @patch('auth.views.send_mail')
-    def test_registro_view_post_valid(self, mock_send_mail):
+    @patch('auth.services.EmailService.enviar_codigo_verificacion')
+    def test_registro_view_post_valid(self, mock_enviar_codigo):
         """Test registro exitoso de nuevo usuario"""
-        mock_send_mail.return_value = 1
+        mock_enviar_codigo.return_value = (True, "Email enviado exitosamente")
         
         response = self.client.post(reverse('auth:registro'), {
             'email': 'newuser@example.com',
@@ -203,7 +215,7 @@ class AuthViewsTestCase(TestCase):
         self.assertFalse(new_user.activo)  # Debe estar inactivo hasta verificar
         
         # Verificar que se envió el email
-        mock_send_mail.assert_called_once()
+        mock_enviar_codigo.assert_called_once()
         
         # Verificar mensaje de éxito
         messages = list(get_messages(response.wsgi_request))
@@ -222,10 +234,10 @@ class AuthViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('form', response.context)
 
-    @patch('auth.views.send_mail')
-    def test_registro_view_email_send_failure(self, mock_send_mail):
+    @patch('auth.services.EmailService.enviar_codigo_verificacion')
+    def test_registro_view_email_send_failure(self, mock_enviar_codigo):
         """Test registro cuando falla el envío de email"""
-        mock_send_mail.side_effect = Exception("Error de envío")
+        mock_enviar_codigo.return_value = (False, "Error de envío")
         
         response = self.client.post(reverse('auth:registro'), {
             'email': 'newuser@example.com',
@@ -238,11 +250,11 @@ class AuthViewsTestCase(TestCase):
         })
         
         self.assertEqual(response.status_code, 302)
-        self.assertRedirects(response, reverse('auth:registro'))
+        self.assertRedirects(response, reverse('auth:verificar_registro'))
         
-        # Verificar que no se creó el usuario
-        with self.assertRaises(Usuario.DoesNotExist):
-            Usuario.objects.get(email='newuser@example.com')
+        # Verificar que se creó el usuario pero está inactivo
+        user = Usuario.objects.get(email='newuser@example.com')
+        self.assertFalse(user.activo)
         
         # Verificar mensaje de error
         messages = list(get_messages(response.wsgi_request))
@@ -250,8 +262,21 @@ class AuthViewsTestCase(TestCase):
 
     def test_verificar_registro_view_post_valid(self):
         """Test verificación exitosa del registro"""
+        # Crear código de verificación en la base de datos
+        from auth.models import CodigoVerificacion
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        codigo_obj = CodigoVerificacion.objects.create(
+            usuario=self.user,
+            codigo='123456',
+            tipo='registro',
+            fecha_expiracion=timezone.now() + timedelta(minutes=5),
+            ip_address='127.0.0.1'
+        )
+        
         session = self.client.session
-        session['verification_code'] = '123456'
+        session['verification_type'] = 'registro'
         session['user_id_to_verify'] = self.user.id
         session.save()
         
@@ -273,7 +298,7 @@ class AuthViewsTestCase(TestCase):
     def test_verificar_registro_view_post_invalid(self):
         """Test verificación con código inválido"""
         session = self.client.session
-        session['verification_code'] = '123456'
+        session['verification_type'] = 'login'
         session['user_id_to_verify'] = self.user.id
         session.save()
         
@@ -587,10 +612,10 @@ class AuthIntegrationTestCase(TestCase):
             fecha_nacimiento='1990-01-01'
         )
 
-    @patch('auth.views.send_mail')
-    def test_complete_registration_flow(self, mock_send_mail):
+    @patch('auth.services.EmailService.enviar_codigo_verificacion')
+    def test_complete_registration_flow(self, mock_enviar_codigo):
         """Test del flujo completo de registro y verificación"""
-        mock_send_mail.return_value = 1
+        mock_enviar_codigo.return_value = (True, "Email enviado exitosamente")
         
         # Paso 1: Registro
         response = self.client.post(reverse('auth:registro'), {
@@ -610,12 +635,15 @@ class AuthIntegrationTestCase(TestCase):
         user = Usuario.objects.get(email='newuser@example.com')
         self.assertFalse(user.activo)
         
-        # Paso 2: Verificación
-        session = self.client.session
-        verification_code = session['verification_code']
+        # Paso 2: Verificación - obtener código de la base de datos
+        from auth.models import CodigoVerificacion
+        codigo_obj = CodigoVerificacion.objects.filter(
+            usuario__email='newuser@example.com',
+            tipo='registro'
+        ).first()
         
         response = self.client.post(reverse('auth:verificar_registro'), {
-            'code': verification_code
+            'code': codigo_obj.codigo
         })
         
         self.assertEqual(response.status_code, 302)
@@ -626,10 +654,10 @@ class AuthIntegrationTestCase(TestCase):
         self.assertTrue(user.activo)
         self.assertTrue(user.is_authenticated)
 
-    @patch('auth.views.send_mail')
-    def test_complete_login_flow(self, mock_send_mail):
+    @patch('auth.services.EmailService.enviar_codigo_verificacion')
+    def test_complete_login_flow(self, mock_enviar_codigo):
         """Test del flujo completo de login y verificación"""
-        mock_send_mail.return_value = 1
+        mock_enviar_codigo.return_value = (True, "Email enviado exitosamente")
         
         # Crear usuario activo con email diferente
         user = Usuario.objects.create_user(
@@ -651,12 +679,15 @@ class AuthIntegrationTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertRedirects(response, reverse('auth:verify_code'))
         
-        # Paso 2: Verificación
-        session = self.client.session
-        verification_code = session['verification_code']
+        # Paso 2: Verificación - obtener código de la base de datos
+        from auth.models import CodigoVerificacion
+        codigo_obj = CodigoVerificacion.objects.filter(
+            usuario__email='loginflow@example.com',
+            tipo='login'
+        ).first()
         
         response = self.client.post(reverse('auth:verify_code'), {
-            'code': verification_code
+            'code': codigo_obj.codigo
         })
         
         self.assertEqual(response.status_code, 302)
@@ -665,10 +696,10 @@ class AuthIntegrationTestCase(TestCase):
         # Verificar que el usuario está logueado
         self.assertTrue(user.is_authenticated)
 
-    @patch('auth.views.send_mail')
-    def test_email_verification_content(self, mock_send_mail):
+    @patch('auth.services.EmailService.enviar_codigo_verificacion')
+    def test_email_verification_content(self, mock_enviar_codigo):
         """Test que el contenido del email de verificación sea correcto"""
-        mock_send_mail.return_value = 1
+        mock_enviar_codigo.return_value = (True, "Email enviado exitosamente")
         
         response = self.client.post(reverse('auth:registro'), {
             'email': 'newuser@example.com',
@@ -680,26 +711,43 @@ class AuthIntegrationTestCase(TestCase):
             'password2': 'newpass123'
         })
         
-        # Verificar que se llamó send_mail con los parámetros correctos
-        mock_send_mail.assert_called_once()
-        call_args = mock_send_mail.call_args
+        # Verificar que se llamó el servicio de email con los parámetros correctos
+        mock_enviar_codigo.assert_called_once()
+        call_args = mock_enviar_codigo.call_args
         
-        self.assertEqual(call_args[0][0], 'Tu Código de Verificación')  # Subject
-        self.assertIn('Tu código de verificación es', call_args[0][1])  # Message
-        self.assertEqual(call_args[0][2], settings.DEFAULT_FROM_EMAIL)  # From
-        self.assertEqual(call_args[0][3], ['newuser@example.com'])  # To
+        # Verificar que se pasó el usuario correcto
+        usuario = call_args[0][0]
+        self.assertEqual(usuario.email, 'newuser@example.com')
+        
+        # Verificar que se pasó un objeto código de verificación
+        codigo_obj = call_args[0][1]
+        self.assertIsNotNone(codigo_obj)
+        self.assertEqual(codigo_obj.tipo, 'registro')
 
     def test_session_cleanup_after_verification(self):
         """Test que la sesión se limpia después de la verificación"""
+        # Crear código de verificación válido en la base de datos
+        from auth.models import CodigoVerificacion
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        codigo_obj = CodigoVerificacion.objects.create(
+            usuario=self.user,
+            codigo='123456',
+            tipo='login',
+            fecha_expiracion=timezone.now() + timedelta(minutes=5),
+            ip_address='127.0.0.1'
+        )
+        
         # Configurar sesión con datos de verificación
         session = self.client.session
-        session['verification_code'] = '123456'
+        session['verification_type'] = 'login'
         session['user_id_to_verify'] = self.user.id
         session.save()
         
         # Verificar que los datos están en la sesión
-        self.assertIn('verification_code', session)
         self.assertIn('user_id_to_verify', session)
+        self.assertIn('verification_type', session)
         
         # Realizar verificación exitosa
         response = self.client.post(reverse('auth:verify_code'), {
@@ -708,13 +756,26 @@ class AuthIntegrationTestCase(TestCase):
         
         # Verificar que los datos se limpiaron de la sesión
         session = self.client.session
-        self.assertNotIn('verification_code', session)
         self.assertNotIn('user_id_to_verify', session)
+        self.assertNotIn('verification_type', session)
 
     def test_multiple_failed_verification_attempts(self):
         """Test múltiples intentos fallidos de verificación"""
+        # Crear código de verificación válido en la base de datos
+        from auth.models import CodigoVerificacion
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        codigo_obj = CodigoVerificacion.objects.create(
+            usuario=self.user,
+            codigo='123456',
+            tipo='login',
+            fecha_expiracion=timezone.now() + timedelta(minutes=5),
+            ip_address='127.0.0.1'
+        )
+        
         session = self.client.session
-        session['verification_code'] = '123456'
+        session['verification_type'] = 'login'
         session['user_id_to_verify'] = self.user.id
         session.save()
         
@@ -732,8 +793,8 @@ class AuthIntegrationTestCase(TestCase):
         
         # Verificar que la sesión sigue intacta
         session = self.client.session
-        self.assertIn('verification_code', session)
         self.assertIn('user_id_to_verify', session)
+        self.assertIn('verification_type', session)
         
         # Intento exitoso
         response = self.client.post(reverse('auth:verify_code'), {
@@ -862,9 +923,22 @@ class AuthSecurityTestCase(TestCase):
 
     def test_session_hijacking_prevention(self):
         """Test prevención de secuestro de sesión"""
+        # Crear código de verificación válido para el usuario original
+        from auth.models import CodigoVerificacion
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        codigo_obj = CodigoVerificacion.objects.create(
+            usuario=self.user,
+            codigo='123456',
+            tipo='login',
+            fecha_expiracion=timezone.now() + timedelta(minutes=5),
+            ip_address='127.0.0.1'
+        )
+        
         # Crear sesión con datos de verificación
         session = self.client.session
-        session['verification_code'] = '123456'
+        session['verification_type'] = 'login'
         session['user_id_to_verify'] = self.user.id
         session.save()
         
@@ -883,18 +957,31 @@ class AuthSecurityTestCase(TestCase):
         session['user_id_to_verify'] = other_user.id
         session.save()
         
-        # Intentar verificar con el código original
+        # Intentar verificar con el código original (debería fallar porque es de otro usuario)
         response = self.client.post(reverse('auth:verify_code'), {
             'code': '123456'
         })
         
-        # El sistema actual permite esto, pero en el futuro se podría implementar protección
-        self.assertEqual(response.status_code, 302)
+        # Debería fallar porque el código pertenece a otro usuario
+        self.assertEqual(response.status_code, 200)
 
     def test_brute_force_protection(self):
         """Test protección contra ataques de fuerza bruta"""
+        # Crear código de verificación válido
+        from auth.models import CodigoVerificacion
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        codigo_obj = CodigoVerificacion.objects.create(
+            usuario=self.user,
+            codigo='123456',
+            tipo='login',
+            fecha_expiracion=timezone.now() + timedelta(minutes=5),
+            ip_address='127.0.0.1'
+        )
+        
         session = self.client.session
-        session['verification_code'] = '123456'
+        session['verification_type'] = 'login'
         session['user_id_to_verify'] = self.user.id
         session.save()
         
@@ -1070,18 +1157,39 @@ class AuthPerformanceTestCase(TestCase):
             fecha_nacimiento='1990-01-01'
         )
         
+        # Crear códigos de verificación válidos
+        from auth.models import CodigoVerificacion
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        codigo1 = CodigoVerificacion.objects.create(
+            usuario=user,
+            codigo='111111',
+            tipo='login',
+            fecha_expiracion=timezone.now() + timedelta(minutes=5),
+            ip_address='127.0.0.1'
+        )
+        
+        codigo2 = CodigoVerificacion.objects.create(
+            usuario=user,
+            codigo='222222',
+            tipo='login',
+            fecha_expiracion=timezone.now() + timedelta(minutes=5),
+            ip_address='127.0.0.1'
+        )
+        
         # Simular múltiples sesiones
         client1 = Client()
         client2 = Client()
         
         # Configurar sesiones diferentes
         session1 = client1.session
-        session1['verification_code'] = '111111'
+        session1['verification_type'] = 'login'
         session1['user_id_to_verify'] = user.id
         session1.save()
         
         session2 = client2.session
-        session2['verification_code'] = '222222'
+        session2['verification_type'] = 'login'
         session2['user_id_to_verify'] = user.id
         session2.save()
         
