@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth.decorators import login_required, permission_required
@@ -41,6 +41,16 @@ class TipoClienteUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateV
         messages.success(self.request, 'Tipo de cliente actualizado exitosamente.')
         return super().form_valid(form)
 
+class TipoClienteDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
+    model = TipoCliente
+    template_name = 'clientes/tipocliente_confirm_delete.html'
+    success_url = reverse_lazy('clientes:tipocliente_list')
+    permission_required = 'clientes.delete_tipocliente'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Eliminar Tipo de Cliente'
+        return context
 
 
 # Vistas para Clientes
