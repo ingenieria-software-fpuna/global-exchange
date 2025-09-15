@@ -106,7 +106,7 @@ fi
 # Optionally create currencies from env var
 if [ "${CREATE_CURRENCIES:-false}" = "true" ]; then
   echo "[entrypoint] Creating currencies and exchange rates..."
-  python scripts/create_currencies_test.py || {
+  PYTHONPATH=/app python scripts/create_currencies_test.py || {
     echo "⚠️  Error creating currencies, but continuing..."
   }
 fi
