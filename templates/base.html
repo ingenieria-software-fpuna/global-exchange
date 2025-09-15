@@ -48,6 +48,33 @@
         .text-muted-sm { color:#6c757d; font-size:.95rem; }
         .skip-link{ position:absolute; left:-999px; top:auto; width:1px; height:1px; overflow:hidden; }
         .skip-link:focus{ position:static; width:auto; height:auto; padding:.5rem 1rem; background:#fff; z-index:1050; }
+        
+        /* Usuario Selector Widget */
+        .usuario-selector-widget {
+            background: #fff;
+            border-radius: 0.5rem;
+        }
+        .usuario-selector-widget .table {
+            margin-bottom: 0;
+        }
+        .usuario-selector-widget .usuario-row {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .usuario-selector-widget .usuario-row:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+        }
+        .usuario-selector-widget .table-primary {
+            background-color: rgba(13, 110, 253, 0.15);
+            border-color: rgba(13, 110, 253, 0.2);
+        }
+        .usuario-selector-widget .sticky-top {
+            background: #f8f9fa !important;
+        }
+        .usuario-selector-widget .form-check-input:checked {
+            background-color: var(--brand-primary);
+            border-color: var(--brand-primary);
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
