@@ -5,9 +5,10 @@ Esta sección contiene las conversaciones y prompts utilizados con herramientas 
 
 .. toctree::
    :maxdepth: 1
-   :caption: Sesiones por fecha:
+   :caption: Sesiones por sprint:
 
-   2025-08-22/index
+   sprint-1-2025-08-22/index
+   sprint-2-2025-09-15/index
 
 Descripción
 -----------
