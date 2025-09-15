@@ -12,6 +12,7 @@ Proyecto de Ingeniería de Software 2 (IS2) de la Facultad Politécnica de la Un
 - [Jira](https://fpuna-team-rlp0euzv.atlassian.net/jira)
 - [Wiki](http://109.199.116.203:8060/es/links-de-interes)
 - [Repositorio del proyecto](https://github.com/ingenieria-software-fpuna/global-exchange)
+- [Guía de contribución al código](http://109.199.116.203:8060/es/dev/guia-de-contribucion)
 
 
 ### Pre-requisitos
@@ -81,6 +82,7 @@ Una vez instaladas las dependencias, puedes ejecutar el proyecto con los siguien
 ```bash
 make app-setup  # Configuración (limpiar DB, levantar DB, aplicar migraciones)
 make user # Crear un usuario para usar el sistema
+make create-currencies # Crea monedas y tasas de cambio de prueba
 make app-run    # Correr el proyecto
 ```
 

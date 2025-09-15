@@ -26,7 +26,31 @@ import os
 
 def welcome_view(request):
     """Vista para la pantalla de bienvenida con tasas de cambio"""
-    return render(request, 'welcome.html')
+    from monedas.models import Moneda
+    from tasa_cambio.models import TasaCambio
+    
+    # Obtener monedas activas con sus tasas de cambio activas
+    monedas_con_tasas = []
+    monedas_activas = Moneda.objects.filter(es_activa=True).order_by('nombre')
+    
+    for moneda in monedas_activas:
+        tasa_activa = TasaCambio.objects.filter(
+            moneda=moneda,
+            es_activa=True
+        ).first()
+        
+        if tasa_activa:
+            monedas_con_tasas.append({
+                'moneda': moneda,
+                'tasa': tasa_activa
+            })
+    
+    context = {
+        'monedas_con_tasas': monedas_con_tasas,
+        'monedas': monedas_activas,
+    }
+    
+    return render(request, 'welcome.html', context)
 
 def docs_view(request, path=''):
     """Vista para servir la documentación Sphinx"""
@@ -52,8 +76,11 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('auth/', include('auth.urls', namespace='auth')),
     path('usuarios/', include('usuarios.urls', namespace='usuarios')),
-    path('roles/', include('roles.urls', namespace='roles')),
+    path('grupos/', include('grupos.urls', namespace='grupos')),
     path('clientes/', include('clientes.urls', namespace='clientes')),
+    path('monedas/', include('monedas.urls', namespace='monedas')),
+    path('tasa-cambio/', include('tasa_cambio.urls', namespace='tasa_cambio')),
+    path('metodos-pago/', include('metodo_pago.urls', namespace='metodo_pago')),
     path('docs/', docs_view, name='docs_index'),
     path('docs/<path:path>', docs_view, name='docs'),
 ]

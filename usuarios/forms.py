@@ -1,7 +1,8 @@
 # apps/usuarios/forms.py
 from django import forms
 from django.contrib.auth import authenticate, get_user_model
-from roles.models import Rol, UsuarioRol
+from django.contrib.auth.models import Group
+from datetime import date
 class LoginForm(forms.Form):
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Correo electrónico'}),
@@ -29,21 +30,42 @@ Usuario = get_user_model()
 class UsuarioCreationForm(forms.ModelForm):
     password = forms.CharField(label="Contraseña", widget=forms.PasswordInput(attrs={'class': 'form-control'}))
     password2 = forms.CharField(label="Repetir Contraseña", widget=forms.PasswordInput(attrs={'class': 'form-control'}))
-    roles = forms.ModelMultipleChoiceField(
-        queryset=Rol.objects.filter(activo=True).order_by('nombre'),
+    groups = forms.ModelMultipleChoiceField(
+        queryset=Group.objects.all().order_by('name'),
         widget=forms.CheckboxSelectMultiple,
         required=False,
-        label="Roles"
+        label="Grupos"
     )
 
     class Meta:
         model = Usuario
-        fields = ('email', 'nombre', 'apellido')
+        fields = ('email', 'nombre', 'apellido', 'cedula', 'fecha_nacimiento', 'groups')
         widgets = {
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),
             'apellido': forms.TextInput(attrs={'class': 'form-control'}),
+            'cedula': forms.TextInput(attrs={'class': 'form-control'}),
+            'fecha_nacimiento': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password = cleaned_data.get("password")
+        password2 = cleaned_data.get("password2")
+        if password and password2 and password != password2:
+            raise forms.ValidationError("Las contraseñas no coinciden.")
+        return cleaned_data
+    
+    def clean_fecha_nacimiento(self):
+        fecha_nacimiento = self.cleaned_data.get('fecha_nacimiento')
+        if fecha_nacimiento:
+            today = date.today()
+            age = today.year - fecha_nacimiento.year
+            if today.month < fecha_nacimiento.month or (today.month == fecha_nacimiento.month and today.day < fecha_nacimiento.day):
+                age -= 1
+            if age < 18:
+                raise forms.ValidationError("El usuario debe ser mayor de 18 años.")
+        return fecha_nacimiento
 
     def save(self, commit=True):
         user = super().save(commit=False)
@@ -51,50 +73,58 @@ class UsuarioCreationForm(forms.ModelForm):
         if commit:
             user.save()
 
-        # Sincronizar roles seleccionados
-        roles_seleccionados = self.cleaned_data.get('roles')
-        if roles_seleccionados is not None:
-            # Eliminar relaciones no seleccionadas (no habrá ninguna en creación, pero es seguro)
-            UsuarioRol.objects.filter(usuario=user).exclude(rol__in=roles_seleccionados).delete()
-            # Crear las relaciones faltantes
-            for rol in roles_seleccionados:
-                UsuarioRol.objects.get_or_create(usuario=user, rol=rol)
+        # Sincronizar grupos seleccionados
+        groups_seleccionados = self.cleaned_data.get('groups')
+        if groups_seleccionados is not None:
+            user.groups.set(groups_seleccionados)
 
         return user
 
 class UsuarioUpdateForm(forms.ModelForm):
-    roles = forms.ModelMultipleChoiceField(
-        queryset=Rol.objects.filter(activo=True).order_by('nombre'),
+    groups = forms.ModelMultipleChoiceField(
+        queryset=Group.objects.all().order_by('name'),
         widget=forms.CheckboxSelectMultiple,
         required=False,
-        label="Roles"
+        label="Grupos"
     )
     class Meta:
         model = Usuario
-        fields = ('email', 'nombre', 'apellido', 'is_staff', 'is_superuser', 'activo')
+        fields = ('email', 'nombre', 'apellido', 'cedula', 'fecha_nacimiento', 'is_staff', 'es_activo', 'groups')
         widgets = {
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),
             'apellido': forms.TextInput(attrs={'class': 'form-control'}),
+            'cedula': forms.TextInput(attrs={'class': 'form-control'}),
+            'fecha_nacimiento': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }
     
+    def clean_fecha_nacimiento(self):
+        fecha_nacimiento = self.cleaned_data.get('fecha_nacimiento')
+        if fecha_nacimiento:
+            today = date.today()
+            # Calcular edad de manera más precisa
+            age = today.year - fecha_nacimiento.year
+            if today.month < fecha_nacimiento.month or (today.month == fecha_nacimiento.month and today.day < fecha_nacimiento.day):
+                age -= 1
+            if age < 18:
+                raise forms.ValidationError("El usuario debe ser mayor de 18 años.")
+        return fecha_nacimiento
+
     def get_user(self):
         return self.user_cache
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Pre-cargar roles asignados al usuario
+        # Pre-cargar grupos asignados al usuario
         if self.instance and self.instance.pk:
-            self.fields['roles'].initial = Rol.objects.filter(usuario_roles__usuario=self.instance).values_list('pk', flat=True)
+            self.fields['groups'].initial = self.instance.groups.values_list('pk', flat=True)
 
     def save(self, commit=True):
         user = super().save(commit=commit)
 
-        # Sincronizar roles seleccionados
-        roles_seleccionados = self.cleaned_data.get('roles')
-        if roles_seleccionados is not None:
-            UsuarioRol.objects.filter(usuario=user).exclude(rol__in=roles_seleccionados).delete()
-            for rol in roles_seleccionados:
-                UsuarioRol.objects.get_or_create(usuario=user, rol=rol)
+        # Sincronizar grupos seleccionados
+        groups_seleccionados = self.cleaned_data.get('groups')
+        if groups_seleccionados is not None:
+            user.groups.set(groups_seleccionados)
 
         return user
