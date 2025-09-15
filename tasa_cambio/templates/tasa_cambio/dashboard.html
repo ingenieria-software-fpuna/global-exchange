@@ -70,6 +70,21 @@
             </div>
           </div>
 
+          <!-- Selector de Método de Pago -->
+          <div class="row g-3 mb-3">
+            <div class="col-12">
+              <label class="form-label">Método de Pago</label>
+              <select id="metodo_pago" class="form-select">
+                <option value="">Sin método (sin comisión)</option>
+                {% for mp in metodos_pago %}
+                  <option value="{{ mp.id }}">{{ mp.nombre }} ({{ mp.comision }}%)</option>
+                {% empty %}
+                  <option value="" disabled>No hay métodos de pago activos</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
           <div class="row g-3">
             <div class="col-12 col-md-4">
               <label class="form-label">Monto</label>
@@ -107,6 +122,8 @@
             </div>
             <div class="fs-4 fw-bold" id="resultado_valor">—</div>
             <div class="small text-muted" id="resultado_detalle">Selecciona monedas y monto para simular.</div>
+            <div class="small" id="resultado_subtotal"></div>
+            <div class="small text-danger" id="resultado_comision"></div>
             <div class="small" id="resultado_tasas"></div>
             <div class="small text-success" id="resultado_descuento"></div>
           </div>
@@ -151,6 +168,7 @@
     const $resDesc = document.getElementById('resultado_descuento');
     const $btnToggle = document.getElementById('btnToggleDir');
     const $cliente = document.getElementById('cliente');
+    const $metodoPago = document.getElementById('metodo_pago');
 
     // Dataset de monedas activas (no incluye PYG normalmente)
     const MONEDAS = [
@@ -195,6 +213,7 @@
       const origen = $origen.value;
       const destino = $destino.value;
       const cliente = $cliente.value;
+      const metodoPago = $metodoPago ? $metodoPago.value : '';
       if (!monto || !origen || !destino) return;
 
       const params = new URLSearchParams({
@@ -203,6 +222,7 @@
         destino: String(destino),
       });
       if (cliente) params.append('cliente_id', cliente);
+      if (metodoPago) params.append('metodo_pago_id', metodoPago);
 
       fetch(`{% url 'tasa_cambio:simular_cambio_api' %}?${params.toString()}`)
         .then(r => r.json())
@@ -217,6 +237,14 @@
           const d = data.data;
           $resValor.textContent = formatDisplayWithDots(d.resultado_formateado);
           $resDetalle.textContent = d.detalle;
+          const $resSubtotal = document.getElementById('resultado_subtotal');
+          const $resComision = document.getElementById('resultado_comision');
+          if (d.subtotal_formateado) {
+            $resSubtotal.textContent = `Sub-total: ${formatDisplayWithDots(d.subtotal_formateado)}`;
+          } else { $resSubtotal.textContent = ''; }
+          if (d.comision_pct && d.comision_monto_formateado) {
+            $resComision.textContent = `Comisión (${d.comision_pct}%): ${formatDisplayWithDots(d.comision_monto_formateado)}`;
+          } else { $resComision.textContent = ''; }
           const t1 = d.tasa_origen ? `${d.tasa_origen.moneda} (${d.tasa_origen.tipo}): ${d.tasa_origen.valor}` : null;
           const t2 = d.tasa_destino ? `${d.tasa_destino.moneda} (${d.tasa_destino.tipo}): ${d.tasa_destino.valor}` : null;
           const parts = [t1, t2].filter(Boolean);
@@ -232,6 +260,10 @@
           $resDetalle.textContent = 'No se pudo simular.';
           $resTasas.textContent = '';
           $resDesc.textContent = '';
+          const $resSubtotal = document.getElementById('resultado_subtotal');
+          const $resComision = document.getElementById('resultado_comision');
+          if ($resSubtotal) $resSubtotal.textContent = '';
+          if ($resComision) $resComision.textContent = '';
         });
     }
 
@@ -239,6 +271,7 @@
     $origen.addEventListener('change', simulate);
     $destino.addEventListener('change', simulate);
     $cliente.addEventListener('change', simulate);
+    if ($metodoPago) $metodoPago.addEventListener('change', simulate);
     $btnToggle.addEventListener('click', () => {
       const keep = getCurrentNonPYG();
       monedaToPYG = !monedaToPYG;
