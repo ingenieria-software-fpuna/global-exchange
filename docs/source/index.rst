@@ -8,6 +8,12 @@ Bienvenido a la documentación del proyecto Global Exchange.
    :caption: Contenidos
 
    getting-started
+   overview
+   architecture
+   apps
+   security-permissions
+   configuration
+   data-model
    bitacora_ia/index
 
 Índices y tablas
@@ -16,4 +22,3 @@ Bienvenido a la documentación del proyecto Global Exchange.
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
