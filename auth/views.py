@@ -5,6 +5,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
 import random
+import os
 from .forms import LoginForm, VerificationCodeForm, RegistroForm
 from .models import CodigoVerificacion
 from .services import EmailService
@@ -15,9 +16,19 @@ def login_view(request):
         if form.is_valid():
             user = form.get_user()
             if user is not None:
+                # Verificar si 2FA está habilitada
+                enable_2fa = os.environ.get('ENABLE_2FA', 'true').lower() in ['true', '1', 'yes', 'on']
+
+                if not enable_2fa:
+                    # 2FA deshabilitada: login directo
+                    login(request, user, backend='grupos.backends.GrupoActivoBackend')
+                    messages.success(request, "¡Has iniciado sesión exitosamente!")
+                    return redirect('auth:dashboard')
+
+                # 2FA habilitada: proceso normal
                 # Limpiar códigos expirados
                 CodigoVerificacion.limpiar_codigos_expirados()
-                
+
                 # Crear nuevo código de verificación con expiración de 5 minutos
                 codigo_obj = CodigoVerificacion.crear_codigo(
                     usuario=user,
@@ -25,14 +36,14 @@ def login_view(request):
                     request=request,
                     minutos_expiracion=5
                 )
-                
+
                 # Guardar ID del usuario en sesión para verificación posterior
                 request.session['user_id_to_verify'] = user.id
                 request.session['verification_type'] = 'login'
-                
+
                 # Enviar email con el nuevo servicio
                 exito, mensaje = EmailService.enviar_codigo_verificacion(user, codigo_obj, request)
-                
+
                 if exito:
                     messages.success(request, 'Se ha enviado un código de verificación a tu correo electrónico.')
                     return redirect('auth:verify_code')
@@ -130,15 +141,31 @@ def registro_view(request):
     if request.method == 'POST':
         form = RegistroForm(request.POST)
         if form.is_valid():
+            # Verificar si 2FA está habilitada
+            enable_2fa = os.environ.get('ENABLE_2FA', 'true').lower() in ['true', '1', 'yes', 'on']
+
             # Crear el usuario
             user = form.save(commit=False)
+
+            if not enable_2fa:
+                # 2FA deshabilitada: activar usuario directamente
+                user.activo = True  # Email verificado automáticamente
+                user.es_activo = True  # Usuario habilitado para el sistema
+                user.save()
+
+                # Iniciar sesión automáticamente
+                login(request, user, backend='grupos.backends.GrupoActivoBackend')
+                messages.success(request, '¡Registro exitoso! Has iniciado sesión automáticamente.')
+                return redirect('auth:dashboard')
+
+            # 2FA habilitada: proceso normal de verificación
             user.activo = False  # Email no verificado hasta confirmar
             user.es_activo = True  # Usuario habilitado para el sistema
             user.save()
-            
+
             # Limpiar códigos expirados
             CodigoVerificacion.limpiar_codigos_expirados()
-            
+
             # Crear código de verificación con expiración de 5 minutos para registro
             codigo_obj = CodigoVerificacion.crear_codigo(
                 usuario=user,
@@ -146,15 +173,15 @@ def registro_view(request):
                 request=request,
                 minutos_expiracion=5
             )
-            
+
             # Guardar información en sesión
             request.session['user_id_to_verify'] = user.id
             request.session['verification_type'] = 'registro'
-            
+
             # Enviar email de verificación
             try:
                 exito, mensaje = EmailService.enviar_codigo_verificacion(user, codigo_obj, request)
-                
+
                 if exito:
                     messages.success(request, '¡Registro exitoso! Se ha enviado un código de verificación a tu correo electrónico.')
                     return redirect('auth:verificar_registro')
@@ -165,7 +192,7 @@ def registro_view(request):
                     user.save()
                     messages.error(request, f'Error al enviar el email de verificación: {mensaje}. Puedes intentar reenviar el código.')
                     return redirect('auth:verificar_registro')  # Ir a página de verificación
-                    
+
             except Exception as e:
                 # Si falla el envío de email, mantener usuario inactivo y permitir reenvío
                 user.activo = False  # Email no verificado
@@ -175,7 +202,7 @@ def registro_view(request):
                 return redirect('auth:verificar_registro')  # Ir a página de verificación
     else:
         form = RegistroForm()
-    
+
     return render(request, 'auth/registro.html', {'form': form})
 
 def verificar_registro_view(request):
