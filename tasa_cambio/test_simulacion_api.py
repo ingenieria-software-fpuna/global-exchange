@@ -39,7 +39,6 @@ class SimularCambioAPITest(TestCase):
             precio_base=9500,  # Precio base en guaraníes
             comision_compra=500,  # Comisión de compra: 9500 - 500 = 9000
             comision_venta=500,   # Comisión de venta: 9500 + 500 = 10000
-            fecha_vigencia=timezone.now(),
             es_activa=True,
         )
 

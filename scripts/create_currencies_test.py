@@ -148,7 +148,6 @@ def crear_monedas_ejemplo():
                 precio_base=datos['precio_base'],
                 comision_compra=datos['comision_compra'],
                 comision_venta=datos['comision_venta'],
-                fecha_vigencia=timezone.now(),
                 es_activa=True
             )
             # Calcular precios para mostrar

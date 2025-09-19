@@ -89,9 +89,8 @@
                                     <th>Comisión Compra</th>
                                     <th>Comisión Venta</th>
                                     <th>Spread</th>
-                                    <th>Inicio Vigencia</th>
+                                    <th>Fecha creacion</th>
                                     <th>Estado</th>
-                                    <th>Fecha Creación</th>
                                     <th class="text-center">Acciones</th>
                                 </tr>
                             </thead>
@@ -136,7 +135,7 @@
                                     </td>
                                     <td>
                                         <small class="text-muted">
-                                            {{ tasacambio.fecha_vigencia|date:"d/m/Y H:i" }}
+                                            {{ tasacambio.fecha_creacion|date:"d/m/Y H:i" }}
                                         </small>
                                     </td>
                                     <td>
@@ -150,11 +149,7 @@
                                             </span>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        <small class="text-muted">
-                                            {{ tasacambio.fecha_creacion|date:"d/m/Y H:i" }}
-                                        </small>
-                                    </td>
+                                
                                     <td class="text-center">
                                         <div class="btn-group" role="group">
                                             {% if perms.tasa_cambio.change_tasacambio %}

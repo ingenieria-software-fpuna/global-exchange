@@ -55,14 +55,14 @@ class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         # Filtro por fecha desde
         fecha_desde = self.request.GET.get('fecha_desde')
         if fecha_desde:
-            queryset = queryset.filter(fecha_vigencia__date__gte=fecha_desde)
+            queryset = queryset.filter(fecha_creacion__date__gte=fecha_desde)
         
         # Filtro por fecha hasta
         fecha_hasta = self.request.GET.get('fecha_hasta')
         if fecha_hasta:
-            queryset = queryset.filter(fecha_vigencia__date__lte=fecha_hasta)
+            queryset = queryset.filter(fecha_creacion__date__lte=fecha_hasta)
         
-        return queryset.order_by('-fecha_vigencia', 'moneda__nombre')
+        return queryset.order_by('-fecha_creacion', 'moneda__nombre')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -91,10 +91,6 @@ class TasaCambioCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateVi
         return context
 
     def form_valid(self, form):
-        # Establecer fecha de vigencia si no se especifica
-        if not form.cleaned_data.get('fecha_vigencia'):
-            form.instance.fecha_vigencia = timezone.now()
-        
         # Verificar si había una cotización anterior para mostrar mensaje informativo
         moneda = form.instance.moneda
         
@@ -164,7 +160,6 @@ def tasacambio_detail_api(request, pk):
             'spread': float(tasacambio.spread),
             'spread_porcentual': round(tasacambio.spread_porcentual, 2),
             'es_activa': tasacambio.es_activa,
-            'fecha_vigencia': tasacambio.fecha_vigencia.strftime('%d/%m/%Y %H:%M'),
             'fecha_creacion': tasacambio.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
             'fecha_actualizacion': tasacambio.fecha_actualizacion.strftime('%d/%m/%Y %H:%M'),
         }

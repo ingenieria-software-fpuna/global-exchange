@@ -29,10 +29,6 @@ class TasaCambio(models.Model):
         help_text="Comisión en guaraníes que se suma al precio base para obtener el precio de venta",
         default=0
     )
-    fecha_vigencia = models.DateTimeField(
-        default=timezone.now,
-        help_text="Fecha y hora desde la cual la cotización está vigente"
-    )
     es_activa = models.BooleanField(
         default=True,
         help_text="Indica si la cotización está activa para operaciones"
@@ -49,7 +45,7 @@ class TasaCambio(models.Model):
     class Meta:
         verbose_name = "Cotización"
         verbose_name_plural = "Cotizaciones"
-        ordering = ['-fecha_vigencia', 'moneda__nombre']
+        ordering = ['-fecha_creacion', 'moneda__nombre']
         db_table = 'tasa_cambio_tasacambio'
 
     def __str__(self):

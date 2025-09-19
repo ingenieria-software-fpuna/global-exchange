@@ -6,16 +6,16 @@ from .models import TasaCambio
 class TasaCambioAdmin(admin.ModelAdmin):
     list_display = [
         'moneda', 'precio_base', 'comision_compra', 'comision_venta', 
-        'spread_display', 'fecha_vigencia', 'es_activa', 'fecha_creacion'
+        'spread_display', 'es_activa', 'fecha_creacion'
     ]
     list_filter = [
-        'es_activa', 'moneda', 'fecha_vigencia', 'fecha_creacion'
+        'es_activa', 'moneda', 'fecha_creacion'
     ]
     search_fields = [
         'moneda__nombre', 'moneda__codigo', 'moneda__simbolo'
     ]
     readonly_fields = ['fecha_creacion', 'fecha_actualizacion']
-    ordering = ['-fecha_vigencia', 'moneda__nombre']
+    ordering = ['-fecha_creacion', 'moneda__nombre']
     
     fieldsets = (
         ('Información de la Moneda', {
@@ -24,8 +24,8 @@ class TasaCambioAdmin(admin.ModelAdmin):
         ('Precios y Comisiones', {
             'fields': ('precio_base', 'comision_compra', 'comision_venta')
         }),
-        ('Vigencia', {
-            'fields': ('fecha_vigencia', 'es_activa')
+        ('Estado', {
+            'fields': ('es_activa',)
         }),
         ('Información del Sistema', {
             'fields': ('fecha_creacion', 'fecha_actualizacion'),
