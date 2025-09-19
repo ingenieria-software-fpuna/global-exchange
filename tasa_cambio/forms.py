@@ -23,19 +23,19 @@ class TasaCambioForm(forms.ModelForm):
             'precio_base': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Ej: 7500',
-                'step': 'any',
-                'min': '0.00000001'
+                'step': '1',
+                'min': '1'
             }),
             'comision_compra': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Ej: 300',
-                'step': 'any',
+                'step': '1',
                 'min': '0'
             }),
             'comision_venta': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Ej: 200',
-                'step': 'any',
+                'step': '1',
                 'min': '0'
             }),
             'fecha_vigencia': forms.DateTimeInput(attrs={
@@ -57,9 +57,9 @@ class TasaCambioForm(forms.ModelForm):
         }
         help_texts = {
             'moneda': 'Seleccione la moneda para la cual se establece la cotización',
-            'precio_base': 'Precio base de referencia para la moneda',
-            'comision_compra': 'Comisión que se resta al precio base para calcular el precio de compra',
-            'comision_venta': 'Comisión que se suma al precio base para calcular el precio de venta',
+            'precio_base': 'Precio base de referencia en guaraníes (valor entero)',
+            'comision_compra': 'Comisión en guaraníes que se resta al precio base para calcular el precio de compra',
+            'comision_venta': 'Comisión en guaraníes que se suma al precio base para calcular el precio de venta',
             'fecha_vigencia': 'Fecha y hora desde la cual la cotización estará vigente',
             'es_activa': 'Indica si la cotización está disponible para operaciones',
         }
@@ -87,26 +87,9 @@ class TasaCambioForm(forms.ModelForm):
             if precio_compra <= 0:
                 raise forms.ValidationError(
                     f'El precio de compra resultante debe ser positivo. '
-                    f'Precio base: {precio_base}, Comisión de compra: {comision_compra} '
-                    f'= Precio de compra: {precio_compra}'
+                    f'Precio base: {precio_base:,} Gs., Comisión de compra: {comision_compra:,} Gs. '
+                    f'= Precio de compra: {precio_compra:,} Gs.'
                 )
-        
-        # Validar que las comisiones respeten los decimales de la moneda
-        if moneda and (precio_base or comision_compra or comision_venta):
-            decimales_moneda = moneda.decimales
-            
-            for campo, valor in [('precio_base', precio_base), 
-                               ('comision_compra', comision_compra),
-                               ('comision_venta', comision_venta)]:
-                if valor:
-                    str_valor = str(valor)
-                    if '.' in str_valor:
-                        decimales_valor = len(str_valor.split('.')[1])
-                        if decimales_valor > decimales_moneda:
-                            raise forms.ValidationError(
-                                f'El {campo.replace("_", " ")} no puede tener más de {decimales_moneda} decimales '
-                                f'(configurado para {moneda.nombre}).'
-                            )
         
         # Verificar si ya existe una cotización activa para informar al usuario
         if moneda and not self.instance.pk:

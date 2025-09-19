@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load moneda_extras %}
 
 {% block title %}{{ titulo }}{% endblock %}
 
@@ -232,56 +233,28 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Función para calcular y mostrar precios
     function calcularPrecios() {
-        const base = parseFloat(precioBase.value) || 0;
-        const compra = parseFloat(comisionCompra.value) || 0;
-        const venta = parseFloat(comisionVenta.value) || 0;
+        const base = parseInt(precioBase.value) || 0;
+        const compra = parseInt(comisionCompra.value) || 0;
+        const venta = parseInt(comisionVenta.value) || 0;
         
         const precioCompraCalculado = base - compra;
         const precioVentaCalculado = base + venta;
         
-        precioCompraDisplay.textContent = precioCompraCalculado.toFixed(2);
-        precioVentaDisplay.textContent = precioVentaCalculado.toFixed(2);
-        
-        // Cambiar color si los precios son inválidos
+        // Mostrar valores sin formato especial (solo números)
         if (precioCompraCalculado <= 0) {
             precioCompraDisplay.className = 'badge bg-warning fs-4';
             precioCompraDisplay.textContent = 'Inválido';
         } else {
             precioCompraDisplay.className = 'badge bg-success fs-4';
+            precioCompraDisplay.textContent = '₲ ' + precioCompraCalculado.toLocaleString('es-PY');
         }
         
         if (precioVentaCalculado <= 0) {
             precioVentaDisplay.className = 'badge bg-warning fs-4';
+            precioVentaDisplay.textContent = 'Inválido';
         } else {
             precioVentaDisplay.className = 'badge bg-danger fs-4';
-        }
-    }
-    
-    // Función para ajustar los campos según los decimales de la moneda
-    function ajustarDecimalesMoneda() {
-        const monedaId = monedaSelect.value;
-        if (monedaId) {
-            // Obtener información de la moneda seleccionada
-            fetch(`/monedas/api/detalle/${monedaId}/`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const decimales = data.data.decimales;
-                        const step = Math.pow(10, -decimales);
-                        
-                        precioBase.step = step;
-                        comisionCompra.step = step;
-                        comisionVenta.step = step;
-                        
-                        // Actualizar placeholder
-                        precioBase.placeholder = `Precio base (${decimales} decimales)`;
-                        comisionCompra.placeholder = `Comisión compra (${decimales} decimales)`;
-                        comisionVenta.placeholder = `Comisión venta (${decimales} decimales)`;
-                    }
-                })
-                .catch(error => {
-                    console.log('Error al obtener detalles de moneda:', error);
-                });
+            precioVentaDisplay.textContent = '₲ ' + precioVentaCalculado.toLocaleString('es-PY');
         }
     }
     
@@ -289,14 +262,6 @@ document.addEventListener('DOMContentLoaded', function() {
     precioBase.addEventListener('input', calcularPrecios);
     comisionCompra.addEventListener('input', calcularPrecios);
     comisionVenta.addEventListener('input', calcularPrecios);
-    
-    // Event listener para cambios en la selección de moneda
-    monedaSelect.addEventListener('change', ajustarDecimalesMoneda);
-    
-    // Ajustar decimales al cargar la página si ya hay una moneda seleccionada
-    if (monedaSelect.value) {
-        ajustarDecimalesMoneda();
-    }
     
     // Calcular precios iniciales
     calcularPrecios();

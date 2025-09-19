@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load moneda_extras %}
 
 {% block title %}Cotizaciones - Global Exchange{% endblock %}
 
@@ -88,7 +89,7 @@
                                     <th>Comisión Compra</th>
                                     <th>Comisión Venta</th>
                                     <th>Spread</th>
-                                    <th>Vigencia</th>
+                                    <th>Inicio Vigencia</th>
                                     <th>Estado</th>
                                     <th>Fecha Creación</th>
                                     <th class="text-center">Acciones</th>
@@ -109,23 +110,23 @@
                                     </td>
                                     <td>
                                         <span class="badge bg-info text-white fs-6">
-                                            {{ tasacambio.precio_base }}
+                                            {{ tasacambio.precio_base|formatear_guaranies }}
                                         </span>
                                     </td>
                                     <td>
                                         <span class="badge bg-warning text-dark fs-6">
-                                            {{ tasacambio.comision_compra }}
+                                            {{ tasacambio.comision_compra|formatear_guaranies }}
                                         </span>
                                     </td>
                                     <td>
                                         <span class="badge bg-warning text-dark fs-6">
-                                            {{ tasacambio.comision_venta }}
+                                            {{ tasacambio.comision_venta|formatear_guaranies }}
                                         </span>
                                     </td>
                                     <td>
                                         <div>
-                                            <span class="badge bg-info text-white">
-                                                {{ tasacambio.spread|floatformat:4 }}
+                                            <span class="badge bg-success text-white">
+                                                {{ tasacambio.spread|formatear_guaranies }}
                                             </span>
                                             <br>
                                             <small class="text-muted">

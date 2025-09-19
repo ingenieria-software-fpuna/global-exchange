@@ -36,8 +36,9 @@ class SimularCambioAPITest(TestCase):
         )
         self.tasa = TasaCambio.objects.create(
             moneda=self.usd,
-            tasa_compra=Decimal('9000.00'),  # 1 USD -> 9000 PYG
-            tasa_venta=Decimal('10000.00'),  # 1 USD cuesta 10000 PYG
+            precio_base=9500,  # Precio base en guaraníes
+            comision_compra=500,  # Comisión de compra: 9500 - 500 = 9000
+            comision_venta=500,   # Comisión de venta: 9500 + 500 = 10000
             fecha_vigencia=timezone.now(),
             es_activa=True,
         )
