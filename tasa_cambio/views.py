@@ -21,10 +21,10 @@ from metodo_pago.models import MetodoPago
 
 
 class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
-    """Vista para listar todas las tasas de cambio"""
+    """Vista para listar todas las cotizaciones"""
     model = TasaCambio
     template_name = 'tasa_cambio/tasacambio_list.html'
-    context_object_name = 'tasas_cambio'
+    context_object_name = 'cotizaciones'
     permission_required = 'tasa_cambio.view_tasacambio'
     paginate_by = 20
 
@@ -77,7 +77,7 @@ class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
 
 
 class TasaCambioCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
-    """Vista para crear una nueva tasa de cambio"""
+    """Vista para crear una nueva cotización"""
     model = TasaCambio
     form_class = TasaCambioForm
     template_name = 'tasa_cambio/tasacambio_form.html'
@@ -176,7 +176,7 @@ def tasacambio_detail_api(request, pk):
 @login_required
 @permission_required('tasa_cambio.view_tasacambio', raise_exception=True)
 def dashboard_tasacambio(request):
-    """Vista del dashboard específico para tasas de cambio"""
+    """Vista del dashboard específico para cotizaciones"""
     # Monedas activas para el simulador (todas las activas)
     monedas_activas = Moneda.objects.filter(es_activa=True).order_by('nombre')
     # Clientes asociados al usuario
