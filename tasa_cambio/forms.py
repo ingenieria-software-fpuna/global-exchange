@@ -13,7 +13,7 @@ class TasaCambioForm(forms.ModelForm):
     class Meta:
         model = TasaCambio
         fields = [
-            'moneda', 'precio_base', 'comision_compra', 'comision_venta', 'fecha_vigencia', 'es_activa'
+            'moneda', 'precio_base', 'comision_compra', 'comision_venta', 'es_activa'
         ]
         widgets = {
             'moneda': forms.Select(attrs={
@@ -38,11 +38,6 @@ class TasaCambioForm(forms.ModelForm):
                 'step': '1',
                 'min': '0'
             }),
-            'fecha_vigencia': forms.DateTimeInput(attrs={
-                'class': 'form-control',
-                'type': 'datetime-local',
-                'placeholder': 'Fecha y hora de vigencia'
-            }),
             'es_activa': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             }),
@@ -52,7 +47,6 @@ class TasaCambioForm(forms.ModelForm):
             'precio_base': 'Precio Base',
             'comision_compra': 'Comisión de Compra',
             'comision_venta': 'Comisión de Venta',
-            'fecha_vigencia': 'Fecha de Inicio de Vigencia',
             'es_activa': 'Cotización Activa',
         }
         help_texts = {
@@ -60,7 +54,6 @@ class TasaCambioForm(forms.ModelForm):
             'precio_base': 'Precio base de referencia en guaraníes (valor entero)',
             'comision_compra': 'Comisión en guaraníes que se resta al precio base para calcular el precio de compra',
             'comision_venta': 'Comisión en guaraníes que se suma al precio base para calcular el precio de venta',
-            'fecha_vigencia': 'Fecha y hora desde la cual la cotización estará vigente',
             'es_activa': 'Indica si la cotización está disponible para operaciones',
         }
 
@@ -69,10 +62,6 @@ class TasaCambioForm(forms.ModelForm):
         
         # Filtrar solo monedas activas para el selector
         self.fields['moneda'].queryset = Moneda.objects.filter(es_activa=True).order_by('nombre')
-        
-        # Establecer fecha y hora actual como valor por defecto
-        if not self.instance.pk:
-            self.fields['fecha_vigencia'].initial = timezone.now().strftime('%Y-%m-%dT%H:%M')
 
     def clean(self):
         cleaned_data = super().clean()
