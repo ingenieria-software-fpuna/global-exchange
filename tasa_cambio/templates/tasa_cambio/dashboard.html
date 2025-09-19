@@ -141,7 +141,7 @@
                 <div>
                   <span class="me-2"><i class="{{ t.moneda.codigo|get_icono_moneda }} text-primary"></i></span>
                   <strong>{{ t.moneda.codigo }}</strong>
-                  <small class="text-muted">Base {{ t.precio_base|formatear_tasa_para_display:t.moneda.decimales }} · Com. C/V {{ t.comision_compra|formatear_tasa_para_display:t.moneda.decimales }}/{{ t.comision_venta|formatear_tasa_para_display:t.moneda.decimales }}</small>
+                  <small class="text-muted">Base {{ t.precio_base|formatear_guaranies }} · Com. C/V {{ t.comision_compra|formatear_guaranies }}/{{ t.comision_venta|formatear_guaranies }}</small>
                 </div>
                 <span class="badge {% if t.es_activa %}bg-success{% else %}bg-secondary{% endif %}">
                   {% if t.es_activa %}Activa{% else %}Inactiva{% endif %}

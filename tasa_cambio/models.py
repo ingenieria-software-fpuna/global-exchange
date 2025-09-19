@@ -14,25 +14,19 @@ class TasaCambio(models.Model):
         related_name='tasas_cambio',
         help_text="Moneda para la cual se establece la cotización"
     )
-    precio_base = models.DecimalField(
-        max_digits=15,
-        decimal_places=8,
-        validators=[MinValueValidator(0.00000001)],
-        help_text="Precio base de la moneda (cotización de referencia)",
+    precio_base = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
+        help_text="Precio base de la moneda en guaraníes (valor entero)",
         default=1
     )
-    comision_compra = models.DecimalField(
-        max_digits=15,
-        decimal_places=8,
+    comision_compra = models.PositiveIntegerField(
         validators=[MinValueValidator(0)],
-        help_text="Comisión que se resta al precio base para obtener el precio de compra",
+        help_text="Comisión en guaraníes que se resta al precio base para obtener el precio de compra",
         default=0
     )
-    comision_venta = models.DecimalField(
-        max_digits=15,
-        decimal_places=8,
+    comision_venta = models.PositiveIntegerField(
         validators=[MinValueValidator(0)],
-        help_text="Comisión que se suma al precio base para obtener el precio de venta",
+        help_text="Comisión en guaraníes que se suma al precio base para obtener el precio de venta",
         default=0
     )
     fecha_vigencia = models.DateTimeField(

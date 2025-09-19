@@ -29,9 +29,9 @@ class TasaCambioModelTest(TestCase):
         # Crear tasa de cambio de prueba
         self.tasa_cambio = TasaCambio.objects.create(
             moneda=self.moneda,
-            precio_base=Decimal('1250'),
-            comision_compra=Decimal('50'),
-            comision_venta=Decimal('60'),
+            precio_base=1250,
+            comision_compra=50,
+            comision_venta=60,
             fecha_vigencia=timezone.now(),
             es_activa=True
         )
@@ -54,8 +54,8 @@ class TasaCambioModelTest(TestCase):
         # spread = (precio_base + comision_venta) - (precio_base - comision_compra) = comision_venta + comision_compra = 60 + 50 = 110
         # precio_compra = precio_base - comision_compra = 1250 - 50 = 1200
         # porcentaje = (110 / 1200) * 100
-        expected_percentage = (Decimal('110') / Decimal('1200')) * 100
-        self.assertEqual(self.tasa_cambio.spread_porcentual, expected_percentage)
+        expected_percentage = (110 / 1200) * 100
+        self.assertAlmostEqual(self.tasa_cambio.spread_porcentual, expected_percentage, places=6)
     
     def test_formatear_tasas(self):
         """Prueba el formateo de las tasas"""
@@ -72,9 +72,9 @@ class TasaCambioModelTest(TestCase):
         # Crear nueva cotización para la misma moneda
         nueva_tasa = TasaCambio.objects.create(
             moneda=self.moneda,
-            precio_base=Decimal('1260'),
-            comision_compra=Decimal('60'),
-            comision_venta=Decimal('65'),
+            precio_base=1260,
+            comision_compra=60,
+            comision_venta=65,
             fecha_vigencia=timezone.now(),
             es_activa=True
         )
@@ -146,7 +146,7 @@ class TasaCambioFormTest(TestCase):
         
         form = TasaCambioForm(data=form_data)
         self.assertFalse(form.is_valid())
-        self.assertIn('mayor o igual a 1e-08', str(form.errors))
+        self.assertIn('mayor o igual a 1', str(form.errors))
 
 
 class TasaCambioViewTest(TestCase):
@@ -175,9 +175,9 @@ class TasaCambioViewTest(TestCase):
         # Crear tasa de cambio de prueba
         self.tasa_cambio = TasaCambio.objects.create(
             moneda=self.moneda,
-            precio_base=Decimal('1250'),
-            comision_compra=Decimal('50'),
-            comision_venta=Decimal('60'),
+            precio_base=1250,
+            comision_compra=50,
+            comision_venta=60,
             fecha_vigencia=timezone.now(),
             es_activa=True
         )
