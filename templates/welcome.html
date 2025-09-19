@@ -71,7 +71,7 @@
 {% if monedas_con_tasas %}
 <section class="py-3">
   <div class="container">
-    <div class="ticker shadow-soft" role="region" aria-label="Tasas de cambio en movimiento">
+    <div class="ticker shadow-soft" role="region" aria-label="Cotizaciones en movimiento">
       <div class="ticker__track">
         <!-- Bloque 1 -->
         {% for item in monedas_con_tasas %}
@@ -105,12 +105,12 @@
 </section>
 {% endif %}
 
-<!-- Tasas de cambio -->
+<!-- Cotizaciones -->
 {% if monedas_con_tasas %}
 <section class="py-5">
     <div class="container">
         <div class="text-center mb-5">
-            <h2 class="h1 text-primary mb-2">Tasas de Cambio</h2>
+            <h2 class="h1 text-primary mb-2">Cotizaciones</h2>
             <p class="text-muted">Moneda base: Guaraní (PYG)</p>
         </div>
 
@@ -155,8 +155,8 @@
         <div class="text-center">
             <div class="alert alert-warning shadow-sm" role="alert">
                 <i class="fas fa-exclamation-triangle me-2"></i>
-                <strong>No hay tasas de cambio disponibles</strong>
-                <p class="mb-0 mt-2">Por favor, contacta con el administrador para configurar las monedas y sus tasas de cambio.</p>
+                <strong>No hay cotizaciones disponibles</strong>
+                <p class="mb-0 mt-2">Por favor, contacta con el administrador para configurar las monedas y sus cotizaciones.</p>
             </div>
         </div>
     </div>

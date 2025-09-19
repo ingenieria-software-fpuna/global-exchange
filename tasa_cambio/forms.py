@@ -7,7 +7,7 @@ from monedas.models import Moneda
 
 class TasaCambioForm(forms.ModelForm):
     """
-    Formulario para crear y editar tasas de cambio
+    Formulario para crear y editar cotizaciones
     """
     
     class Meta:
@@ -52,7 +52,7 @@ class TasaCambioForm(forms.ModelForm):
             'precio_base': 'Precio Base',
             'comision_compra': 'Comisión de Compra',
             'comision_venta': 'Comisión de Venta',
-            'fecha_vigencia': 'Fecha de Vigencia',
+            'fecha_vigencia': 'Fecha de Inicio de Vigencia',
             'es_activa': 'Cotización Activa',
         }
         help_texts = {
@@ -142,7 +142,7 @@ class TasaCambioForm(forms.ModelForm):
 
 class TasaCambioSearchForm(forms.Form):
     """
-    Formulario para búsqueda y filtros de tasas de cambio
+    Formulario para búsqueda y filtros de cotizaciones
     """
     q = forms.CharField(
         required=False,

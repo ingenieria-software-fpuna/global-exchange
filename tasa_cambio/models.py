@@ -53,8 +53,8 @@ class TasaCambio(models.Model):
     )
 
     class Meta:
-        verbose_name = "Tasa de Cambio"
-        verbose_name_plural = "Tasas de Cambio"
+        verbose_name = "Cotización"
+        verbose_name_plural = "Cotizaciones"
         ordering = ['-fecha_vigencia', 'moneda__nombre']
         db_table = 'tasa_cambio_tasacambio'
 

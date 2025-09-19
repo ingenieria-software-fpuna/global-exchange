@@ -37,7 +37,7 @@ class TasaCambioModelTest(TestCase):
         )
     
     def test_crear_tasa_cambio(self):
-        """Prueba la creación de una tasa de cambio"""
+        """Prueba la creación de una cotización"""
         self.assertEqual(self.tasa_cambio.moneda, self.moneda)
         self.assertEqual(self.tasa_cambio.precio_base, Decimal('1250'))
         self.assertEqual(self.tasa_cambio.comision_compra, Decimal('50'))
@@ -233,7 +233,7 @@ class TasaCambioViewTest(TestCase):
         self.assertEqual(response.status_code, 403)
     
     def test_create_tasa_cambio(self):
-        """Prueba la creación de una tasa de cambio"""
+        """Prueba la creación de una cotización"""
         form_data = {
             'moneda': self.moneda.id,
             'precio_base': '1260',
@@ -286,12 +286,12 @@ class TasaCambioURLTest(TestCase):
     """Pruebas para las URLs de TasaCambio"""
     
     def test_tasacambio_list_url(self):
-        """Prueba la URL de lista de tasas de cambio"""
+        """Prueba la URL de lista de cotizaciones"""
         url = reverse('tasa_cambio:tasacambio_list')
         self.assertEqual(url, '/tasa-cambio/')
     
     def test_tasacambio_create_url(self):
-        """Prueba la URL de creación de tasas de cambio"""
+        """Prueba la URL de creación de cotizaciones"""
         url = reverse('tasa_cambio:tasacambio_create')
         self.assertEqual(url, '/tasa-cambio/crear/')
     
