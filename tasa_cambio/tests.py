@@ -29,8 +29,9 @@ class TasaCambioModelTest(TestCase):
         # Crear tasa de cambio de prueba
         self.tasa_cambio = TasaCambio.objects.create(
             moneda=self.moneda,
-            tasa_compra=Decimal('1.25'),
-            tasa_venta=Decimal('1.26'),
+            precio_base=Decimal('1250'),
+            comision_compra=Decimal('50'),
+            comision_venta=Decimal('60'),
             fecha_vigencia=timezone.now(),
             es_activa=True
         )
@@ -38,28 +39,32 @@ class TasaCambioModelTest(TestCase):
     def test_crear_tasa_cambio(self):
         """Prueba la creación de una tasa de cambio"""
         self.assertEqual(self.tasa_cambio.moneda, self.moneda)
-        self.assertEqual(self.tasa_cambio.tasa_compra, Decimal('1.25'))
-        self.assertEqual(self.tasa_cambio.tasa_venta, Decimal('1.26'))
+        self.assertEqual(self.tasa_cambio.precio_base, Decimal('1250'))
+        self.assertEqual(self.tasa_cambio.comision_compra, Decimal('50'))
+        self.assertEqual(self.tasa_cambio.comision_venta, Decimal('60'))
         self.assertTrue(self.tasa_cambio.es_activa)
     
     def test_spread_calculation(self):
         """Prueba el cálculo del spread"""
-        expected_spread = Decimal('0.01')
+        expected_spread = Decimal('110')  # 1310 - 1200
         self.assertEqual(self.tasa_cambio.spread, expected_spread)
     
     def test_spread_porcentual_calculation(self):
         """Prueba el cálculo del spread porcentual"""
-        expected_percentage = (Decimal('0.01') / Decimal('1.25')) * 100
+        # spread = (precio_base + comision_venta) - (precio_base - comision_compra) = comision_venta + comision_compra = 60 + 50 = 110
+        # precio_compra = precio_base - comision_compra = 1250 - 50 = 1200
+        # porcentaje = (110 / 1200) * 100
+        expected_percentage = (Decimal('110') / Decimal('1200')) * 100
         self.assertEqual(self.tasa_cambio.spread_porcentual, expected_percentage)
     
     def test_formatear_tasas(self):
         """Prueba el formateo de las tasas"""
-        self.assertEqual(self.tasa_cambio.formatear_tasa_compra(), "1.25")
-        self.assertEqual(self.tasa_cambio.formatear_tasa_venta(), "1.26")
+        self.assertEqual(self.tasa_cambio.formatear_tasa_compra(), "1200.00")
+        self.assertEqual(self.tasa_cambio.formatear_tasa_venta(), "1310.00")
     
     def test_str_representation(self):
         """Prueba la representación en string del modelo"""
-        expected_str = "Dólar Estadounidense: Compra 1.25 - Venta 1.26"
+        expected_str = "Dólar Estadounidense: Base 1250 - Com. C/V 50/60"
         self.assertEqual(str(self.tasa_cambio), expected_str)
     
     def test_auto_desactivar_anterior(self):
@@ -67,8 +72,9 @@ class TasaCambioModelTest(TestCase):
         # Crear nueva cotización para la misma moneda
         nueva_tasa = TasaCambio.objects.create(
             moneda=self.moneda,
-            tasa_compra=Decimal('1.2600'),
-            tasa_venta=Decimal('1.2650'),
+            precio_base=Decimal('1260'),
+            comision_compra=Decimal('60'),
+            comision_venta=Decimal('65'),
             fecha_vigencia=timezone.now(),
             es_activa=True
         )
@@ -98,8 +104,9 @@ class TasaCambioFormTest(TestCase):
         
         form_data = {
             'moneda': self.moneda.id,
-            'tasa_compra': '1.25',
-            'tasa_venta': '1.26',
+            'precio_base': '1250',
+            'comision_compra': '50',
+            'comision_venta': '60',
             'fecha_vigencia': timezone.now().strftime('%Y-%m-%dT%H:%M'),
             'es_activa': True
         }
@@ -107,30 +114,32 @@ class TasaCambioFormTest(TestCase):
         form = TasaCambioForm(data=form_data)
         self.assertTrue(form.is_valid())
     
-    def test_form_invalid_tasa_venta_menor(self):
-        """Prueba que la tasa de venta debe ser mayor que la de compra"""
+    def test_form_invalid_precio_compra_negativo(self):
+        """Prueba que el precio de compra resultante no puede ser negativo o cero"""
         from .forms import TasaCambioForm
         
         form_data = {
             'moneda': self.moneda.id,
-            'tasa_compra': '1.2550',
-            'tasa_venta': '1.2500',  # Menor que compra
+            'precio_base': '100',
+            'comision_compra': '200',  # Comisión mayor que base
+            'comision_venta': '50',
             'fecha_vigencia': timezone.now().strftime('%Y-%m-%dT%H:%M'),
             'es_activa': True
         }
         
         form = TasaCambioForm(data=form_data)
         self.assertFalse(form.is_valid())
-        self.assertIn('tasa de venta debe ser mayor', str(form.errors))
+        self.assertIn('precio de compra', str(form.errors))
     
-    def test_form_invalid_tasas_cero(self):
-        """Prueba que las tasas no pueden ser cero o negativas"""
+    def test_form_invalid_precio_base_cero(self):
+        """Prueba que el precio base no puede ser cero o negativo"""
         from .forms import TasaCambioForm
         
         form_data = {
             'moneda': self.moneda.id,
-            'tasa_compra': '0',
-            'tasa_venta': '1.2550',
+            'precio_base': '0',
+            'comision_compra': '50',
+            'comision_venta': '60',
             'fecha_vigencia': timezone.now().strftime('%Y-%m-%dT%H:%M'),
             'es_activa': True
         }
@@ -166,8 +175,9 @@ class TasaCambioViewTest(TestCase):
         # Crear tasa de cambio de prueba
         self.tasa_cambio = TasaCambio.objects.create(
             moneda=self.moneda,
-            tasa_compra=Decimal('1.25'),
-            tasa_venta=Decimal('1.26'),
+            precio_base=Decimal('1250'),
+            comision_compra=Decimal('50'),
+            comision_venta=Decimal('60'),
             fecha_vigencia=timezone.now(),
             es_activa=True
         )
@@ -226,8 +236,9 @@ class TasaCambioViewTest(TestCase):
         """Prueba la creación de una tasa de cambio"""
         form_data = {
             'moneda': self.moneda.id,
-            'tasa_compra': '1.26',
-            'tasa_venta': '1.27',
+            'precio_base': '1260',
+            'comision_compra': '60',
+            'comision_venta': '70',
             'fecha_vigencia': timezone.now().strftime('%Y-%m-%dT%H:%M'),
             'es_activa': True
         }

@@ -14,17 +14,26 @@ class TasaCambio(models.Model):
         related_name='tasas_cambio',
         help_text="Moneda para la cual se establece la cotización"
     )
-    tasa_compra = models.DecimalField(
+    precio_base = models.DecimalField(
         max_digits=15,
         decimal_places=8,
         validators=[MinValueValidator(0.00000001)],
-        help_text="Tasa de compra de la moneda (precio al que se compra)"
+        help_text="Precio base de la moneda (cotización de referencia)",
+        default=1
     )
-    tasa_venta = models.DecimalField(
+    comision_compra = models.DecimalField(
         max_digits=15,
         decimal_places=8,
-        validators=[MinValueValidator(0.00000001)],
-        help_text="Tasa de venta de la moneda (precio al que se vende)"
+        validators=[MinValueValidator(0)],
+        help_text="Comisión que se resta al precio base para obtener el precio de compra",
+        default=0
+    )
+    comision_venta = models.DecimalField(
+        max_digits=15,
+        decimal_places=8,
+        validators=[MinValueValidator(0)],
+        help_text="Comisión que se suma al precio base para obtener el precio de venta",
+        default=0
     )
     fecha_vigencia = models.DateTimeField(
         default=timezone.now,
@@ -50,7 +59,21 @@ class TasaCambio(models.Model):
         db_table = 'tasa_cambio_tasacambio'
 
     def __str__(self):
-        return f"{self.moneda.nombre}: Compra {self.tasa_compra} - Venta {self.tasa_venta}"
+        return f"{self.moneda.nombre}: Base {self.precio_base} - Com. C/V {self.comision_compra}/{self.comision_venta}"
+
+    @property
+    def tasa_compra(self):
+        """
+        Propiedad de compatibilidad que devuelve el precio de compra calculado
+        """
+        return self.precio_base - self.comision_compra
+
+    @property
+    def tasa_venta(self):
+        """
+        Propiedad de compatibilidad que devuelve el precio de venta calculado
+        """
+        return self.precio_base + self.comision_venta
 
     def save(self, *args, **kwargs):
         # Usar transacción para asegurar que la desactivación se ejecute antes de guardar
@@ -68,26 +91,50 @@ class TasaCambio(models.Model):
         """
         Calcula el spread (diferencia entre venta y compra)
         """
-        return self.tasa_venta - self.tasa_compra
+        return (self.precio_base + self.comision_venta) - (self.precio_base - self.comision_compra)
 
     @property
     def spread_porcentual(self):
         """
         Calcula el spread como porcentaje
         """
-        if self.tasa_compra > 0:
-            return ((self.tasa_venta - self.tasa_compra) / self.tasa_compra) * 100
+        precio_compra = self.precio_base - self.comision_compra
+        if precio_compra > 0:
+            precio_venta = self.precio_base + self.comision_venta
+            return ((precio_venta - precio_compra) / precio_compra) * 100
         return 0
+
+    @property
+    def margen_total(self):
+        """
+        Calcula el margen total (suma de comisiones)
+        """
+        return self.comision_compra + self.comision_venta
+
+    @property
+    def margen_porcentual(self):
+        """
+        Calcula el margen total como porcentaje del precio base
+        """
+        if self.precio_base > 0:
+            return (self.margen_total / self.precio_base) * 100
+        return 0
+
+    def formatear_precio_base(self):
+        """
+        Formatea el precio base según los decimales de la moneda
+        """
+        return self.moneda.formatear_monto(self.precio_base)
 
     def formatear_tasa_compra(self):
         """
         Formatea la tasa de compra según los decimales de la moneda
         """
-        return self.moneda.formatear_monto(self.tasa_compra)
+        return self.moneda.formatear_monto(self.precio_base - self.comision_compra)
 
     def formatear_tasa_venta(self):
         """
         Formatea la tasa de venta según los decimales de la moneda
         """
-        return self.moneda.formatear_monto(self.tasa_venta)
+        return self.moneda.formatear_monto(self.precio_base + self.comision_venta)
     

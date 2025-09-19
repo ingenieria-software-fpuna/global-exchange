@@ -5,8 +5,8 @@ from .models import TasaCambio
 @admin.register(TasaCambio)
 class TasaCambioAdmin(admin.ModelAdmin):
     list_display = [
-        'moneda', 'tasa_compra', 'tasa_venta', 'spread_display', 
-        'fecha_vigencia', 'es_activa', 'fecha_creacion'
+        'moneda', 'precio_base', 'comision_compra', 'comision_venta', 
+        'spread_display', 'fecha_vigencia', 'es_activa', 'fecha_creacion'
     ]
     list_filter = [
         'es_activa', 'moneda', 'fecha_vigencia', 'fecha_creacion'
@@ -21,8 +21,8 @@ class TasaCambioAdmin(admin.ModelAdmin):
         ('Información de la Moneda', {
             'fields': ('moneda',)
         }),
-        ('Tasas', {
-            'fields': ('tasa_compra', 'tasa_venta')
+        ('Precios y Comisiones', {
+            'fields': ('precio_base', 'comision_compra', 'comision_venta')
         }),
         ('Vigencia', {
             'fields': ('fecha_vigencia', 'es_activa')
