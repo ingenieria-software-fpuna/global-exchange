@@ -141,7 +141,7 @@
                 <div>
                   <span class="me-2"><i class="{{ t.moneda.codigo|get_icono_moneda }} text-primary"></i></span>
                   <strong>{{ t.moneda.codigo }}</strong>
-                  <small class="text-muted">Compra {{ t.tasa_compra|formatear_tasa_para_display:t.moneda.decimales }} · Venta {{ t.tasa_venta|formatear_tasa_para_display:t.moneda.decimales }}</small>
+                  <small class="text-muted">Base {{ t.precio_base|formatear_tasa_para_display:t.moneda.decimales }} · Com. C/V {{ t.comision_compra|formatear_tasa_para_display:t.moneda.decimales }}/{{ t.comision_venta|formatear_tasa_para_display:t.moneda.decimales }}</small>
                 </div>
                 <span class="badge {% if t.es_activa %}bg-success{% else %}bg-secondary{% endif %}">
                   {% if t.es_activa %}Activa{% else %}Inactiva{% endif %}
@@ -157,6 +157,7 @@
   </div>
 </div>
 
+<script type="application/json" id="monedas-data">{% for m in monedas %}{"codigo": "{{ m.codigo }}", "nombre": "{{ m.nombre|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}</script>
 <script>
   (function() {
     const $monto = document.getElementById('monto');
@@ -171,11 +172,8 @@
     const $metodoPago = document.getElementById('metodo_pago');
 
     // Dataset de monedas activas (no incluye PYG normalmente)
-    const MONEDAS = [
-      {% for m in monedas %}
-        { codigo: '{{ m.codigo }}', nombre: '{{ m.nombre|escapejs }}' }{% if not forloop.last %},{% endif %}
-      {% endfor %}
-    ].filter(m => m.codigo !== 'PYG');
+    const monedasData = JSON.parse('[' + document.getElementById('monedas-data').textContent + ']');
+    const MONEDAS = monedasData.filter(m => m.codigo !== 'PYG');
 
     function setOptions(el, options, selected) {
       el.innerHTML = options.map(o => `<option value="${o.codigo}" ${o.codigo===selected?'selected':''}>${o.nombre} (${o.codigo})</option>`).join('');

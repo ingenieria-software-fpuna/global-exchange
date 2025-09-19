@@ -13,24 +13,30 @@ class TasaCambioForm(forms.ModelForm):
     class Meta:
         model = TasaCambio
         fields = [
-            'moneda', 'tasa_compra', 'tasa_venta', 'fecha_vigencia', 'es_activa'
+            'moneda', 'precio_base', 'comision_compra', 'comision_venta', 'fecha_vigencia', 'es_activa'
         ]
         widgets = {
             'moneda': forms.Select(attrs={
                 'class': 'form-select',
                 'placeholder': 'Seleccione una moneda'
             }),
-            'tasa_compra': forms.NumberInput(attrs={
+            'precio_base': forms.NumberInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Ej: 1.25',
+                'placeholder': 'Ej: 7500',
                 'step': 'any',
                 'min': '0.00000001'
             }),
-            'tasa_venta': forms.NumberInput(attrs={
+            'comision_compra': forms.NumberInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Ej: 1.26',
+                'placeholder': 'Ej: 300',
                 'step': 'any',
-                'min': '0.00000001'
+                'min': '0'
+            }),
+            'comision_venta': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: 200',
+                'step': 'any',
+                'min': '0'
             }),
             'fecha_vigencia': forms.DateTimeInput(attrs={
                 'class': 'form-control',
@@ -43,15 +49,17 @@ class TasaCambioForm(forms.ModelForm):
         }
         labels = {
             'moneda': 'Moneda',
-            'tasa_compra': 'Tasa de Compra',
-            'tasa_venta': 'Tasa de Venta',
+            'precio_base': 'Precio Base',
+            'comision_compra': 'Comisión de Compra',
+            'comision_venta': 'Comisión de Venta',
             'fecha_vigencia': 'Fecha de Vigencia',
             'es_activa': 'Cotización Activa',
         }
         help_texts = {
             'moneda': 'Seleccione la moneda para la cual se establece la cotización',
-            'tasa_compra': 'Precio al cual se compra la moneda (mínimo 0.0001)',
-            'tasa_venta': 'Precio al cual se vende la moneda (mínimo 0.0001)',
+            'precio_base': 'Precio base de referencia para la moneda',
+            'comision_compra': 'Comisión que se resta al precio base para calcular el precio de compra',
+            'comision_venta': 'Comisión que se suma al precio base para calcular el precio de venta',
             'fecha_vigencia': 'Fecha y hora desde la cual la cotización estará vigente',
             'es_activa': 'Indica si la cotización está disponible para operaciones',
         }
@@ -68,42 +76,37 @@ class TasaCambioForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        tasa_compra = cleaned_data.get('tasa_compra')
-        tasa_venta = cleaned_data.get('tasa_venta')
+        precio_base = cleaned_data.get('precio_base')
+        comision_compra = cleaned_data.get('comision_compra')
+        comision_venta = cleaned_data.get('comision_venta')
         moneda = cleaned_data.get('moneda')
         
-        # Validar que la tasa de venta sea mayor que la de compra
-        if tasa_compra and tasa_venta:
-            if tasa_venta <= tasa_compra:
+        # Validar que el precio de compra resultante sea positivo
+        if precio_base and comision_compra:
+            precio_compra = precio_base - comision_compra
+            if precio_compra <= 0:
                 raise forms.ValidationError(
-                    'La tasa de venta debe ser mayor que la tasa de compra.'
+                    f'El precio de compra resultante debe ser positivo. '
+                    f'Precio base: {precio_base}, Comisión de compra: {comision_compra} '
+                    f'= Precio de compra: {precio_compra}'
                 )
         
-        # Validar que las tasas respeten los decimales de la moneda
-        if moneda and (tasa_compra or tasa_venta):
+        # Validar que las comisiones respeten los decimales de la moneda
+        if moneda and (precio_base or comision_compra or comision_venta):
             decimales_moneda = moneda.decimales
             
-            if tasa_compra:
-                # Verificar que la tasa de compra no tenga más decimales de los permitidos
-                str_compra = str(tasa_compra)
-                if '.' in str_compra:
-                    decimales_compra = len(str_compra.split('.')[1])
-                    if decimales_compra > decimales_moneda:
-                        raise forms.ValidationError(
-                            f'La tasa de compra no puede tener más de {decimales_moneda} decimales '
-                            f'(configurado para {moneda.nombre}).'
-                        )
-            
-            if tasa_venta:
-                # Verificar que la tasa de venta no tenga más decimales de los permitidos
-                str_venta = str(tasa_venta)
-                if '.' in str_venta:
-                    decimales_venta = len(str_venta.split('.')[1])
-                    if decimales_venta > decimales_moneda:
-                        raise forms.ValidationError(
-                            f'La tasa de venta no puede tener más de {decimales_moneda} decimales '
-                            f'(configurado para {moneda.nombre}).'
-                        )
+            for campo, valor in [('precio_base', precio_base), 
+                               ('comision_compra', comision_compra),
+                               ('comision_venta', comision_venta)]:
+                if valor:
+                    str_valor = str(valor)
+                    if '.' in str_valor:
+                        decimales_valor = len(str_valor.split('.')[1])
+                        if decimales_valor > decimales_moneda:
+                            raise forms.ValidationError(
+                                f'El {campo.replace("_", " ")} no puede tener más de {decimales_moneda} decimales '
+                                f'(configurado para {moneda.nombre}).'
+                            )
         
         # Verificar si ya existe una cotización activa para informar al usuario
         if moneda and not self.instance.pk:
@@ -118,17 +121,23 @@ class TasaCambioForm(forms.ModelForm):
         
         return cleaned_data
 
-    def clean_tasa_compra(self):
-        tasa_compra = self.cleaned_data.get('tasa_compra')
-        if tasa_compra and tasa_compra <= 0:
-            raise forms.ValidationError('La tasa de compra debe ser mayor que cero.')
-        return tasa_compra
+    def clean_precio_base(self):
+        precio_base = self.cleaned_data.get('precio_base')
+        if precio_base and precio_base <= 0:
+            raise forms.ValidationError('El precio base debe ser mayor que cero.')
+        return precio_base
 
-    def clean_tasa_venta(self):
-        tasa_venta = self.cleaned_data.get('tasa_venta')
-        if tasa_venta and tasa_venta <= 0:
-            raise forms.ValidationError('La tasa de venta debe ser mayor que cero.')
-        return tasa_venta
+    def clean_comision_compra(self):
+        comision_compra = self.cleaned_data.get('comision_compra')
+        if comision_compra and comision_compra < 0:
+            raise forms.ValidationError('La comisión de compra no puede ser negativa.')
+        return comision_compra
+
+    def clean_comision_venta(self):
+        comision_venta = self.cleaned_data.get('comision_venta')
+        if comision_venta and comision_venta < 0:
+            raise forms.ValidationError('La comisión de venta no puede ser negativa.')
+        return comision_venta
 
 
 class TasaCambioSearchForm(forms.Form):
