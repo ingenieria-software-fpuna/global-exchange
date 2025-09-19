@@ -54,7 +54,7 @@ def get_icono_moneda(codigo):
         'GEL': 'fas fa-lari-sign',
         'AZN': 'fas fa-manat-sign',
         'TMT': 'fas fa-manat-sign',
-        'PYG': 'fas fa-guarani-sign',  # Si existe, sino usar genérico
+        'PYG': 'fas fa-guarani-sign', 
     }
     
     return iconos.get(codigo.upper(), 'fas fa-coins')  # Icono genérico por defecto
@@ -70,3 +70,19 @@ def formatear_tasa_para_display(tasa, decimales):
     # Formatear con el número de decimales especificado
     formato = f"{{:.{decimales}f}}"
     return formato.format(float(tasa))
+
+@register.filter
+def formatear_guaranies(valor):
+    """
+    Formatea un valor en guaraníes con separadores de miles
+    """
+    if valor is None:
+        return "N/A"
+    
+    try:
+        # Convertir a entero si es necesario
+        valor_int = int(valor)
+        # Formatear con separadores de miles
+        return f"₲ {valor_int:,}".replace(',', '.')
+    except (ValueError, TypeError):
+        return "N/A"

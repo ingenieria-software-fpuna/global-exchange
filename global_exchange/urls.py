@@ -25,11 +25,11 @@ from django.http import Http404
 import os
 
 def welcome_view(request):
-    """Vista para la pantalla de bienvenida con tasas de cambio"""
+    """Vista para la pantalla de bienvenida con cotizaciones"""
     from monedas.models import Moneda
     from tasa_cambio.models import TasaCambio
     
-    # Obtener monedas activas con sus tasas de cambio activas
+    # Obtener monedas activas con sus cotizaciones activas
     monedas_con_tasas = []
     monedas_activas = Moneda.objects.filter(es_activa=True).order_by('nombre')
     

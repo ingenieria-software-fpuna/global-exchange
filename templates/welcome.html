@@ -71,17 +71,17 @@
 {% if monedas_con_tasas %}
 <section class="py-3">
   <div class="container">
-    <div class="ticker shadow-soft" role="region" aria-label="Tasas de cambio en movimiento">
+    <div class="ticker shadow-soft" role="region" aria-label="Cotizaciones en movimiento">
       <div class="ticker__track">
         <!-- Bloque 1 -->
         {% for item in monedas_con_tasas %}
         <span class="ticker__item">
           <i class="{{ item.moneda.codigo|get_icono_moneda }} text-primary"></i>
           <span class="ticker__label">{{ item.moneda.codigo }}</span>
-          <span class="ticker__value">{{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}</span>
+          <span class="ticker__value">{{ item.tasa.tasa_venta|formatear_guaranies }}</span>
           <span class="text-muted">
-            Compra {{ item.tasa.tasa_compra|formatear_tasa_para_display:item.moneda.decimales }} · 
-            Venta {{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}
+            Compra {{ item.tasa.tasa_compra|formatear_guaranies }} · 
+            Venta {{ item.tasa.tasa_venta|formatear_guaranies }}
           </span>
         </span>
         {% endfor %}
@@ -91,10 +91,10 @@
         <span class="ticker__item">
           <i class="{{ item.moneda.codigo|get_icono_moneda }} text-primary"></i>
           <span class="ticker__label">{{ item.moneda.codigo }}</span>
-          <span class="ticker__value">{{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}</span>
+          <span class="ticker__value">{{ item.tasa.tasa_venta|formatear_guaranies }}</span>
           <span class="text-muted">
-            Compra {{ item.tasa.tasa_compra|formatear_tasa_para_display:item.moneda.decimales }} · 
-            Venta {{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}
+            Compra {{ item.tasa.tasa_compra|formatear_guaranies }} · 
+            Venta {{ item.tasa.tasa_venta|formatear_guaranies }}
           </span>
         </span>
         {% endfor %}
@@ -105,12 +105,12 @@
 </section>
 {% endif %}
 
-<!-- Tasas de cambio -->
+<!-- Cotizaciones -->
 {% if monedas_con_tasas %}
 <section class="py-5">
     <div class="container">
         <div class="text-center mb-5">
-            <h2 class="h1 text-primary mb-2">Tasas de Cambio</h2>
+            <h2 class="h1 text-primary mb-2">Cotizaciones</h2>
             <p class="text-muted">Moneda base: Guaraní (PYG)</p>
         </div>
 
@@ -124,12 +124,12 @@
                         </div>
                         <h5 class="card-title">{{ item.moneda.nombre }}</h5>
                         <p class="mb-1">
-                            <span class="h4 text-success">{{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}</span>
+                            <span class="h4 text-success">{{ item.tasa.tasa_venta|formatear_guaranies }}</span>
                             <small class="text-muted"> PYG/{{ item.moneda.codigo }}</small>
                         </p>
                         <small class="text-muted">
-                            Compra: {{ item.tasa.tasa_compra|formatear_tasa_para_display:item.moneda.decimales }} · 
-                            Venta: {{ item.tasa.tasa_venta|formatear_tasa_para_display:item.moneda.decimales }}
+                            Compra: {{ item.tasa.tasa_compra|formatear_guaranies }} · 
+                            Venta: {{ item.tasa.tasa_venta|formatear_guaranies }}
                         </small>
                     </div>
                 </div>
@@ -141,7 +141,7 @@
             <div class="col-12">
                 <div class="alert alert-info shadow-sm text-center" role="alert">
                     <i class="fas fa-circle-info me-2"></i>
-                    <strong>Nota:</strong> Las tasas se actualizan cada hora. Para operaciones específicas, contacta con nuestros agentes.
+                    <strong>Nota:</strong> Las cotizaciones se actualizan cada hora. Para operaciones específicas, contacta con nuestros agentes.
                 </div>
             </div>
         </div>
@@ -155,8 +155,8 @@
         <div class="text-center">
             <div class="alert alert-warning shadow-sm" role="alert">
                 <i class="fas fa-exclamation-triangle me-2"></i>
-                <strong>No hay tasas de cambio disponibles</strong>
-                <p class="mb-0 mt-2">Por favor, contacta con el administrador para configurar las monedas y sus tasas de cambio.</p>
+                <strong>No hay cotizaciones disponibles</strong>
+                <p class="mb-0 mt-2">Por favor, contacta con el administrador para configurar las monedas y sus cotizaciones.</p>
             </div>
         </div>
     </div>
@@ -302,7 +302,9 @@
       {% for m in monedas %}
         { codigo: '{{ m.codigo }}', nombre: '{{ m.nombre|escapejs }}' }{% if not forloop.last %},{% endif %}
       {% endfor %}
-    ].filter(m => m.codigo !== 'PYG');
+    ];
+    
+    const MONEDAS_FILTRADAS = MONEDAS.filter(m => m.codigo !== 'PYG');
 
     function setOptions(el, options, selected) {
       el.innerHTML = options.map(o => `<option value="${o.codigo}" ${o.codigo===selected?'selected':''}>${o.nombre} (${o.codigo})</option>`).join('');
@@ -313,7 +315,7 @@
     function applyDirection(preserveCode) {
       if (monedaToPYG) {
         const prefer = preserveCode || 'USD';
-        setOptions($origen, MONEDAS, prefer);
+        setOptions($origen, MONEDAS_FILTRADAS, prefer);
         $origen.disabled = false;
         $destino.innerHTML = '<option value="PYG" selected>Guaraní (PYG)</option>';
         $destino.disabled = true;
@@ -321,8 +323,8 @@
         $origen.innerHTML = '<option value="PYG" selected>Guaraní (PYG)</option>';
         $origen.disabled = true;
         const prefer = preserveCode || 'USD';
-        const sel = MONEDAS.find(m => m.codigo === prefer) ? prefer : (MONEDAS[0]?.codigo || '');
-        setOptions($destino, MONEDAS, sel);
+        const sel = MONEDAS_FILTRADAS.find(m => m.codigo === prefer) ? prefer : (MONEDAS_FILTRADAS[0]?.codigo || '');
+        setOptions($destino, MONEDAS_FILTRADAS, sel);
         $destino.disabled = false;
       }
     }
@@ -378,7 +380,7 @@
           const t1 = d.tasa_origen ? `${d.tasa_origen.moneda} (${d.tasa_origen.tipo}): ${d.tasa_origen.valor}` : null;
           const t2 = d.tasa_destino ? `${d.tasa_destino.moneda} (${d.tasa_destino.tipo}): ${d.tasa_destino.valor}` : null;
           const parts = [t1, t2].filter(Boolean);
-          $resTasas.textContent = parts.length ? `Tasas usadas: ${parts.join(' · ')}` : '';
+          $resTasas.textContent = parts.length ? `Cotizaciones usadas: ${parts.join(' · ')}` : '';
         })
         .catch(() => {
           $resValor.textContent = '—';
