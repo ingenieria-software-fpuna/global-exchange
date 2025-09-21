@@ -22,6 +22,15 @@ def crear_monedas_ejemplo():
     
     monedas_datos = [
         {
+            'nombre': 'Guaraní',
+            'codigo': 'PYG',
+            'simbolo': '₲',
+            'decimales': 0,
+            'precio_base': Decimal('1.00'),
+            'comision_compra': Decimal('0.00'),
+            'comision_venta': Decimal('0.00')
+        },
+        {
             'nombre': 'Dólar Estadounidense',
             'codigo': 'USD',
             'simbolo': '$',
