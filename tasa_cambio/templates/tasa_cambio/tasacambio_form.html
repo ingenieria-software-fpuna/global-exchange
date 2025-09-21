@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load moneda_extras %}
 
 {% block title %}{{ titulo }}{% endblock %}
 
@@ -57,51 +58,51 @@
                                 {% endif %}
                             </div>
 
-                            <!-- Tasa de Compra -->
-                            <div class="col-md-6">
-                                <label for="{{ form.tasa_compra.id_for_label }}" class="form-label">
-                                    {{ form.tasa_compra.label }} <span class="text-danger">*</span>
+                            <!-- Precio Base -->
+                            <div class="col-md-4">
+                                <label for="{{ form.precio_base.id_for_label }}" class="form-label">
+                                    {{ form.precio_base.label }} <span class="text-danger">*</span>
                                 </label>
-                                {{ form.tasa_compra }}
-                                {% if form.tasa_compra.errors %}
+                                {{ form.precio_base }}
+                                {% if form.precio_base.errors %}
                                     <div class="invalid-feedback d-block">
-                                        {{ form.tasa_compra.errors.0 }}
+                                        {{ form.precio_base.errors.0 }}
                                     </div>
                                 {% endif %}
-                                {% if form.tasa_compra.help_text %}
-                                    <div class="form-text">{{ form.tasa_compra.help_text }}</div>
+                                {% if form.precio_base.help_text %}
+                                    <div class="form-text">{{ form.precio_base.help_text }}</div>
                                 {% endif %}
                             </div>
 
-                            <!-- Tasa de Venta -->
-                            <div class="col-md-6">
-                                <label for="{{ form.tasa_venta.id_for_label }}" class="form-label">
-                                    {{ form.tasa_venta.label }} <span class="text-danger">*</span>
+                            <!-- Comisión de Compra -->
+                            <div class="col-md-4">
+                                <label for="{{ form.comision_compra.id_for_label }}" class="form-label">
+                                    {{ form.comision_compra.label }} <span class="text-danger">*</span>
                                 </label>
-                                {{ form.tasa_venta }}
-                                {% if form.tasa_venta.errors %}
+                                {{ form.comision_compra }}
+                                {% if form.comision_compra.errors %}
                                     <div class="invalid-feedback d-block">
-                                        {{ form.tasa_venta.errors.0 }}
+                                        {{ form.comision_compra.errors.0 }}
                                     </div>
                                 {% endif %}
-                                {% if form.tasa_venta.help_text %}
-                                    <div class="form-text">{{ form.tasa_venta.help_text }}</div>
+                                {% if form.comision_compra.help_text %}
+                                    <div class="form-text">{{ form.comision_compra.help_text }}</div>
                                 {% endif %}
                             </div>
 
-                            <!-- Fecha de Vigencia -->
-                            <div class="col-md-12">
-                                <label for="{{ form.fecha_vigencia.id_for_label }}" class="form-label">
-                                    {{ form.fecha_vigencia.label }} <span class="text-danger">*</span>
+                            <!-- Comisión de Venta -->
+                            <div class="col-md-4">
+                                <label for="{{ form.comision_venta.id_for_label }}" class="form-label">
+                                    {{ form.comision_venta.label }} <span class="text-danger">*</span>
                                 </label>
-                                {{ form.fecha_vigencia }}
-                                {% if form.fecha_vigencia.errors %}
+                                {{ form.comision_venta }}
+                                {% if form.comision_venta.errors %}
                                     <div class="invalid-feedback d-block">
-                                        {{ form.fecha_vigencia.errors.0 }}
+                                        {{ form.comision_venta.errors.0 }}
                                     </div>
                                 {% endif %}
-                                {% if form.fecha_vigencia.help_text %}
-                                    <div class="form-text">{{ form.fecha_vigencia.help_text }}</div>
+                                {% if form.comision_venta.help_text %}
+                                    <div class="form-text">{{ form.comision_venta.help_text }}</div>
                                 {% endif %}
                             </div>
 
@@ -121,6 +122,44 @@
                                 {% if form.es_activa.help_text %}
                                     <div class="form-text">{{ form.es_activa.help_text }}</div>
                                 {% endif %}
+                            </div>
+
+                            <!-- Vista previa de precios calculados -->
+                            <div class="col-md-12">
+                                <div class="card bg-light mt-3">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-calculator me-2"></i>
+                                            Precios Calculados
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="text-center">
+                                                    <h5 class="text-success">Precio de Compra</h5>
+                                                    <span class="badge bg-success fs-4" id="precio-compra">-</span>
+                                                    <small class="d-block text-muted mt-1">Precio Base - Comisión Compra</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="text-center">
+                                                    <h5 class="text-danger">Precio de Venta</h5>
+                                                    <span class="badge bg-danger fs-4" id="precio-venta">-</span>
+                                                    <small class="d-block text-muted mt-1">Precio Base + Comisión Venta</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row mt-3">
+                                            <div class="col-md-12 text-center">
+                                                <small class="text-info">
+                                                    <i class="fas fa-info-circle me-1"></i>
+                                                    Los precios se actualizan automáticamente al cambiar los valores
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -167,77 +206,49 @@
     }, false);
 })();
 
-// Validación en tiempo real de tasas
+// Validación en tiempo real y cálculo de precios
 document.addEventListener('DOMContentLoaded', function() {
-    const tasaCompra = document.getElementById('{{ form.tasa_compra.id_for_label }}');
-    const tasaVenta = document.getElementById('{{ form.tasa_venta.id_for_label }}');
+    const precioBase = document.getElementById('{{ form.precio_base.id_for_label }}');
+    const comisionCompra = document.getElementById('{{ form.comision_compra.id_for_label }}');
+    const comisionVenta = document.getElementById('{{ form.comision_venta.id_for_label }}');
     const monedaSelect = document.getElementById('{{ form.moneda.id_for_label }}');
+    const precioCompraDisplay = document.getElementById('precio-compra');
+    const precioVentaDisplay = document.getElementById('precio-venta');
     
-    // Función para ajustar los campos de tasa según los decimales de la moneda
-    function ajustarDecimalesMoneda() {
-        const monedaId = monedaSelect.value;
-        if (monedaId) {
-            // Obtener información de la moneda seleccionada
-            fetch(`/monedas/api/detalle/${monedaId}/`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const decimales = data.data.decimales;
-                        const step = Math.pow(10, -decimales);
-                        
-                        // Ajustar el step de los campos de tasa
-                        tasaCompra.step = step;
-                        tasaVenta.step = step;
-                        
-                        // Actualizar placeholders con ejemplos apropiados
-                        if (decimales === 0) {
-                            tasaCompra.placeholder = 'Ej: 1250';
-                            tasaVenta.placeholder = 'Ej: 1260';
-                        } else if (decimales === 2) {
-                            tasaCompra.placeholder = 'Ej: 1250.00';
-                            tasaVenta.placeholder = 'Ej: 1260.00';
-                        } else if (decimales === 4) {
-                            tasaCompra.placeholder = 'Ej: 1250.0000';
-                            tasaVenta.placeholder = 'Ej: 1260.0000';
-                        } else {
-                            tasaCompra.placeholder = `Ej: 1250.${'0'.repeat(decimales)}`;
-                            tasaVenta.placeholder = `Ej: 1260.${'0'.repeat(decimales)}`;
-                        }
-                        
-                        // Limpiar valores existentes para evitar inconsistencias
-                        tasaCompra.value = '';
-                        tasaVenta.value = '';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error al obtener información de la moneda:', error);
-                });
+    // Función para calcular y mostrar precios
+    function calcularPrecios() {
+        const base = parseInt(precioBase.value) || 0;
+        const compra = parseInt(comisionCompra.value) || 0;
+        const venta = parseInt(comisionVenta.value) || 0;
+        
+        const precioCompraCalculado = base - compra;
+        const precioVentaCalculado = base + venta;
+        
+        // Mostrar valores sin formato especial (solo números)
+        if (precioCompraCalculado <= 0 || compra<0 ) {
+            precioCompraDisplay.className = 'badge bg-warning fs-4';
+            precioCompraDisplay.textContent = 'Inválido';
+        } else {
+            precioCompraDisplay.className = 'badge bg-success fs-4';
+            precioCompraDisplay.textContent = '₲ ' + precioCompraCalculado.toLocaleString('es-PY');
+        }
+        
+        if (precioVentaCalculado <= 0 || venta<0 ) {
+            precioVentaDisplay.className = 'badge bg-warning fs-4';
+            precioVentaDisplay.textContent = 'Inválido';
+        } else {
+            precioVentaDisplay.className = 'badge bg-danger fs-4';
+            precioVentaDisplay.textContent = '₲ ' + precioVentaCalculado.toLocaleString('es-PY');
         }
     }
     
-    // Event listener para cambios en la selección de moneda
-    monedaSelect.addEventListener('change', ajustarDecimalesMoneda);
+    // Event listeners para cálculo en tiempo real
+    precioBase.addEventListener('input', calcularPrecios);
+    comisionCompra.addEventListener('input', calcularPrecios);
+    comisionVenta.addEventListener('input', calcularPrecios);
     
-    // Ajustar decimales al cargar la página si ya hay una moneda seleccionada
-    if (monedaSelect.value) {
-        ajustarDecimalesMoneda();
-    }
-    
-    function validarTasas() {
-        if (tasaCompra.value && tasaVenta.value) {
-            const compra = parseFloat(tasaCompra.value);
-            const venta = parseFloat(tasaVenta.value);
-            
-            if (venta <= compra) {
-                tasaVenta.setCustomValidity('La tasa de venta debe ser mayor que la de compra');
-            } else {
-                tasaVenta.setCustomValidity('');
-            }
-        }
-    }
-    
-    tasaCompra.addEventListener('input', validarTasas);
-    tasaVenta.addEventListener('input', validarTasas);
+    // Calcular precios iniciales
+    calcularPrecios();
 });
 </script>
 {% endblock %}

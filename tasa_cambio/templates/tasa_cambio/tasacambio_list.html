@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load moneda_extras %}
 
 {% block title %}Cotizaciones - Global Exchange{% endblock %}
 
@@ -22,13 +23,12 @@
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-start mb-3">
-                <button type="button"
-                        class="btn btn-outline-secondary"
-                        onclick="window.location.href='{% url "auth:dashboard" %}'"
-                        title="Volver a la página anterior">
+                <a href="{% url 'auth:dashboard' %}"
+                   class="btn btn-outline-secondary"
+                   title="Volver a la página anterior">
                     <i class="fas fa-arrow-left me-2"></i>
                     {{ text|default:"Volver al Dashboard" }}
-                </button>
+                </a>
             </div>
             
             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -77,7 +77,7 @@
                 </div>
             </div>
 
-            {% if tasas_cambio %}
+            {% if cotizaciones %}
             <div class="card shadow-sm">
                 <div class="card-body">
                     <div class="table-responsive">
@@ -85,17 +85,17 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>Moneda</th>
-                                    <th>Tasa Compra</th>
-                                    <th>Tasa Venta</th>
+                                    <th>Precio Base</th>
+                                    <th>Comisión Compra</th>
+                                    <th>Comisión Venta</th>
                                     <th>Spread</th>
-                                    <th>Vigencia</th>
+                                    <th>Fecha creacion</th>
                                     <th>Estado</th>
-                                    <th>Fecha Creación</th>
                                     <th class="text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for tasacambio in tasas_cambio %}
+                                {% for tasacambio in cotizaciones %}
                                 <tr>
                                     <td>
                                         <div>
@@ -108,19 +108,24 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <span class="badge bg-success text-white fs-6">
-                                            {{ tasacambio.tasa_compra }}
+                                        <span class="badge bg-info text-white fs-6">
+                                            {{ tasacambio.precio_base|formatear_guaranies }}
                                         </span>
                                     </td>
                                     <td>
-                                        <span class="badge bg-danger text-white fs-6">
-                                            {{ tasacambio.tasa_venta }}
+                                        <span class="badge bg-warning text-dark fs-6">
+                                            {{ tasacambio.comision_compra|formatear_guaranies }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-warning text-dark fs-6">
+                                            {{ tasacambio.comision_venta|formatear_guaranies }}
                                         </span>
                                     </td>
                                     <td>
                                         <div>
-                                            <span class="badge bg-info text-white">
-                                                {{ tasacambio.spread|floatformat:4 }}
+                                            <span class="badge bg-success text-white">
+                                                {{ tasacambio.spread|formatear_guaranies }}
                                             </span>
                                             <br>
                                             <small class="text-muted">
@@ -130,7 +135,7 @@
                                     </td>
                                     <td>
                                         <small class="text-muted">
-                                            {{ tasacambio.fecha_vigencia|date:"d/m/Y H:i" }}
+                                            {{ tasacambio.fecha_creacion|date:"d/m/Y H:i" }}
                                         </small>
                                     </td>
                                     <td>
@@ -144,11 +149,7 @@
                                             </span>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        <small class="text-muted">
-                                            {{ tasacambio.fecha_creacion|date:"d/m/Y H:i" }}
-                                        </small>
-                                    </td>
+                                
                                     <td class="text-center">
                                         <div class="btn-group" role="group">
                                             {% if perms.tasa_cambio.change_tasacambio %}
