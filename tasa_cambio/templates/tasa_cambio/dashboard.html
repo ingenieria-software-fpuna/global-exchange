@@ -9,45 +9,10 @@
     <h1 class="h3 mb-0">{{ titulo }}</h1>
   </div>
 
-  <!-- Stats -->
-  <div class="row g-3 mb-4">
-    <div class="col-12 col-sm-6 col-lg-3">
-      <div class="card h-100 shadow-sm">
-        <div class="card-body">
-          <div class="text-muted small">Total cotizaciones</div>
-          <div class="fs-3 fw-bold">{{ total_cotizaciones }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-sm-6 col-lg-3">
-      <div class="card h-100 shadow-sm">
-        <div class="card-body">
-          <div class="text-muted small">Activas</div>
-          <div class="fs-3 fw-bold text-success">{{ cotizaciones_activas }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-sm-6 col-lg-3">
-      <div class="card h-100 shadow-sm">
-        <div class="card-body">
-          <div class="text-muted small">Inactivas</div>
-          <div class="fs-3 fw-bold text-danger">{{ cotizaciones_inactivas }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-sm-6 col-lg-3">
-      <div class="card h-100 shadow-sm">
-        <div class="card-body">
-          <div class="text-muted small">Monedas con cotización activa</div>
-          <div class="fs-3 fw-bold">{{ monedas_con_cotizacion }}</div>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Simulador de Cambio -->
   <div class="row g-4">
-    <div class="col-12 col-lg-7">
+    <div class="col-12">
       <div class="card shadow-sm">
         <div class="card-body">
           <div class="d-flex align-items-center justify-content-between mb-3">
@@ -131,29 +96,6 @@
       </div>
     </div>
 
-    <div class="col-12 col-lg-5">
-      <div class="card h-100 shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title mb-3"><i class="fas fa-clock me-2"></i>Recientes</h5>
-          <ul class="list-group list-group-flush">
-            {% for t in cotizaciones_recientes %}
-              <li class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                  <span class="me-2"><i class="{{ t.moneda.codigo|get_icono_moneda }} text-primary"></i></span>
-                  <strong>{{ t.moneda.codigo }}</strong>
-                  <small class="text-muted">Base {{ t.precio_base|formatear_guaranies }} · Com. C/V {{ t.comision_compra|formatear_guaranies }}/{{ t.comision_venta|formatear_guaranies }}</small>
-                </div>
-                <span class="badge {% if t.es_activa %}bg-success{% else %}bg-secondary{% endif %}">
-                  {% if t.es_activa %}Activa{% else %}Inactiva{% endif %}
-                </span>
-              </li>
-            {% empty %}
-              <li class="list-group-item text-muted">Sin cotizaciones recientes</li>
-            {% endfor %}
-          </ul>
-        </div>
-      </div>
-    </div>
   </div>
 </div>
 
