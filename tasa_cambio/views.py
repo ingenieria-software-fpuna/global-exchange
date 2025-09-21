@@ -292,20 +292,25 @@ def simular_cambio_api(request):
         tasa_destino = get_tasa_activa(destino)
         if not tasa_destino:
             return JsonResponse({'success': False, 'message': f'No hay tasa activa para {destino.codigo}.'}, status=404)
-        # Ajustar tasa de venta por descuento (si corresponde)
-        tasa_venta_aplicada = Decimal(tasa_destino.tasa_venta)
+
+        # Calcular comisión de venta ajustada por descuento
+        comision_venta_ajustada = Decimal(tasa_destino.comision_venta)
         if descuento_pct > 0:
-            tasa_venta_aplicada = (tasa_venta_aplicada * (D('1') - (descuento_pct / D('100'))))
-        # De PYG a destino: usar tasa_venta (posiblemente ajustada)
-        resultado = (monto / tasa_venta_aplicada).quantize(Decimal('1.' + '0'*max(destino.decimales, 0)), rounding=ROUND_HALF_UP)
+            comision_venta_ajustada = comision_venta_ajustada * (D('1') - (descuento_pct / D('100')))
+        
+        # Calcular precio de venta: precio_base + comision_venta_ajustada
+        precio_venta = Decimal(tasa_destino.precio_base) + comision_venta_ajustada
+            
+        # De PYG a destino: usar precio de venta calculado
+        resultado = (monto / precio_venta).quantize(Decimal('1.' + '0'*max(destino.decimales, 0)), rounding=ROUND_HALF_UP)
         tasa_destino_usada = {
             'moneda': destino.codigo,
             'tipo': 'venta' + (' (ajustada)' if descuento_pct > 0 else ''),
-            'valor': float(tasa_venta_aplicada),
+            'valor': float(precio_venta),
         }
-        detalle = f"PYG -> {destino.codigo} usando tasa de venta"
+        detalle = f"PYG -> {destino.codigo} usando precio de venta"
         if descuento_pct > 0:
-            detalle += f" con descuento {descuento_pct}%"
+            detalle += f" con descuento {descuento_pct}% en comisión"
         resultado_formateado = destino.mostrar_monto(resultado)
         # Calcular comisión y total neto sobre la moneda destino
         subtotal = resultado
@@ -321,20 +326,25 @@ def simular_cambio_api(request):
         tasa_origen = get_tasa_activa(origen)
         if not tasa_origen:
             return JsonResponse({'success': False, 'message': f'No hay tasa activa para {origen.codigo}.'}, status=404)
-        # Ajustar tasa de compra por descuento (si corresponde)
-        tasa_compra_aplicada = Decimal(tasa_origen.tasa_compra)
+        
+        # Calcular comisión de compra ajustada por descuento
+        comision_compra_ajustada = Decimal(tasa_origen.comision_compra)
         if descuento_pct > 0:
-            tasa_compra_aplicada = (tasa_compra_aplicada * (D('1') + (descuento_pct / D('100'))))
-        # De origen a PYG: usar tasa_compra (posiblemente ajustada)
-        resultado = (monto * tasa_compra_aplicada).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+            comision_compra_ajustada = comision_compra_ajustada * (D('1') - (descuento_pct / D('100')))
+        
+        # Calcular precio de compra: precio_base - comision_compra_ajustada
+        precio_compra = Decimal(tasa_origen.precio_base) - comision_compra_ajustada
+        
+        # De origen a PYG: usar precio de compra calculado
+        resultado = (monto * precio_compra).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
         tasa_origen_usada = {
             'moneda': origen.codigo,
             'tipo': 'compra' + (' (ajustada)' if descuento_pct > 0 else ''),
-            'valor': float(tasa_compra_aplicada),
+            'valor': float(precio_compra),
         }
-        detalle = f"{origen.codigo} -> PYG usando tasa de compra"
+        detalle = f"{origen.codigo} -> PYG usando precio de compra"
         if descuento_pct > 0:
-            detalle += f" con descuento {descuento_pct}%"
+            detalle += f" con descuento {descuento_pct}% en comisión"
         resultado_formateado = f"PYG {int(resultado)}"
         # Calcular comisión y total neto sobre PYG
         subtotal = resultado

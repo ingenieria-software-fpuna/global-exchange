@@ -5,10 +5,13 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from decimal import Decimal
+import json
 
 from .models import TasaCambio
 from monedas.models import Moneda
 from .forms import TasaCambioForm
+from clientes.models import Cliente, TipoCliente
+from metodo_pago.models import MetodoPago
 
 User = get_user_model()
 
@@ -357,3 +360,503 @@ class TasaCambioURLTest(TestCase):
         """Prueba la URL del dashboard"""
         url = reverse('tasa_cambio:dashboard')
         self.assertEqual(url, '/tasa-cambio/dashboard/')
+
+
+class SimuladorCambioTest(TestCase):
+    """Tests para el simulador de cambios de monedas"""
+    
+    def setUp(self):
+        # Crear usuario de prueba
+        self.user = User.objects.create_user(
+            email='test@example.com',
+            password='testpass123'
+        )
+        
+        # Crear monedas de prueba
+        self.moneda_pyg = Moneda.objects.create(
+            codigo='PYG',
+            nombre='Guaraní Paraguayo',
+            simbolo='₲',
+            decimales=0,
+            es_activa=True
+        )
+        
+        self.moneda_usd = Moneda.objects.create(
+            codigo='USD',
+            nombre='Dólar Estadounidense',
+            simbolo='$',
+            decimales=2,
+            es_activa=True
+        )
+        
+        self.moneda_eur = Moneda.objects.create(
+            codigo='EUR',
+            nombre='Euro',
+            simbolo='€',
+            decimales=2,
+            es_activa=True
+        )
+        
+        # Crear tasas de cambio activas
+        self.tasa_usd = TasaCambio.objects.create(
+            moneda=self.moneda_usd,
+            precio_base=7500,
+            comision_compra=50,
+            comision_venta=75,
+            es_activa=True
+        )
+        
+        self.tasa_eur = TasaCambio.objects.create(
+            moneda=self.moneda_eur,
+            precio_base=8000,
+            comision_compra=60,
+            comision_venta=80,
+            es_activa=True
+        )
+        
+        # Crear tipo de cliente y cliente para pruebas
+        self.tipo_cliente = TipoCliente.objects.create(
+            nombre='Cliente Premium',
+            descuento=Decimal('5.00')
+        )
+        
+        self.cliente = Cliente.objects.create(
+            nombre_comercial='Cliente Test',
+            ruc='12345678',
+            tipo_cliente=self.tipo_cliente,
+            activo=True
+        )
+        self.cliente.usuarios_asociados.add(self.user)
+        
+        # Crear método de pago
+        self.metodo_pago = MetodoPago.objects.create(
+            nombre='Transferencia Bancaria',
+            comision=Decimal('2.50'),
+            es_activo=True
+        )
+        
+        self.client = Client()
+    
+    def test_simulador_pyg_a_usd_sin_cliente_ni_metodo(self):
+        """Prueba conversión de PYG a USD sin cliente ni método de pago"""
+        self.client.force_login(self.user)
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': '75000'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        
+        self.assertTrue(data['success'])
+        self.assertIn('data', data)
+        
+        # Verificar cálculo: 75000 PYG / 7575 (precio_venta) = 9.90 USD
+        expected_result = 75000 / 7575  # 7575 = 7500 + 75
+        self.assertAlmostEqual(data['data']['resultado'], expected_result, places=2)
+        self.assertEqual(data['data']['detalle'], 'PYG -> USD usando precio de venta')
+        self.assertIsNone(data['data']['cliente'])
+        self.assertIsNone(data['data']['metodo_pago'])
+    
+    def test_simulador_usd_a_pyg_sin_cliente_ni_metodo(self):
+        """Prueba conversión de USD a PYG sin cliente ni método de pago"""
+        self.client.force_login(self.user)
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        response = self.client.get(url, {
+            'origen': 'USD',
+            'destino': 'PYG',
+            'monto': '10'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        
+        self.assertTrue(data['success'])
+        
+        # Verificar cálculo: 10 USD * 7450 (precio_compra) = 74500 PYG
+        expected_result = 10 * 7450  # 7450 = 7500 - 50
+        self.assertEqual(data['data']['resultado'], expected_result)
+        self.assertEqual(data['data']['detalle'], 'USD -> PYG usando precio de compra')
+    
+    def test_simulador_con_cliente_y_descuento(self):
+        """Prueba conversión con cliente que tiene descuento"""
+        self.client.force_login(self.user)
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': '75000',
+            'cliente_id': self.cliente.id
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        
+        self.assertTrue(data['success'])
+        self.assertIsNotNone(data['data']['cliente'])
+        self.assertEqual(data['data']['cliente']['nombre'], 'Cliente Test')
+        self.assertEqual(data['data']['cliente']['descuento'], 5.0)
+        
+        # Verificar que se aplicó el descuento en la comisión
+        # Comisión ajustada: 75 * (1 - 5/100) = 71.25
+        # Precio de venta: 7500 + 71.25 = 7571.25
+        # Resultado: 75000 / 7571.25 = 9.91 USD
+        expected_result = 75000 / 7571.25
+        self.assertAlmostEqual(data['data']['resultado'], expected_result, places=2)
+        self.assertIn('descuento 5.00% en comisión', data['data']['detalle'])
+    
+    def test_simulador_con_cliente_y_metodo_pago(self):
+        """Prueba conversión con cliente (descuento) y método de pago (comisión)"""
+        self.client.force_login(self.user)
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': '75000',
+            'cliente_id': self.cliente.id,
+            'metodo_pago_id': self.metodo_pago.id
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        
+        self.assertTrue(data['success'])
+        self.assertIsNotNone(data['data']['cliente'])
+        self.assertIsNotNone(data['data']['metodo_pago'])
+        
+        # Verificar que se aplicaron tanto el descuento como la comisión
+        self.assertIn('descuento 5.00% en comisión', data['data']['detalle'])
+        self.assertGreater(data['data']['comision_pct'], 0)
+    
+    def test_simulador_parametros_faltantes(self):
+        """Prueba que falle cuando faltan parámetros requeridos"""
+        self.client.force_login(self.user)
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        
+        # Sin origen
+        response = self.client.get(url, {
+            'destino': 'USD',
+            'monto': '100'
+        })
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])
+        self.assertIn('Parámetros requeridos', data['message'])
+        
+        # Sin destino
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'monto': '100'
+        })
+        self.assertEqual(response.status_code, 400)
+        
+        # Sin monto
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD'
+        })
+        self.assertEqual(response.status_code, 400)
+    
+    def test_simulador_monto_invalido(self):
+        """Prueba que falle con monto inválido"""
+        self.client.force_login(self.user)
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        
+        # Monto negativo
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': '-100'
+        })
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])
+        self.assertIn('Monto inválido', data['message'])
+        
+        # Monto cero
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': '0'
+        })
+        self.assertEqual(response.status_code, 400)
+        
+        # Monto no numérico
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': 'abc'
+        })
+        self.assertEqual(response.status_code, 400)
+    
+    def test_simulador_mismas_monedas(self):
+        """Prueba que falle cuando origen y destino son iguales"""
+        self.client.force_login(self.user)
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'PYG',
+            'monto': '100'
+        })
+        
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])
+        self.assertIn('Seleccione una moneda distinta de PYG', data['message'])
+    
+    def test_simulador_cruce_directo_no_permitido(self):
+        """Prueba que falle cuando se intenta cruzar dos monedas no-PYG"""
+        self.client.force_login(self.user)
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        response = self.client.get(url, {
+            'origen': 'USD',
+            'destino': 'EUR',
+            'monto': '100'
+        })
+        
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])
+        self.assertIn('No se permiten cruces entre monedas', data['message'])
+    
+    def test_simulador_moneda_no_encontrada(self):
+        """Prueba que falle cuando la moneda no existe o está inactiva"""
+        self.client.force_login(self.user)
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        
+        # Moneda inexistente
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'BTC',
+            'monto': '100'
+        })
+        self.assertEqual(response.status_code, 404)
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])
+        self.assertIn('no encontrada o inactiva', data['message'])
+        
+        # Moneda inactiva
+        self.moneda_usd.es_activa = False
+        self.moneda_usd.save()
+        
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': '100'
+        })
+        self.assertEqual(response.status_code, 404)
+    
+    def test_simulador_sin_tasa_activa(self):
+        """Prueba que falle cuando no hay tasa activa para la moneda"""
+        self.client.force_login(self.user)
+        
+        # Desactivar la tasa
+        self.tasa_usd.es_activa = False
+        self.tasa_usd.save()
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': '100'
+        })
+        
+        self.assertEqual(response.status_code, 404)
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])
+        self.assertIn('No hay tasa activa para USD', data['message'])
+    
+    def test_simulador_cliente_invalido(self):
+        """Prueba que falle con cliente inválido o no asociado"""
+        self.client.force_login(self.user)
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        
+        # Cliente inexistente
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': '100',
+            'cliente_id': 99999
+        })
+        self.assertEqual(response.status_code, 403)
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])
+        self.assertIn('Cliente inválido o no asociado', data['message'])
+        
+        # Cliente no asociado al usuario
+        otro_cliente = Cliente.objects.create(
+            nombre_comercial='Otro Cliente',
+            ruc='87654321',
+            tipo_cliente=self.tipo_cliente,
+            activo=True
+        )
+        
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': '100',
+            'cliente_id': otro_cliente.id
+        })
+        self.assertEqual(response.status_code, 403)
+    
+    def test_simulador_metodo_pago_invalido(self):
+        """Prueba que falle con método de pago inválido"""
+        self.client.force_login(self.user)
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        
+        # Método inexistente
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': '100',
+            'metodo_pago_id': 99999
+        })
+        self.assertEqual(response.status_code, 404)
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])
+        self.assertIn('Método de pago inválido o inactivo', data['message'])
+        
+        # Método inactivo
+        self.metodo_pago.es_activo = False
+        self.metodo_pago.save()
+        
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': '100',
+            'metodo_pago_id': self.metodo_pago.id
+        })
+        self.assertEqual(response.status_code, 404)
+    
+    def test_simulador_sin_autenticacion(self):
+        """Prueba que falle sin autenticación cuando se especifica cliente"""
+        url = reverse('tasa_cambio:simular_cambio_api')
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': '100',
+            'cliente_id': self.cliente.id
+        })
+        
+        self.assertEqual(response.status_code, 401)
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])
+        self.assertIn('Autenticación requerida', data['message'])
+    
+    def test_simulador_formateo_resultados(self):
+        """Prueba que los resultados se formateen correctamente"""
+        self.client.force_login(self.user)
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': '75000'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        
+        self.assertTrue(data['success'])
+        self.assertIn('resultado_formateado', data['data'])
+        self.assertIn('subtotal_formateado', data['data'])
+        self.assertIn('comision_monto_formateado', data['data'])
+        self.assertIn('total_neto_formateado', data['data'])
+        
+        # Verificar que el formateo incluye el símbolo de la moneda
+        self.assertIn('$', data['data']['resultado_formateado'])
+    
+    def test_simulador_diferentes_decimales(self):
+        """Prueba conversión con monedas que tienen diferentes decimales"""
+        self.client.force_login(self.user)
+        
+        # Crear moneda con 0 decimales
+        moneda_jpy = Moneda.objects.create(
+            codigo='JPY',
+            nombre='Yen Japonés',
+            simbolo='¥',
+            decimales=0,
+            es_activa=True
+        )
+        
+        TasaCambio.objects.create(
+            moneda=moneda_jpy,
+            precio_base=50,
+            comision_compra=1,
+            comision_venta=1,
+            es_activa=True
+        )
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'JPY',
+            'monto': '1000'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        
+        self.assertTrue(data['success'])
+        # Verificar que el resultado se redondea correctamente según los decimales
+        self.assertIsInstance(data['data']['resultado'], (int, float))
+    
+    def test_simulador_precision_calculos(self):
+        """Prueba la precisión de los cálculos con valores específicos"""
+        self.client.force_login(self.user)
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        response = self.client.get(url, {
+            'origen': 'USD',
+            'destino': 'PYG',
+            'monto': '1.50'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        
+        self.assertTrue(data['success'])
+        
+        # Cálculo exacto: 1.50 * 7450 = 11175 PYG
+        expected_result = 1.50 * 7450
+        self.assertEqual(data['data']['resultado'], expected_result)
+    
+    def test_simulador_redondeo_correcto(self):
+        """Prueba que el redondeo se aplique correctamente"""
+        self.client.force_login(self.user)
+        
+        # Crear tasa con valores que generen redondeo
+        tasa_test = TasaCambio.objects.create(
+            moneda=self.moneda_usd,
+            precio_base=1000,
+            comision_compra=33,
+            comision_venta=33,
+            es_activa=True
+        )
+        
+        url = reverse('tasa_cambio:simular_cambio_api')
+        response = self.client.get(url, {
+            'origen': 'PYG',
+            'destino': 'USD',
+            'monto': '1033'  # 1033 / 1033 = 1.000... debería redondear a 1.00
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        
+        self.assertTrue(data['success'])
+        # Verificar que el resultado se redondea correctamente
+        self.assertAlmostEqual(data['data']['resultado'], 1.0, places=2)
