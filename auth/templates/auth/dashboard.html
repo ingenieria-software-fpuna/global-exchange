@@ -139,6 +139,22 @@
             </div>
         </div>
         {% endif %}
+        {% if can_view_metodocobro %}
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <i class="fas fa-money-bill-wave fa-3x text-danger mb-3"></i>
+                    <h5 class="card-title">Métodos de Cobro</h5>
+                    <p class="card-text">Configura métodos de cobro y sus restricciones de moneda.</p>
+                </div>
+                <div class="card-footer bg-light">
+                    <a href="{% url 'metodo_cobro:metodocobro_list' %}" class="btn btn-danger w-100">
+                        Ir a Métodos de Cobro
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
