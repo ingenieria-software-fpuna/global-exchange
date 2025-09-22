@@ -1,6 +1,7 @@
 from django import forms
 from .models import MetodoCobro
 from monedas.models import Moneda
+from .widgets import MonedaSelectorWidget
 
 
 class MetodoCobroForm(forms.ModelForm):
@@ -8,7 +9,7 @@ class MetodoCobroForm(forms.ModelForm):
 
     monedas_permitidas = forms.ModelMultipleChoiceField(
         queryset=Moneda.objects.filter(es_activa=True),
-        widget=forms.CheckboxSelectMultiple,
+        widget=MonedaSelectorWidget(),
         help_text="Seleccione las monedas permitidas para este método de cobro",
         required=True
     )
