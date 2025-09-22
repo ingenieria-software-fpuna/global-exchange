@@ -6,7 +6,7 @@ Los métodos de cobro serán:
 - Transferencia bancaria (Solo para PYG)
 - Tarjeta de débito (Solo para PYG)
 - Billetera electrónica (Solo para PYG)
-- Tarjeta de crédito (Solo para PYG)
+- Tarjeta de crédito (Solo para PYG, USD)
 - Cheque (Solo para PYG, USD, EUR)
 - Cheque adelantado (Solo para PYG, USD, EUR)
 - Efectivo (Todas las monedas excepto PYG)
@@ -65,7 +65,7 @@ def crear_metodos_cobro():
             'nombre': 'Tarjeta de crédito',
             'descripcion': 'Pago con tarjeta de crédito',
             'comision': Decimal('3.00'),
-            'monedas': [pyg]
+            'monedas': [pyg, usd]
         },
         {
             'nombre': 'Cheque',
