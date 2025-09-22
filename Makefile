@@ -33,6 +33,10 @@ create-payment-methods:
 	@echo "Poblando base de datos con métodos de pago de ejemplo..."
 	poetry run python scripts/create_metodos_pago_test.py
 
+create-collection-methods:
+	@echo "Poblando base de datos con métodos de cobro de ejemplo..."
+	poetry run python scripts/create_metodos_cobro_test.py
+
 migrate-groups:
 	@echo "Migrando grupos existentes al nuevo modelo..."
 	poetry run python manage.py migrate_grupos_existentes
@@ -62,6 +66,7 @@ endif
 	make check-admin-group
 	make create-currencies
 	make create-payment-methods
+	make create-collection-methods
 
 #-------------- Comandos de administración ----------------#
 
@@ -102,6 +107,7 @@ help:
 	@echo "  app-setup         - Configurar el proyecto (db + migraciones + grupos + datos ejemplo)"
 	@echo "  create-currencies - Poblar base de datos con monedas y tasas de ejemplo"
 	@echo "  create-payment-methods - Poblar base con métodos de pago de ejemplo"
+	@echo "  create-collection-methods - Poblar base con métodos de cobro de ejemplo"
 	@echo "  migrate-groups    - Migrar grupos existentes al nuevo modelo"
 	@echo "  test-grupo-permisos - Probar funcionalidad de permisos con grupos activos/inactivos"
 	@echo "  limpiar-codigos   - Limpiar códigos de verificación expirados"
