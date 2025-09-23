@@ -11,7 +11,7 @@ class MonedaForm(forms.ModelForm):
     class Meta:
         model = Moneda
         fields = [
-            'nombre', 'codigo', 'simbolo', 'decimales', 'es_activa'
+            'nombre', 'codigo', 'simbolo', 'decimales', 'monto_limite_transaccion', 'es_activa'
         ]
         widgets = {
             'nombre': forms.TextInput(attrs={
@@ -33,6 +33,12 @@ class MonedaForm(forms.ModelForm):
                 'min': 0,
                 'placeholder': 'Ej: 2'
             }),
+            'monto_limite_transaccion': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: 1000000.00',
+                'min': '0',
+                'step': '0.01'
+            }),
             'es_activa': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             }),
@@ -41,12 +47,14 @@ class MonedaForm(forms.ModelForm):
             'nombre': 'Nombre de la Moneda',
             'codigo': 'Código ISO 4217',
             'simbolo': 'Símbolo',
+            'monto_limite_transaccion': 'Monto límite por transacción',
             'es_activa': 'Moneda Activa',
         }
         help_texts = {
             'nombre': 'Nombre completo de la moneda',
             'codigo': 'Código de 3 letras según ISO 4217',
             'simbolo': 'Símbolo usado para representar la moneda',
+            'monto_limite_transaccion': 'Monto máximo permitido en una sola transacción. Vacío = sin límite.',
             'es_activa': 'Indica si la moneda está disponible para operaciones',
         }
 
