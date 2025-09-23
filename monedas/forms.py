@@ -54,7 +54,7 @@ class MonedaForm(forms.ModelForm):
             'nombre': 'Nombre completo de la moneda',
             'codigo': 'Código de 3 letras según ISO 4217',
             'simbolo': 'Símbolo usado para representar la moneda',
-            'monto_limite_transaccion': 'Monto máximo permitido en una sola transacción. Vacío = sin límite.',
+            'monto_limite_transaccion': 'El monto límite debe estar expresado en guaraníes (PYG). Vacío = sin límite.',
             'es_activa': 'Indica si la moneda está disponible para operaciones',
         }
 
