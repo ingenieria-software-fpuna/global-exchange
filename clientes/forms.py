@@ -59,6 +59,9 @@ class ClienteForm(forms.ModelForm):
                 'class': 'form-check-input'
             })
         }
+        help_texts = {
+            'monto_limite_transaccion': 'El monto límite debe estar expresado en guaraníes (PYG). Vacío = sin límite.',
+        }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
