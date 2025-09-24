@@ -26,6 +26,14 @@ class Moneda(models.Model):
         validators=[MinValueValidator(0)],
         help_text="Número de decimales que usa la moneda (ej: 2 para USD, 0 para JPY)"
     )
+    monto_limite_transaccion = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(0)],
+        help_text="Monto máximo permitido para una sola transacción en esta moneda. Vacío = sin límite."
+    )
     es_activa = models.BooleanField(
         default=True,
         help_text="Indica si la moneda está activa para operaciones"

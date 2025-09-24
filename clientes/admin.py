@@ -26,7 +26,7 @@ class TipoClienteAdmin(admin.ModelAdmin):
 class ClienteAdmin(admin.ModelAdmin):
     list_display = [
         'nombre_comercial', 'ruc', 'tipo_cliente', 'correo_electronico', 
-        'numero_telefono', 'activo', 'fecha_creacion'
+        'numero_telefono', 'monto_limite_transaccion', 'activo', 'fecha_creacion'
     ]
     list_filter = [
         'activo', 'tipo_cliente', 'fecha_creacion', 'usuarios_asociados'
@@ -40,7 +40,7 @@ class ClienteAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Información Básica', {
-            'fields': ('nombre_comercial', 'ruc', 'tipo_cliente')
+            'fields': ('nombre_comercial', 'ruc', 'tipo_cliente', 'monto_limite_transaccion')
         }),
         ('Información de Contacto', {
             'fields': ('direccion', 'correo_electronico', 'numero_telefono')
