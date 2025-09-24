@@ -83,6 +83,19 @@
                                     {% endif %}
                                     <div class="form-text">Tipo de cliente que determina el descuento aplicable.</div>
                                 </div>
+
+                                <div class="mb-3">
+                                    <label for="{{ form.monto_limite_transaccion.id_for_label }}" class="form-label">
+                                        <strong>Monto límite por transacción:</strong>
+                                    </label>
+                                    {{ form.monto_limite_transaccion }}
+                                    {% if form.monto_limite_transaccion.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.monto_limite_transaccion.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">El monto límite debe estar expresado en guaraníes (PYG). Vacío = sin límite.</div>
+                                </div>
                             </div>
 
                             <!-- Información de Contacto -->

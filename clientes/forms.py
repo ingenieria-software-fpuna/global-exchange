@@ -23,7 +23,7 @@ class ClienteForm(forms.ModelForm):
         model = Cliente
         fields = [
             'nombre_comercial', 'ruc', 'direccion', 'correo_electronico',
-            'numero_telefono', 'tipo_cliente', 'usuarios_asociados', 'activo'
+            'numero_telefono', 'tipo_cliente', 'monto_limite_transaccion', 'usuarios_asociados', 'activo'
         ]
         widgets = {
             'nombre_comercial': forms.TextInput(attrs={
@@ -49,9 +49,18 @@ class ClienteForm(forms.ModelForm):
             'tipo_cliente': forms.Select(attrs={
                 'class': 'form-select'
             }),
+            'monto_limite_transaccion': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: 1000000.00',
+                'min': '0',
+                'step': '0.01'
+            }),
             'activo': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             })
+        }
+        help_texts = {
+            'monto_limite_transaccion': 'El monto límite debe estar expresado en guaraníes (PYG). Vacío = sin límite.',
         }
     
     def __init__(self, *args, **kwargs):
@@ -74,6 +83,8 @@ class ClienteForm(forms.ModelForm):
         self.fields['correo_electronico'].label = "Correo Electrónico"
         self.fields['numero_telefono'].label = "Número de Teléfono"
         self.fields['tipo_cliente'].label = "Tipo de Cliente"
+        self.fields['monto_limite_transaccion'].label = "Monto límite por transacción"
+        self.fields['monto_limite_transaccion'].help_text = "Monto máximo permitido en una sola transacción. Vacío = sin límite."
         self.fields['activo'].label = "Activo"
         
         # Marcar campos requeridos

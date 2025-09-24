@@ -1,5 +1,5 @@
 from django.db import models
-from django.core.validators import RegexValidator
+from django.core.validators import RegexValidator, MinValueValidator
 from django.core.exceptions import ValidationError
 
 # Create your models here.
@@ -74,6 +74,15 @@ class Cliente(models.Model):
         blank=True,
         verbose_name="Usuarios Asociados",
         help_text="Usuarios que pueden operar en nombre de este cliente"
+    )
+    monto_limite_transaccion = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Monto límite por transacción",
+        help_text="Monto máximo permitido para una sola transacción. Dejar vacío para sin límite."
     )
     activo = models.BooleanField(
         default=True, 
