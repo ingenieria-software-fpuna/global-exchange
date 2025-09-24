@@ -106,6 +106,12 @@ def permissions_context(request):
         context['can_view_metodocobro'] = request.user.has_perm('metodo_cobro.view_metodocobro')
         context['can_create_metodocobro'] = request.user.has_perm('metodo_cobro.add_metodocobro')
         context['can_edit_metodocobro'] = request.user.has_perm('metodo_cobro.change_metodocobro')
+
+        # Permisos específicos para tausers
+        context['can_view_tauser'] = request.user.has_perm('tauser.view_tauser')
+        context['can_create_tauser'] = request.user.has_perm('tauser.add_tauser')
+        context['can_edit_tauser'] = request.user.has_perm('tauser.change_tauser')
+        context['can_delete_tauser'] = request.user.has_perm('tauser.delete_tauser')
         
         # Dashboard
         context['can_view_dashboard'] = (
@@ -117,7 +123,8 @@ def permissions_context(request):
             context['can_view_monedas'] or
             context['can_view_tasacambio'] or
             context['can_view_metodopago'] or
-            context['can_view_metodocobro']
+            context['can_view_metodocobro'] or
+            context['can_view_tauser']
         )
         
     else:
