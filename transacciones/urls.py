@@ -11,4 +11,5 @@ urlpatterns = [
     path('resumen/<str:transaccion_id>/', views.resumen_transaccion, name='resumen_transaccion'),
     path('procesar-pago/<str:transaccion_id>/', views.procesar_pago, name='procesar_pago'),
     path('cancelar/<str:transaccion_id>/', views.cancelar_transaccion, name='cancelar_transaccion'),
+    path('cancelar-por-expiracion/<str:transaccion_id>/', views.cancelar_por_expiracion, name='cancelar_por_expiracion'),
 ]

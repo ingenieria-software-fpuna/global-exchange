@@ -252,6 +252,11 @@ def resumen_transaccion(request, transaccion_id):
         if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
             raise Http404("Transacción no encontrada")
     
+    # Verificar si la transacción está expirada y debe cancelarse automáticamente
+    if transaccion.estado.codigo == EstadoTransaccion.PENDIENTE and transaccion.esta_expirada():
+        transaccion.cancelar_por_expiracion()
+        messages.warning(request, 'Esta transacción ha expirado y fue cancelada automáticamente.')
+    
     context = {
         'transaccion': transaccion,
         'resumen_financiero': transaccion.get_resumen_financiero(),  # Mantener compatibilidad
@@ -335,6 +340,40 @@ def cancelar_transaccion(request, transaccion_id):
     except Exception as e:
         messages.error(request, f'Error al cancelar la transacción: {str(e)}')
         return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+
+@login_required
+@require_http_methods(["POST"])
+def cancelar_por_expiracion(request, transaccion_id):
+    """
+    API endpoint para cancelar una transacción automáticamente por expiración.
+    """
+    try:
+        transaccion = get_object_or_404(Transaccion, id_transaccion=transaccion_id)
+        
+        # Verificar permisos
+        if transaccion.usuario != request.user:
+            if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+                return JsonResponse({'success': False, 'error': 'Sin permisos'})
+        
+        # Verificar que esté pendiente y expirada
+        if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
+            return JsonResponse({'success': False, 'error': 'Transacción ya no está pendiente'})
+        
+        if not transaccion.esta_expirada():
+            return JsonResponse({'success': False, 'error': 'Transacción aún no ha expirado'})
+        
+        # Cancelar por expiración
+        if transaccion.cancelar_por_expiracion():
+            return JsonResponse({
+                'success': True, 
+                'message': 'Transacción cancelada automáticamente por expiración'
+            })
+        else:
+            return JsonResponse({'success': False, 'error': 'No se pudo cancelar la transacción'})
+            
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'})
 
 
 def calcular_transaccion(monto, moneda_origen, moneda_destino, cliente=None, metodo_pago=None):
