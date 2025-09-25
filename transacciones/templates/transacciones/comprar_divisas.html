@@ -116,17 +116,13 @@
               </div>
               <div class="col-12 col-md-4">
                 <label for="moneda_origen" class="form-label">Pagando con</label>
-                <select id="moneda_origen" name="moneda_origen" class="form-select" required>
-                  <option value="PYG" 
-                    {% if moneda_origen_preseleccionada == 'PYG' %}selected
-                    {% elif not moneda_origen_preseleccionada %}selected
-                    {% endif %}>Guaraní (PYG)</option>
-                  {% for moneda in monedas %}
-                    {% if moneda.codigo != 'PYG' %}
-                      <option value="{{ moneda.codigo }}" {% if moneda_origen_preseleccionada == moneda.codigo %}selected{% endif %}>{{ moneda.nombre }} ({{ moneda.codigo }})</option>
-                    {% endif %}
-                  {% endfor %}
+                <select id="moneda_origen" name="moneda_origen" class="form-select" required readonly>
+                  <option value="PYG" selected>Guaraní (PYG)</option>
                 </select>
+                <div class="form-text">
+                  <i class="fas fa-info-circle me-1"></i>
+                  Las compras siempre se pagan en Guaraníes
+                </div>
               </div>
               <div class="col-12 col-md-4">
                 <label for="moneda_destino" class="form-label">Comprando</label>
@@ -225,7 +221,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         metodoPago.value &&
                         monto.value && 
                         parseFloat(monto.value) > 0 &&
-                        monedaOrigen.value &&
                         monedaDestino.value;
         return esValido;
     }
@@ -234,7 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function calcularPreview() {
         const datos = {
             monto: monto.value,
-            origen: monedaOrigen.value,
+            origen: 'PYG',
             destino: monedaDestino.value,
             cliente_id: cliente.value || null,
             metodo_cobro_id: metodoCobro.value || null,
@@ -316,7 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 try {
                     const limitesParams = new URLSearchParams({
                         monto: datos.monto,
-                        moneda_origen: datos.origen
+                        moneda_origen: 'PYG'
                     });
                     if (datos.cliente_id) limitesParams.append('cliente_id', datos.cliente_id);
                     
@@ -372,7 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const infoLimites = document.getElementById('info-limites');
         const contenidoLimites = document.getElementById('contenido-limites');
         
-        if (!monto.value || parseFloat(monto.value) <= 0 || !monedaOrigen.value) {
+        if (!monto.value || parseFloat(monto.value) <= 0) {
             infoLimites.style.display = 'none';
             return;
         }
@@ -380,7 +375,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const params = new URLSearchParams({
                 monto: monto.value,
-                moneda_origen: monedaOrigen.value
+                moneda_origen: 'PYG'
             });
             if (cliente.value) params.append('cliente_id', cliente.value);
             
@@ -451,7 +446,7 @@ document.addEventListener('DOMContentLoaded', function() {
     monedaDestino.addEventListener('change', actualizarMetodosPago);
     
     // Auto-calcular cuando cambien los valores
-    [monto, monedaOrigen, monedaDestino, cliente, metodoCobro, metodoPago].forEach(element => {
+    [monto, monedaDestino, cliente, metodoCobro, metodoPago].forEach(element => {
         element.addEventListener('change', function() {
             if (monto.value && parseFloat(monto.value) > 0) {
                 calcularPreview();
@@ -474,7 +469,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Mostrar límites cuando se cargue la página o cambien valores críticos
-    [monto, monedaOrigen, cliente].forEach(element => {
+    [monto, cliente].forEach(element => {
         element.addEventListener('input', function() {
             clearTimeout(element.limitesTimer);
             element.limitesTimer = setTimeout(mostrarInfoLimites, 300);
@@ -510,7 +505,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData();
         formData.append('csrfmiddlewaretoken', form.querySelector('[name=csrfmiddlewaretoken]').value);
         formData.append('monto', monto.value);
-        formData.append('moneda_origen', monedaOrigen.value);
+        formData.append('moneda_origen', 'PYG');
         formData.append('moneda_destino', monedaDestino.value);
         formData.append('cliente_id', cliente.value);
         formData.append('metodo_cobro_id', metodoCobro.value); // Aquí usamos metodo_cobro_id
@@ -545,7 +540,7 @@ document.addEventListener('DOMContentLoaded', function() {
     actualizarMetodosPago();
     
     // Si hay valores preseleccionados desde el simulador, hacer cálculo inicial
-    {% if cantidad_preseleccionada and moneda_origen_preseleccionada and moneda_destino_preseleccionada %}
+    {% if cantidad_preseleccionada and moneda_destino_preseleccionada %}
         // Esperar un momento para que se carguen los elementos
         setTimeout(function() {
             const btnCalcular = document.getElementById('btnCalcular');
