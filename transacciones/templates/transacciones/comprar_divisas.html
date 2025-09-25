@@ -39,10 +39,10 @@
               <div class="col-12">
                 <label for="cliente" class="form-label">
                   <i class="fas fa-user me-1"></i>
-                  Cliente
+                  Cliente <span class="text-danger">*</span>
                 </label>
-                <select id="cliente" name="cliente_id" class="form-select">
-                  <option value="" {% if not cliente_preseleccionado %}selected{% endif %}>Sin cliente (sin descuento)</option>
+                <select id="cliente" name="cliente_id" class="form-select" required>
+                  <option value="" {% if not cliente_preseleccionado %}selected{% endif %}>Seleccione un cliente</option>
                   {% for cliente in clientes %}
                     <option value="{{ cliente.id }}" data-descuento="{{ cliente.tipo_cliente.descuento }}" 
                             {% if cliente_preseleccionado and cliente.id|stringformat:"s" == cliente_preseleccionado %}selected{% endif %}>
@@ -53,6 +53,9 @@
                     <option value="" disabled>No hay clientes asociados</option>
                   {% endfor %}
                 </select>
+                <div class="form-text">
+                Las compras de divisas requieren cliente para aplicar descuentos y controlar límites.
+                </div>
               </div>
             </div>
 
@@ -177,6 +180,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const cliente = document.getElementById('cliente');
     const metodoCobro = document.getElementById('metodo_cobro');
     
+    // Función para validar si se puede proceder con la compra
+    function validarFormularioCompleto() {
+        const esValido = cliente.value && 
+                        metodoCobro.value && 
+                        monto.value && 
+                        parseFloat(monto.value) > 0 &&
+                        monedaOrigen.value &&
+                        monedaDestino.value;
+        return esValido;
+    }
+    
     // Función para calcular preview
     async function calcularPreview() {
         const datos = {
@@ -268,11 +282,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             `;
                             previewContent.innerHTML += infoLimites;
                         }
-                        btnComprar.disabled = false;
+                        btnComprar.disabled = !validarFormularioCompleto();
                     }
                 } catch (limitesError) {
                     console.warn('Error al validar límites:', limitesError);
-                    btnComprar.disabled = false; // Permitir continuar si no se pueden validar límites
+                    btnComprar.disabled = !validarFormularioCompleto(); // Validar formulario aunque no se puedan validar límites
                 }
                 
                 preview.style.display = 'block';
@@ -334,6 +348,19 @@ document.addEventListener('DOMContentLoaded', function() {
             if (monto.value && parseFloat(monto.value) > 0) {
                 calcularPreview();
                 mostrarInfoLimites();
+            } else {
+                // Si no hay monto válido, deshabilitar botón
+                btnComprar.disabled = true;
+                preview.style.display = 'none';
+            }
+        });
+    });
+    
+    // Validar formulario completo cuando cambien campos obligatorios
+    [cliente, metodoCobro].forEach(element => {
+        element.addEventListener('change', function() {
+            if (!validarFormularioCompleto()) {
+                btnComprar.disabled = true;
             }
         });
     });
@@ -349,6 +376,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Envío del formulario
     form.addEventListener('submit', function(e) {
         e.preventDefault();
+        
+        if (!cliente.value) {
+            alert('Por favor seleccione un cliente. Las compras requieren cliente.');
+            cliente.focus();
+            return;
+        }
         
         if (!metodoCobro.value) {
             alert('Por favor seleccione un método de cobro.');
