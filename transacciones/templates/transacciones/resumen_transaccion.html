@@ -61,8 +61,19 @@
               {% if transaccion.fecha_pago %}
                 <p><strong>Fecha de pago:</strong> {{ transaccion.fecha_pago|date:"d/m/Y H:i" }}</p>
               {% endif %}
+              {% if transaccion.metodo_cobro %}
+                <p><strong>Método de cobro:</strong> {{ transaccion.metodo_cobro.nombre }}
+                  {% if transaccion.metodo_cobro.comision > 0 %}
+                    <small class="text-danger">({{ transaccion.metodo_cobro.comision }}% comisión)</small>
+                  {% endif %}
+                </p>
+              {% endif %}
               {% if transaccion.metodo_pago %}
-                <p><strong>Método de pago:</strong> {{ transaccion.metodo_pago.nombre }}</p>
+                <p><strong>Método de entrega:</strong> {{ transaccion.metodo_pago.nombre }}
+                  {% if transaccion.metodo_pago.comision > 0 %}
+                    <small class="text-danger">({{ transaccion.metodo_pago.comision }}% comisión)</small>
+                  {% endif %}
+                </p>
               {% endif %}
             </div>
           </div>
@@ -76,50 +87,81 @@
         </div>
         <div class="card-body">
           <div class="row">
+            <!-- Columna izquierda: Detalles del cliente -->
             <div class="col-md-6">
               <div class="mb-3">
-                <label class="text-muted">Monto a entregar</label>
+                <label class="text-muted">Subtotal (monto base)</label>
                 <div class="fs-5 fw-bold">
-                  {{ transaccion.moneda_origen.simbolo }}{{ transaccion.monto_origen|floatformat:2 }}
+                  {{ resumen_detallado.subtotal_formateado }}
                   <small class="text-muted">({{ transaccion.moneda_origen.codigo }})</small>
                 </div>
               </div>
-              <div class="mb-3">
-                <label class="text-muted">Tasa de cambio</label>
-                <div class="fs-6">{{ transaccion.tasa_cambio|floatformat:4 }}</div>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="mb-3">
-                <label class="text-muted">Monto a recibir (base)</label>
-                <div class="fs-5">
-                  {{ transaccion.moneda_destino.simbolo }}{{ resumen_financiero.monto_base|floatformat:2 }}
-                  <small class="text-muted">({{ transaccion.moneda_destino.codigo }})</small>
-                </div>
-              </div>
               
-              {% if resumen_financiero.comision > 0 %}
-              <div class="mb-2 text-danger">
-                <small>Comisión ({{ resumen_financiero.porcentaje_comision }}%): 
-                  +{{ transaccion.moneda_destino.simbolo }}{{ resumen_financiero.comision|floatformat:2 }}
-                </small>
+              {% if resumen_detallado.comision_cobro > 0 %}
+              <div class="mb-2">
+                <label class="text-muted small">Comisión cobro ({{ resumen_detallado.metodo_cobro.comision }}%)</label>
+                <div class="text-danger">{{ resumen_detallado.comision_cobro_formateado }}</div>
               </div>
               {% endif %}
               
-              {% if resumen_financiero.descuento > 0 %}
-              <div class="mb-2 text-success">
-                <small>Descuento ({{ resumen_financiero.porcentaje_descuento }}%): 
-                  -{{ transaccion.moneda_destino.simbolo }}{{ resumen_financiero.descuento|floatformat:2 }}
-                </small>
+              {% if resumen_detallado.comision_pago > 0 %}
+              <div class="mb-2">
+                <label class="text-muted small">Comisión entrega ({{ resumen_detallado.metodo_pago.comision }}%)</label>
+                <div class="text-danger">{{ resumen_detallado.comision_pago_formateado }}</div>
+              </div>
+              {% endif %}
+              
+              {% if resumen_detallado.comision_total > 0 %}
+              <div class="mb-2">
+                <label class="text-muted small">Total comisiones</label>
+                <div class="text-danger fw-bold">{{ resumen_detallado.comision_total_formateado }}</div>
+              </div>
+              {% endif %}
+              
+              {% if resumen_detallado.descuento_aplicado > 0 %}
+              <div class="mb-2">
+                <label class="text-muted small">Descuento aplicado ({{ resumen_detallado.descuento_pct }}%)</label>
+                <div class="text-success">-{{ resumen_detallado.descuento_aplicado_formateado }}</div>
               </div>
               {% endif %}
               
               <hr class="my-2">
-              <div class="fs-4 fw-bold text-primary">
-                <label class="text-muted fs-6">Total final</label><br>
-                {{ transaccion.moneda_destino.simbolo }}{{ resumen_financiero.total_final|floatformat:2 }}
-                <small class="text-muted fs-6">({{ transaccion.moneda_destino.codigo }})</small>
+              <div class="mb-3">
+                <label class="text-muted">Total a pagar por cliente</label>
+                <div class="fs-4 fw-bold text-primary">
+                  {{ resumen_detallado.total_cliente_formateado }}
+                  <small class="text-muted fs-6">({{ transaccion.moneda_origen.codigo }})</small>
+                </div>
               </div>
+            </div>
+            
+            <!-- Columna derecha: Lo que recibe -->
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="text-muted">Tasa de cambio utilizada ({{ resumen_detallado.tasa_cambio_tipo }})</label>
+                <div class="fs-6">₲ {{ resumen_detallado.tasa_cambio|floatformat:4 }}</div>
+              </div>
+              
+              <div class="mb-3">
+                <label class="text-muted">Cliente recibirá</label>
+                <div class="fs-4 fw-bold text-success">
+                  {{ resumen_detallado.monto_recibe_formateado }}
+                  <small class="text-muted fs-6">({{ transaccion.moneda_destino.codigo }})</small>
+                </div>
+              </div>
+              
+              {% if resumen_detallado.cliente %}
+              <div class="mt-4 p-3 bg-light rounded">
+                <h6 class="text-muted mb-2">Información del Cliente</h6>
+                <p class="mb-1"><strong>{{ resumen_detallado.cliente.nombre }}</strong></p>
+                {% if resumen_detallado.cliente.tipo %}
+                  <p class="mb-1">Tipo: {{ resumen_detallado.cliente.tipo }}</p>
+                {% endif %}
+                {% if resumen_detallado.cliente.descuento > 0 %}
+                  <p class="mb-0 text-success">Descuento: {{ resumen_detallado.cliente.descuento }}%</p>
+                {% endif %}
+              </div>
+              {% endif %}
             </div>
           </div>
         </div>

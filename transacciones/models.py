@@ -387,3 +387,91 @@ class Transaccion(models.Model):
             'porcentaje_comision': self.porcentaje_comision,
             'porcentaje_descuento': self.porcentaje_descuento,
         }
+
+    def get_resumen_detallado(self):
+        """Retorna un diccionario con el resumen financiero detallado incluyendo comisiones por método"""
+        from decimal import Decimal
+        
+        # Calcular comisiones individuales usando el monto origen
+        comision_cobro = Decimal('0')
+        comision_pago = Decimal('0')
+        
+        if self.metodo_cobro and self.metodo_cobro.comision > 0:
+            comision_cobro = self.monto_origen * (self.metodo_cobro.comision / 100)
+        
+        if self.metodo_pago and self.metodo_pago.comision > 0:
+            comision_pago = self.monto_origen * (self.metodo_pago.comision / 100)
+        
+        comision_total = comision_cobro + comision_pago
+        
+        # Descuento aplicado (sobre las comisiones)
+        descuento_aplicado = Decimal('0')
+        descuento_pct = Decimal('0')
+        if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.descuento > 0:
+            descuento_pct = self.cliente.tipo_cliente.descuento
+            descuento_aplicado = comision_total * (descuento_pct / 100)
+        
+        # Total a pagar por el cliente
+        total_cliente = self.monto_origen + comision_total - descuento_aplicado
+        
+        # Formatear montos
+        def formatear_monto(valor, moneda):
+            if moneda.codigo == 'PYG':
+                return f"₲ {valor:,.0f}"
+            else:
+                return f"{moneda.simbolo} {valor:,.2f}"
+        
+        return {
+            # Básicos
+            'subtotal': float(self.monto_origen),
+            'subtotal_formateado': formatear_monto(self.monto_origen, self.moneda_origen),
+            
+            # Comisiones
+            'comision_cobro': float(comision_cobro),
+            'comision_cobro_formateado': formatear_monto(comision_cobro, self.moneda_origen),
+            'comision_pago': float(comision_pago),
+            'comision_pago_formateado': formatear_monto(comision_pago, self.moneda_origen),
+            'comision_total': float(comision_total),
+            'comision_total_formateado': formatear_monto(comision_total, self.moneda_origen),
+            
+            # Descuento
+            'descuento_aplicado': float(descuento_aplicado),
+            'descuento_aplicado_formateado': formatear_monto(descuento_aplicado, self.moneda_origen),
+            'descuento_pct': float(descuento_pct),
+            
+            # Total final
+            'total_cliente': float(total_cliente),
+            'total_cliente_formateado': formatear_monto(total_cliente, self.moneda_origen),
+            
+            # Lo que recibe
+            'monto_recibe': float(self.monto_destino),
+            'monto_recibe_formateado': formatear_monto(self.monto_destino, self.moneda_destino),
+            
+            # Tasa
+            'tasa_cambio': float(self.tasa_cambio),
+            'tasa_cambio_tipo': self.get_tipo_tasa_utilizada(),
+            
+            # Información de métodos
+            'metodo_cobro': {
+                'nombre': self.metodo_cobro.nombre if self.metodo_cobro else None,
+                'comision': float(self.metodo_cobro.comision) if self.metodo_cobro else 0
+            },
+            'metodo_pago': {
+                'nombre': self.metodo_pago.nombre if self.metodo_pago else None,
+                'comision': float(self.metodo_pago.comision) if self.metodo_pago else 0
+            },
+            
+            # Cliente
+            'cliente': {
+                'nombre': self.cliente.nombre_comercial if self.cliente else None,
+                'tipo': self.cliente.tipo_cliente.nombre if self.cliente and self.cliente.tipo_cliente else None,
+                'descuento': float(self.cliente.tipo_cliente.descuento) if self.cliente and self.cliente.tipo_cliente else 0
+            } if self.cliente else None
+        }
+
+    def get_tipo_tasa_utilizada(self):
+        """Determina qué tipo de tasa se utilizó en la transacción"""
+        if self.moneda_origen.codigo == 'PYG':
+            return 'venta'  # Cliente compra divisa extranjera con PYG
+        else:
+            return 'compra'  # Cliente vende divisa extranjera por PYG

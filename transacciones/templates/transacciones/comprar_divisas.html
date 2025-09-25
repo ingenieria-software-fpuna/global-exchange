@@ -154,6 +154,7 @@
               </div>
             </div>
 
+
             <!-- Botones de Acción -->
             <div class="d-flex gap-2 justify-content-end">
               <button type="button" id="btnCalcular" class="btn btn-outline-primary">
@@ -197,7 +198,7 @@ window.metodosPagoData = [
         nombre: "{{ metodo.nombre|escapejs }}",
         activo: {{ metodo.es_activo|yesno:"true,false" }},
         monedas_permitidas: [
-            {% for moneda in metodo.monedas_permitidas.all %}{{ moneda.id }}{% if not forloop.last %},{% endif %}{% endfor %}
+            {% for moneda in metodo.monedas_permitidas.all %}"{{ moneda.codigo }}"{% if not forloop.last %},{% endif %}{% endfor %}
         ]
     }{% if not forloop.last %},{% endif %}
     {% endfor %}
@@ -235,8 +236,9 @@ document.addEventListener('DOMContentLoaded', function() {
             monto: monto.value,
             origen: monedaOrigen.value,
             destino: monedaDestino.value,
-            cliente_id: cliente.value || null
-            // NO enviamos metodo_cobro al simulador - solo es para la simulación
+            cliente_id: cliente.value || null,
+            metodo_cobro_id: metodoCobro.value || null,
+            metodo_pago_id: metodoPago.value || null
         };
         
         if (!datos.monto || parseFloat(datos.monto) <= 0) {
@@ -247,13 +249,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
             const params = new URLSearchParams();
-            Object.entries(datos).forEach(([key, value]) => {
-                if (value !== null && value !== '') {
-                    params.append(key, value);
-                }
-            });
+            params.append('monto', datos.monto);
+            params.append('origen', datos.origen);
+            params.append('destino', datos.destino);
+            if (datos.cliente_id) params.append('cliente_id', datos.cliente_id);
+            if (metodoCobro.value) params.append('metodo_cobro_id', metodoCobro.value);
+            if (metodoPago.value) params.append('metodo_pago_id', metodoPago.value);
             
-            const response = await fetch(`{% url 'tasa_cambio:simular_cambio_api' %}?${params}`);
+            const response = await fetch(`{% url 'transacciones:api_calcular_compra_completa' %}?${params}`);
             const result = await response.json();
             
             if (result.success) {
@@ -261,23 +264,45 @@ document.addEventListener('DOMContentLoaded', function() {
                 previewContent.innerHTML = `
                     <div class="row g-2">
                         <div class="col-6">
-                            <small class="text-muted">Recibirá:</small><br>
-                            <strong class="text-success">${data.resultado_formateado}</strong>
+                            <small class="text-muted">Subtotal:</small><br>
+                            <strong>${data.subtotal_formateado}</strong>
                         </div>
                         <div class="col-6">
-                            <small class="text-muted">Tasa utilizada:</small><br>
-                            <strong>${data.tasa_destino.valor.toLocaleString()}</strong>
+                            <small class="text-muted">Tasa utilizada (${data.tipo_operacion}):</small><br>
+                            <strong>₲ ${data.precio_usado.toLocaleString()}</strong>
                         </div>
-                        ${data.comision_monto > 0 ? `
+                        ${data.comision_cobro > 0 ? `
                         <div class="col-6">
-                            <small class="text-muted">Comisión:</small><br>
-                            <span class="text-danger">${data.comision_monto_formateado} (${data.comision_pct}%)</span>
+                            <small class="text-muted">Comisión cobro:</small><br>
+                            <span class="text-danger">${data.comision_cobro_formateado} (${data.metodo_cobro.comision}%)</span>
                         </div>
                         ` : ''}
-                        ${data.cliente && data.cliente.descuento > 0 ? `
+                        ${data.comision_pago > 0 ? `
+                        <div class="col-6">
+                            <small class="text-muted">Comisión entrega:</small><br>
+                            <span class="text-danger">${data.comision_pago_formateado} (${data.metodo_pago.comision}%)</span>
+                        </div>
+                        ` : ''}
+                        ${data.comision_total > 0 ? `
+                        <div class="col-12">
+                            <hr class="my-1">
+                            <small class="text-muted">Total comisiones:</small><br>
+                            <strong class="text-danger">${data.comision_total_formateado}</strong>
+                        </div>
+                        ` : ''}
+                        <div class="col-12">
+                            <hr class="my-1">
+                            <small class="text-muted">Total a pagar:</small><br>
+                            <strong class="text-primary fs-5">${data.total_formateado}</strong>
+                        </div>
+                        <div class="col-12">
+                            <small class="text-muted">Recibirá:</small><br>
+                            <strong class="text-success fs-5">${data.resultado_formateado}</strong>
+                        </div>
+                        ${data.descuento_pct > 0 ? `
                         <div class="col-6">
                             <small class="text-muted">Descuento aplicado:</small><br>
-                            <span class="text-success">${data.cliente.descuento}%</span>
+                            <span class="text-success">${data.descuento_aplicado_formateado} (${data.descuento_pct}%)</span>
                         </div>
                         ` : ''}
                     </div>
@@ -329,7 +354,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 preview.style.display = 'block';
             } else {
-                previewContent.innerHTML = `<div class="text-danger">${result.message}</div>`;
+                console.error('Error en cálculo:', result.error);
+                previewContent.innerHTML = `<div class="text-danger">Error: ${result.error || 'Error desconocido'}</div>`;
                 preview.style.display = 'block';
                 btnComprar.disabled = true;
             }
@@ -379,20 +405,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Función para actualizar métodos de pago según moneda destino
     function actualizarMetodosPago() {
-        const monedaDestinoId = monedaDestino.value;
+        const monedaDestinoCodigo = monedaDestino.value;
         
         // Resetear el selector de método de pago
         metodoPago.innerHTML = '<option value="">Seleccione un método de entrega</option>';
         
-        if (!monedaDestinoId) {
+        if (!monedaDestinoCodigo) {
             metodoPago.disabled = true;
             return;
         }
         
         // Filtrar métodos de pago que permiten la moneda seleccionada
-        const metodosPagoFiltrados = window.metodosPagoData.filter(metodo => 
-            metodo.monedas_permitidas.includes(parseInt(monedaDestinoId))
-        );
+        const metodosPagoFiltrados = window.metodosPagoData.filter(metodo => {
+            return metodo.monedas_permitidas.includes(monedaDestinoCodigo);
+        });
         
         if (metodosPagoFiltrados.length === 0) {
             metodoPago.disabled = true;
@@ -405,6 +431,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const option = document.createElement('option');
             option.value = metodo.id;
             option.textContent = metodo.nombre;
+            if (metodo.comision && metodo.comision > 0) {
+                option.textContent += ` (${metodo.comision}% comisión)`;
+            } else {
+                option.textContent += ' (sin comisión)';
+            }
             if (!metodo.activo) {
                 option.textContent += ' (Inactivo)';
                 option.disabled = true;
