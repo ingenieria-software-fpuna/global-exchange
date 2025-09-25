@@ -5,7 +5,7 @@ from django.http import JsonResponse, Http404
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.db import transaction
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import json
 
 from .models import Transaccion, TipoOperacion, EstadoTransaccion
@@ -203,15 +203,14 @@ def iniciar_compra(request):
             else:
                 return redirect('tasa_cambio:dashboard')
         
-        # Calcular la transacción usando la misma lógica del simulador
-        # Para el cálculo, usar metodo_pago (la API existente espera metodo_pago)
-        metodo_para_calculo = metodo_pago if metodo_pago else metodo_cobro
-        resultado = calcular_transaccion(
+        # Calcular la transacción usando la NUEVA lógica (igual que la vista previa)
+        resultado = calcular_transaccion_completa(
             monto=monto,
             moneda_origen=moneda_origen,
             moneda_destino=moneda_destino,
             cliente=cliente,
-            metodo_pago=metodo_para_calculo  # La función existente espera metodo_pago
+            metodo_cobro=metodo_cobro,
+            metodo_pago=metodo_pago
         )
         
         if not resultado['success']:
@@ -223,21 +222,24 @@ def iniciar_compra(request):
             tipo_compra = TipoOperacion.objects.get(codigo=TipoOperacion.COMPRA)
             estado_pendiente = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PENDIENTE)
             
+            # Usar los datos de la nueva función de cálculo
+            data = resultado['data']
+            
             nueva_transaccion = Transaccion(
                 cliente=cliente,
                 usuario=request.user,
                 tipo_operacion=tipo_compra,
                 moneda_origen=moneda_origen,
                 moneda_destino=moneda_destino,
-                monto_origen=monto,
-                monto_destino=resultado['data']['monto_destino'],
+                monto_origen=monto,  # Lo que el cliente pagará
+                monto_destino=Decimal(str(data['resultado'])),  # Lo que recibirá
                 metodo_cobro=metodo_cobro,  # Para compras, usamos método de cobro
                 metodo_pago=metodo_pago,    # Para compatibilidad con dashboard antiguo
-                tasa_cambio=resultado['data']['tasa_utilizada'],
-                porcentaje_comision=resultado['data']['porcentaje_comision'],
-                monto_comision=resultado['data']['monto_comision'],
-                porcentaje_descuento=resultado['data']['porcentaje_descuento'],
-                monto_descuento=resultado['data']['monto_descuento'],
+                tasa_cambio=Decimal(str(data['precio_usado'])),  # Tasa ajustada con descuento
+                porcentaje_comision=Decimal(str(data.get('comision_total', 0))),
+                monto_comision=Decimal(str(data.get('comision_total', 0))),
+                porcentaje_descuento=Decimal(str(data.get('descuento_pct', 0))),
+                monto_descuento=Decimal(str(data.get('descuento_aplicado', 0))),
                 estado=estado_pendiente,
                 ip_cliente=get_client_ip(request)
             )
@@ -563,7 +565,7 @@ def get_client_ip(request):
 def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=None, metodo_cobro=None, metodo_pago=None):
     """
     Calcula el resultado completo de una transacción incluyendo:
-    - Conversión usando tasas de cambio
+    - Conversión usando tasas de cambio con descuento del cliente aplicado
     - Comisiones de método de cobro
     - Comisiones de método de pago/entrega
     - Descuentos de cliente
@@ -577,55 +579,64 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
         if monto <= 0:
             return {'success': False, 'error': 'El monto debe ser mayor a cero'}
         
-        # Obtener tasas de cambio
+        # Obtener descuento del cliente
+        descuento_pct = Decimal('0')
+        if cliente and cliente.tipo_cliente and cliente.tipo_cliente.descuento > 0:
+            descuento_pct = Decimal(str(cliente.tipo_cliente.descuento))
+        
+        # NUEVA LÓGICA: Cliente ingresa cuánto quiere PAGAR, sistema calcula cuánto RECIBE
+        # Esto es específico para COMPRAS (PYG → divisa extranjera)
+        if moneda_origen.codigo != 'PYG':
+            return {'success': False, 'error': 'Las compras solo se realizan con PYG como moneda origen'}
+        
+        # Obtener tasa de la divisa que va a comprar
         try:
-            tasa_origen = TasaCambio.objects.get(moneda=moneda_origen, es_activa=True)
             tasa_destino = TasaCambio.objects.get(moneda=moneda_destino, es_activa=True)
-        except TasaCambio.DoesNotExist as e:
-            return {'success': False, 'error': f'Tasa de cambio no disponible: {str(e)}'}
+        except TasaCambio.DoesNotExist:
+            return {'success': False, 'error': f'Tasa de cambio no disponible para {moneda_destino.codigo}'}
         
-        # Cálculos base siguiendo la lógica del simulador
-        # Determinar si es compra o venta desde la perspectiva del sistema
-        # Venta: Cliente compra divisa extranjera con PYG (usa tasa_venta)
-        # Compra: Cliente vende divisa extranjera por PYG (usa tasa_compra)
+        # Aplicar descuento del cliente a la comisión de venta (como hace el simulador)
+        comision_venta_ajustada = Decimal(str(tasa_destino.comision_venta))
+        if descuento_pct > 0:
+            comision_venta_ajustada = comision_venta_ajustada * (Decimal('1') - (descuento_pct / Decimal('100')))
         
-        if moneda_origen.codigo == 'PYG':
-            # Cliente compra divisa extranjera con PYG → usar tasa de venta
-            precio_usado = tasa_destino.tasa_venta
-            monto_base_destino = monto / precio_usado
-        else:
-            # Cliente vende divisa extranjera por PYG → usar tasa de compra
-            precio_usado = tasa_origen.tasa_compra
-            monto_base_destino = monto * precio_usado
+        # Calcular precio de venta ajustado: precio_base + comision_venta_ajustada
+        precio_usado = Decimal(str(tasa_destino.precio_base)) + comision_venta_ajustada
+        tipo_operacion = 'venta' + (' (ajustada)' if descuento_pct > 0 else '')
         
-        # 3. Calcular subtotal en moneda origen (antes de comisiones)
-        subtotal = monto
+        # NUEVA LÓGICA DE CÁLCULO:
+        # 1. El monto ingresado es lo que el cliente quiere PAGAR (en PYG)
+        monto_a_pagar = monto
         
-        # 4. Calcular comisiones
+        # 2. Calcular comisiones de métodos SOBRE el monto que va a pagar
         comision_cobro = Decimal('0')
         comision_pago = Decimal('0')
         
         if metodo_cobro and metodo_cobro.comision > 0:
-            comision_cobro = subtotal * (metodo_cobro.comision / 100)
+            comision_cobro = monto_a_pagar * (Decimal(str(metodo_cobro.comision)) / Decimal('100'))
         
         if metodo_pago and metodo_pago.comision > 0:
-            comision_pago = subtotal * (metodo_pago.comision / 100)
+            comision_pago = monto_a_pagar * (Decimal(str(metodo_pago.comision)) / Decimal('100'))
         
         comision_total = comision_cobro + comision_pago
         
-        # 5. Calcular total a pagar (en moneda origen)
-        total_origen = subtotal + comision_total
-        
-        # 6. Aplicar descuento de cliente si existe
+        # 3. Aplicar descuento del cliente a las comisiones de métodos
         descuento_aplicado = Decimal('0')
-        descuento_pct = Decimal('0')
-        if cliente and cliente.tipo_cliente and cliente.tipo_cliente.descuento > 0:
-            descuento_pct = cliente.tipo_cliente.descuento
-            descuento_aplicado = comision_total * (descuento_pct / 100)
-            total_origen = total_origen - descuento_aplicado
+        if descuento_pct > 0 and comision_total > 0:
+            descuento_aplicado = comision_total * (descuento_pct / Decimal('100'))
         
-        # 7. El resultado final es siempre el monto base (sin comisiones aplicadas al resultado)
-        resultado_final = monto_base_destino
+        # 4. Calcular el monto neto disponible para la conversión (después de comisiones y descuentos)
+        monto_neto_conversion = monto_a_pagar - comision_total + descuento_aplicado
+        
+        # 5. Convertir el monto neto a la divisa destino usando la tasa ajustada
+        resultado_final = (monto_neto_conversion / precio_usado).quantize(
+            Decimal('1.' + '0' * max(moneda_destino.decimales, 0)), 
+            rounding=ROUND_HALF_UP
+        )
+        
+        # 6. Valores para mostrar
+        subtotal = monto_a_pagar  # Lo que ingresó el cliente
+        total_origen = monto_a_pagar  # El cliente paga exactamente lo que ingresó
         
         # Formatear montos
         def formatear_monto(valor, moneda):
@@ -652,21 +663,23 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
                     'simbolo': moneda_destino.simbolo
                 },
                 
-                # Tasas y precio usado
+                # Tasas y precio usado (con descuento aplicado)
                 'precio_usado': float(precio_usado),
-                'tipo_operacion': 'venta' if moneda_origen.codigo == 'PYG' else 'compra',
-                'tasa_origen': {
-                    'valor': float(tasa_origen.tasa_compra if moneda_origen.codigo != 'PYG' else tasa_origen.precio_base),
-                    'precio_base': float(tasa_origen.precio_base),
-                    'tasa_compra': float(tasa_origen.tasa_compra),
-                    'tasa_venta': float(tasa_origen.tasa_venta)
+                'tipo_operacion': tipo_operacion,
+                'tasa_origen': None if moneda_origen.codigo == 'PYG' else {
+                    'moneda': moneda_origen.codigo,
+                    'tipo': tipo_operacion,
+                    'valor': float(precio_usado),
                 },
-                'tasa_destino': {
-                    'valor': float(tasa_destino.tasa_venta if moneda_origen.codigo == 'PYG' else tasa_destino.precio_base),
-                    'precio_base': float(tasa_destino.precio_base),
-                    'tasa_compra': float(tasa_destino.tasa_compra),
-                    'tasa_venta': float(tasa_destino.tasa_venta)
+                'tasa_destino': None if moneda_origen.codigo != 'PYG' else {
+                    'moneda': moneda_destino.codigo,
+                    'tipo': tipo_operacion, 
+                    'valor': float(precio_usado),
                 },
+                
+                # Tasas para mostrar en el preview
+                'tasa_base': float(Decimal(str(tasa_destino.precio_base)) + Decimal(str(tasa_destino.comision_venta))),
+                'tasa_ajustada': float(precio_usado),
                 
                 # Cálculos
                 'subtotal': float(subtotal),
@@ -687,6 +700,11 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
                 'resultado': float(resultado_final),
                 'resultado_formateado': formatear_monto(resultado_final, moneda_destino),
                 
+                # Información de descuentos
+                'descuento_pct': float(descuento_pct),
+                'descuento_aplicado': float(descuento_aplicado),
+                'descuento_aplicado_formateado': formatear_monto(descuento_aplicado, moneda_origen),
+                
                 # Información de métodos
                 'metodo_cobro': {
                     'id': metodo_cobro.id if metodo_cobro else None,
@@ -700,20 +718,19 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
                     'comision': float(metodo_pago.comision) if metodo_pago else 0
                 } if metodo_pago else None,
                 
-                # Cliente
+                # Información del cliente
                 'cliente': {
-                    'id': cliente.id if cliente else None,
-                    'nombre': cliente.nombre_comercial if cliente else None,
-                    'tipo_cliente': cliente.tipo_cliente.nombre if cliente and cliente.tipo_cliente else None,
-                    'descuento': float(cliente.tipo_cliente.descuento) if cliente and cliente.tipo_cliente else 0
+                    'id': cliente.id,
+                    'nombre': cliente.nombre_comercial,
+                    'tipo': cliente.tipo_cliente.nombre,
+                    'descuento': float(descuento_pct),
                 } if cliente else None,
                 
-                # Descuento aplicado
-                'descuento_aplicado': float(descuento_aplicado),
-                'descuento_aplicado_formateado': formatear_monto(descuento_aplicado, moneda_origen),
-                'descuento_pct': float(descuento_pct),
-                
-                'detalle': f"Conversión de {formatear_monto(monto, moneda_origen)} a {moneda_destino.nombre}"
+                # Detalle explicativo
+                'detalle': (f"PYG -> {moneda_destino.codigo} usando precio de venta" + 
+                           (f" con descuento {descuento_pct}% en comisión" if descuento_pct > 0 else "")) if moneda_origen.codigo == 'PYG' 
+                           else (f"{moneda_origen.codigo} -> PYG usando precio de compra" + 
+                                (f" con descuento {descuento_pct}% en comisión" if descuento_pct > 0 else ""))
             }
         }
         
