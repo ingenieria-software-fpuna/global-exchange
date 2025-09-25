@@ -147,7 +147,7 @@ def iniciar_compra(request):
         metodo_pago = None
         
         if metodo_cobro_id:
-            # Nueva pantalla de compras - usa métodos de cobro
+            # Nueva pantalla de compras - usa métodos de cobro Y métodos de pago
             # REQUERIR cliente para compras
             if not cliente_id:
                 messages.error(request, 'Las compras de divisas requieren seleccionar un cliente.')
@@ -158,6 +158,18 @@ def iniciar_compra(request):
             except MetodoCobro.DoesNotExist:
                 messages.error(request, 'El método de cobro seleccionado no es válido.')
                 return redirect('transacciones:comprar_divisas')
+            
+            # Para la nueva pantalla también necesitamos método de pago (entrega)
+            if not metodo_pago_id:
+                messages.error(request, 'Debe seleccionar un método de entrega.')
+                return redirect('transacciones:comprar_divisas')
+                
+            try:
+                metodo_pago = MetodoPago.objects.get(id=metodo_pago_id, es_activo=True)
+            except MetodoPago.DoesNotExist:
+                messages.error(request, 'El método de entrega seleccionado no es válido.')
+                return redirect('transacciones:comprar_divisas')
+                
         elif metodo_pago_id:
             # Dashboard antiguo - usa métodos de pago (mantener compatibilidad)
             try:
@@ -414,8 +426,11 @@ def comprar_divisas(request):
         usuarios_asociados=request.user
     ).select_related('tipo_cliente').order_by('nombre_comercial')
     
-    # Métodos de cobro activos (para COMPRAS)
+    # Métodos de cobro activos (para recibir pago del cliente)
     metodos_cobro = MetodoCobro.objects.filter(es_activo=True).order_by('nombre')
+    
+    # Métodos de pago activos (para entregar divisas al cliente)
+    metodos_pago = MetodoPago.objects.filter(es_activo=True).order_by('nombre')
     
     # Obtener parámetros de URL para pre-poblar el formulario (desde el simulador)
     moneda_origen_id = request.GET.get('moneda_origen')
@@ -428,6 +443,7 @@ def comprar_divisas(request):
         'monedas': monedas_activas,
         'clientes': clientes_usuario,
         'metodos_cobro': metodos_cobro,
+        'metodos_pago': metodos_pago,
         'moneda_origen_preseleccionada': moneda_origen_id,
         'moneda_destino_preseleccionada': moneda_destino_id,
         'cantidad_preseleccionada': cantidad,
