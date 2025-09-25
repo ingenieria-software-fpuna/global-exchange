@@ -35,20 +35,7 @@
             </div>
           </div>
 
-          <!-- Selector de Método de Pago -->
-          <div class="row g-3 mb-3">
-            <div class="col-12">
-              <label class="form-label">Método de Pago</label>
-              <select id="metodo_pago" class="form-select">
-                <option value="">Sin método (sin comisión)</option>
-                {% for mp in metodos_pago %}
-                  <option value="{{ mp.id }}">{{ mp.nombre }} ({{ mp.comision }}%)</option>
-                {% empty %}
-                  <option value="" disabled>No hay métodos de pago activos</option>
-                {% endfor %}
-              </select>
-            </div>
-          </div>
+          <!-- Métodos de pago eliminados - este es solo un simulador -->
 
           <div class="row g-3">
             <div class="col-12 col-md-4">
@@ -91,6 +78,20 @@
             <div class="small text-danger" id="resultado_comision"></div>
             <div class="small" id="resultado_tasas"></div>
             <div class="small text-success" id="resultado_descuento"></div>
+            
+            <!-- Enlace a Compra de Divisas -->
+            <div class="mt-3" id="enlace_compra_container" style="display: none;">
+              <a href="#" id="btnIrCompra" class="btn btn-success btn-lg w-100">
+                <i class="fas fa-shopping-cart me-2"></i>
+                Ir a Comprar Divisas
+              </a>
+              <div class="text-center mt-2">
+                <small class="text-muted">
+                  <i class="fas fa-info-circle me-1"></i>
+                  El simulador te ayuda a calcular. Para comprar, usa nuestra pantalla especializada.
+                </small>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -111,7 +112,7 @@
     const $resDesc = document.getElementById('resultado_descuento');
     const $btnToggle = document.getElementById('btnToggleDir');
     const $cliente = document.getElementById('cliente');
-    const $metodoPago = document.getElementById('metodo_pago');
+    const $metodoPago = document.getElementById('metodo_pago'); // Opcional, para compatibilidad
 
     // Dataset de monedas activas (no incluye PYG normalmente)
     const monedasData = JSON.parse('[' + document.getElementById('monedas-data').textContent + ']');
@@ -194,6 +195,9 @@
           } else {
             $resDesc.textContent = '';
           }
+          
+          // Mostrar botón de comprar si la simulación es exitosa
+          document.getElementById('enlace_compra_container').style.display = 'block';
         })
         .catch(() => {
           $resValor.textContent = '—';
@@ -204,6 +208,9 @@
           const $resComision = document.getElementById('resultado_comision');
           if ($resSubtotal) $resSubtotal.textContent = '';
           if ($resComision) $resComision.textContent = '';
+          
+          // Ocultar botón de comprar si hay error
+          document.getElementById('enlace_compra_container').style.display = 'none';
         });
     }
 
@@ -249,8 +256,42 @@
       return `${prefix}${numFinal}${suffix}`;
     }
 
+    // El simulador ahora solo muestra cálculos y redirige a la pantalla de compras
+
     applyDirection();
     simulate();
+    
+    // Configurar enlace dinámico a compras
+    document.getElementById('btnIrCompra').addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        // Construir URL con parámetros de la simulación actual
+        const monedaOrigen = $origen.value;
+        const monedaDestino = $destino.value;
+        const cantidad = $monto.value;
+        const cliente = $cliente.value;
+        
+        let url = "{% url 'transacciones:comprar_divisas' %}";
+        
+        // Agregar parámetros si hay datos válidos de la simulación
+        if (monedaOrigen && monedaDestino && cantidad) {
+            const params = new URLSearchParams({
+                'moneda_origen': monedaOrigen,
+                'moneda_destino': monedaDestino,
+                'cantidad': cantidad
+            });
+            
+            // Agregar cliente si está seleccionado
+            if (cliente) {
+                params.append('cliente_id', cliente);
+            }
+            
+            url += '?' + params.toString();
+        }
+        
+        window.location.href = url;
+    });
   })();
 </script>
+
 {% endblock %}

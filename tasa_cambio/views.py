@@ -18,6 +18,7 @@ from .forms import TasaCambioForm, TasaCambioSearchForm
 from monedas.models import Moneda
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from metodo_pago.models import MetodoPago
+from metodo_cobro.models import MetodoCobro
 
 
 class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
@@ -189,7 +190,7 @@ def dashboard_tasacambio(request):
         'monedas_con_cotizacion': TasaCambio.objects.filter(es_activa=True).select_related('moneda').count(),
         'monedas': monedas_activas,
         'clientes': clientes_usuario,
-        'metodos_pago': MetodoPago.objects.filter(es_activo=True).order_by('nombre'),
+        # metodos_pago removidos - el dashboard ahora es solo simulador
     }
     
     return render(request, 'tasa_cambio/dashboard.html', context)
