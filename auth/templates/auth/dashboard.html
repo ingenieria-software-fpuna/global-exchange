@@ -12,6 +12,22 @@
     </div>
     <hr>
     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4 text-center">
+        <!-- Comprar Divisas (acceso directo) -->
+        <div class="col">
+            <div class="card h-100 shadow-sm border-primary">
+                <div class="card-body">
+                    <i class="fas fa-shopping-cart fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">Comprar Divisas</h5>
+                    <p class="card-text">Realiza transacciones de compra de divisas directamente.</p>
+                </div>
+                <div class="card-footer bg-light">
+                    <a href="{% url 'transacciones:comprar_divisas' %}" class="btn btn-primary w-100">
+                        <i class="fas fa-shopping-cart me-1"></i>
+                        Comprar Ahora
+                    </a>
+                </div>
+            </div>
+        </div>
         <!-- Simulador de cambio (acceso público) -->
         <div class="col">
             <div class="card h-100 shadow-sm">
