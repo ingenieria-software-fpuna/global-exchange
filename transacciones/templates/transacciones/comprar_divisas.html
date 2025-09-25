@@ -81,6 +81,28 @@
               </div>
             </div>
 
+            <!-- Método de Entrega/Pago -->
+            <div class="row g-3 mb-4">
+              <div class="col-12">
+                <label for="metodo_pago" class="form-label">
+                  <i class="fas fa-hand-holding-usd me-1"></i>
+                  Método de Entrega <span class="text-danger">*</span>
+                </label>
+                <select id="metodo_pago" name="metodo_pago_id" class="form-select" required>
+                  <option value="">Seleccione cómo recibirá las divisas</option>
+                  {% for metodo in metodos_pago %}
+                    <option value="{{ metodo.id }}" data-comision="{{ metodo.comision }}">
+                      {{ metodo.nombre }} 
+                      {% if metodo.comision > 0 %}({{ metodo.comision }}% comisión){% else %}(sin comisión){% endif %}
+                    </option>
+                  {% empty %}
+                    <option value="" disabled>No hay métodos de entrega activos</option>
+                  {% endfor %}
+                </select>
+                <div class="form-text">Seleccione cómo recibirá las divisas compradas.</div>
+              </div>
+            </div>
+
             <!-- Configuración de la Operación -->
             <div class="row g-3 mb-4">
               <div class="col-12 col-md-4">
@@ -167,6 +189,20 @@
 </div>
 
 <script>
+// Datos de métodos de pago para JavaScript
+window.metodosPagoData = [
+    {% for metodo in metodos_pago %}
+    {
+        id: {{ metodo.id }},
+        nombre: "{{ metodo.nombre|escapejs }}",
+        activo: {{ metodo.es_activo|yesno:"true,false" }},
+        monedas_permitidas: [
+            {% for moneda in metodo.monedas_permitidas.all %}{{ moneda.id }}{% if not forloop.last %},{% endif %}{% endfor %}
+        ]
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+];
+
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('formCompra');
     const btnCalcular = document.getElementById('btnCalcular');
@@ -179,11 +215,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const monedaDestino = document.getElementById('moneda_destino');
     const cliente = document.getElementById('cliente');
     const metodoCobro = document.getElementById('metodo_cobro');
+    const metodoPago = document.getElementById('metodo_pago');
     
     // Función para validar si se puede proceder con la compra
     function validarFormularioCompleto() {
         const esValido = cliente.value && 
                         metodoCobro.value && 
+                        metodoPago.value &&
                         monto.value && 
                         parseFloat(monto.value) > 0 &&
                         monedaOrigen.value &&
@@ -197,8 +235,8 @@ document.addEventListener('DOMContentLoaded', function() {
             monto: monto.value,
             origen: monedaOrigen.value,
             destino: monedaDestino.value,
-            cliente_id: cliente.value || null,
-            metodo_pago_id: metodoCobro.value || null // Usamos la API existente
+            cliente_id: cliente.value || null
+            // NO enviamos metodo_cobro al simulador - solo es para la simulación
         };
         
         if (!datos.monto || parseFloat(datos.monto) <= 0) {
@@ -339,11 +377,50 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Función para actualizar métodos de pago según moneda destino
+    function actualizarMetodosPago() {
+        const monedaDestinoId = monedaDestino.value;
+        
+        // Resetear el selector de método de pago
+        metodoPago.innerHTML = '<option value="">Seleccione un método de entrega</option>';
+        
+        if (!monedaDestinoId) {
+            metodoPago.disabled = true;
+            return;
+        }
+        
+        // Filtrar métodos de pago que permiten la moneda seleccionada
+        const metodosPagoFiltrados = window.metodosPagoData.filter(metodo => 
+            metodo.monedas_permitidas.includes(parseInt(monedaDestinoId))
+        );
+        
+        if (metodosPagoFiltrados.length === 0) {
+            metodoPago.disabled = true;
+            metodoPago.innerHTML = '<option value="">No hay métodos disponibles para esta moneda</option>';
+            return;
+        }
+        
+        metodoPago.disabled = false;
+        metodosPagoFiltrados.forEach(metodo => {
+            const option = document.createElement('option');
+            option.value = metodo.id;
+            option.textContent = metodo.nombre;
+            if (!metodo.activo) {
+                option.textContent += ' (Inactivo)';
+                option.disabled = true;
+            }
+            metodoPago.appendChild(option);
+        });
+    }
+
     // Event listeners
     btnCalcular.addEventListener('click', calcularPreview);
     
+    // Actualizar métodos de pago cuando cambie la moneda destino
+    monedaDestino.addEventListener('change', actualizarMetodosPago);
+    
     // Auto-calcular cuando cambien los valores
-    [monto, monedaOrigen, monedaDestino, cliente, metodoCobro].forEach(element => {
+    [monto, monedaOrigen, monedaDestino, cliente, metodoCobro, metodoPago].forEach(element => {
         element.addEventListener('change', function() {
             if (monto.value && parseFloat(monto.value) > 0) {
                 calcularPreview();
@@ -357,7 +434,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Validar formulario completo cuando cambien campos obligatorios
-    [cliente, metodoCobro].forEach(element => {
+    [cliente, metodoCobro, metodoPago].forEach(element => {
         element.addEventListener('change', function() {
             if (!validarFormularioCompleto()) {
                 btnComprar.disabled = true;
@@ -388,6 +465,11 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        if (!metodoPago.value) {
+            alert('Por favor seleccione un método de entrega/pago.');
+            return;
+        }
+        
         if (!monto.value || parseFloat(monto.value) <= 0) {
             alert('Por favor ingrese un monto válido.');
             return;
@@ -401,6 +483,7 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('moneda_destino', monedaDestino.value);
         formData.append('cliente_id', cliente.value);
         formData.append('metodo_cobro_id', metodoCobro.value); // Aquí usamos metodo_cobro_id
+        formData.append('metodo_pago_id', metodoPago.value); // Agregar método de pago
         
         // Deshabilitar botón mientras se procesa
         btnComprar.disabled = true;
@@ -426,6 +509,9 @@ document.addEventListener('DOMContentLoaded', function() {
             btnComprar.innerHTML = '<i class="fas fa-shopping-cart me-1"></i>Proceder con la Compra';
         });
     });
+    
+    // Configuración inicial de métodos de pago
+    actualizarMetodosPago();
     
     // Si hay valores preseleccionados desde el simulador, hacer cálculo inicial
     {% if cantidad_preseleccionada and moneda_origen_preseleccionada and moneda_destino_preseleccionada %}
