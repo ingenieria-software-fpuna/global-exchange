@@ -148,6 +148,11 @@ def iniciar_compra(request):
         
         if metodo_cobro_id:
             # Nueva pantalla de compras - usa métodos de cobro
+            # REQUERIR cliente para compras
+            if not cliente_id:
+                messages.error(request, 'Las compras de divisas requieren seleccionar un cliente.')
+                return redirect('transacciones:comprar_divisas')
+            
             try:
                 metodo_cobro = MetodoCobro.objects.get(id=metodo_cobro_id, es_activo=True)
             except MetodoCobro.DoesNotExist:
