@@ -98,10 +98,6 @@ def iniciar_compra(request):
     Inicia el proceso de compra de divisas creando una transacción pendiente.
     """
     try:
-        # Debug: imprimir datos recibidos
-        print("=== DEBUG INICIAR COMPRA ===")
-        print("POST data:", dict(request.POST))
-        
         # Obtener datos del formulario
         monto = Decimal(request.POST.get('monto', '0'))
         moneda_origen_codigo = request.POST.get('moneda_origen')
@@ -112,22 +108,17 @@ def iniciar_compra(request):
         metodo_cobro_id = request.POST.get('metodo_cobro_id')
         metodo_pago_id = request.POST.get('metodo_pago_id')
         
-        print(f"Datos parseados: monto={monto}, origen={moneda_origen_codigo}, destino={moneda_destino_codigo}, cliente={cliente_id}, metodo_cobro={metodo_cobro_id}, metodo_pago={metodo_pago_id}")
-        
         # Validaciones básicas
         if monto <= 0:
             messages.error(request, 'El monto debe ser mayor a cero.')
-            print("ERROR: Monto <= 0")
             return redirect('tasa_cambio:dashboard')
         
         # Obtener objetos del modelo
         try:
             moneda_origen = Moneda.objects.get(codigo=moneda_origen_codigo, es_activa=True)
             moneda_destino = Moneda.objects.get(codigo=moneda_destino_codigo, es_activa=True)
-            print(f"Monedas encontradas: {moneda_origen} -> {moneda_destino}")
         except Moneda.DoesNotExist:
             messages.error(request, 'Las monedas seleccionadas no son válidas.')
-            print("ERROR: Monedas no válidas")
             return redirect('tasa_cambio:dashboard')
         
         cliente = None
@@ -179,7 +170,6 @@ def iniciar_compra(request):
                 return redirect('tasa_cambio:dashboard')
         
         # Validar límites de transacción
-        print("Validando límites...")
         validacion_limites = validar_limites_transaccion(
             monto_origen=monto,
             moneda_origen=moneda_origen,
@@ -189,17 +179,13 @@ def iniciar_compra(request):
         
         if not validacion_limites['valido']:
             messages.error(request, f'Transacción rechazada: {validacion_limites["mensaje"]}')
-            print(f"ERROR: Límites excedidos: {validacion_limites['mensaje']}")
             # Redirigir según desde donde vino
             if metodo_cobro_id:
                 return redirect('transacciones:comprar_divisas')
             else:
                 return redirect('tasa_cambio:dashboard')
         
-        print(f"Límites validados exitosamente: {validacion_limites['limites_aplicados']}")
-        
         # Calcular la transacción usando la misma lógica del simulador
-        print("Calculando transacción...")
         # Para el cálculo, usar metodo_pago (la API existente espera metodo_pago)
         metodo_para_calculo = metodo_pago if metodo_pago else metodo_cobro
         resultado = calcular_transaccion(
@@ -210,15 +196,11 @@ def iniciar_compra(request):
             metodo_pago=metodo_para_calculo  # La función existente espera metodo_pago
         )
         
-        print(f"Resultado del cálculo: {resultado}")
-        
         if not resultado['success']:
             messages.error(request, resultado['message'])
-            print(f"ERROR en cálculo: {resultado['message']}")
             return redirect('tasa_cambio:dashboard')
         
         # Crear la transacción
-        print("Creando transacción...")
         with transaction.atomic():
             tipo_compra = TipoOperacion.objects.get(codigo=TipoOperacion.COMPRA)
             estado_pendiente = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PENDIENTE)
@@ -243,14 +225,10 @@ def iniciar_compra(request):
             )
             nueva_transaccion.save()
         
-        print(f"Transacción creada: {nueva_transaccion.id_transaccion}")
         messages.success(request, f'Transacción creada exitosamente: {nueva_transaccion.id_transaccion}')
         return redirect('transacciones:resumen_transaccion', transaccion_id=nueva_transaccion.id_transaccion)
         
     except Exception as e:
-        print(f"EXCEPCIÓN: {str(e)}")
-        import traceback
-        traceback.print_exc()
         messages.error(request, f'Error al crear la transacción: {str(e)}')
         return redirect('tasa_cambio:dashboard')
 
@@ -262,8 +240,8 @@ def resumen_transaccion(request, transaccion_id):
     """
     transaccion = get_object_or_404(
         Transaccion.objects.select_related(
-            'cliente', 'usuario', 'tipo_operacion', 'estado',
-            'moneda_origen', 'moneda_destino', 'metodo_pago'
+            'cliente', 'cliente__tipo_cliente', 'usuario', 'tipo_operacion', 'estado',
+            'moneda_origen', 'moneda_destino', 'metodo_pago', 'metodo_cobro'
         ),
         id_transaccion=transaccion_id
     )
@@ -276,7 +254,8 @@ def resumen_transaccion(request, transaccion_id):
     
     context = {
         'transaccion': transaccion,
-        'resumen_financiero': transaccion.get_resumen_financiero(),
+        'resumen_financiero': transaccion.get_resumen_financiero(),  # Mantener compatibilidad
+        'resumen_detallado': transaccion.get_resumen_detallado(),    # Nuevo resumen detallado
         'puede_pagar': transaccion.estado.codigo == EstadoTransaccion.PENDIENTE and not transaccion.esta_expirada(),
         'tiempo_restante': (transaccion.fecha_expiracion - timezone.now()).total_seconds() if not transaccion.esta_expirada() else 0,
     }
@@ -522,3 +501,255 @@ def get_client_ip(request):
     else:
         ip = request.META.get('REMOTE_ADDR')
     return ip
+
+
+def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=None, metodo_cobro=None, metodo_pago=None):
+    """
+    Calcula el resultado completo de una transacción incluyendo:
+    - Conversión usando tasas de cambio
+    - Comisiones de método de cobro
+    - Comisiones de método de pago/entrega
+    - Descuentos de cliente
+    - Total final
+    
+    Returns:
+        dict: Diccionario con todos los datos de la transacción o error
+    """
+    try:
+        # Validaciones iniciales
+        if monto <= 0:
+            return {'success': False, 'error': 'El monto debe ser mayor a cero'}
+        
+        # Obtener tasas de cambio
+        try:
+            tasa_origen = TasaCambio.objects.get(moneda=moneda_origen, es_activa=True)
+            tasa_destino = TasaCambio.objects.get(moneda=moneda_destino, es_activa=True)
+        except TasaCambio.DoesNotExist as e:
+            return {'success': False, 'error': f'Tasa de cambio no disponible: {str(e)}'}
+        
+        # Cálculos base siguiendo la lógica del simulador
+        # Determinar si es compra o venta desde la perspectiva del sistema
+        # Venta: Cliente compra divisa extranjera con PYG (usa tasa_venta)
+        # Compra: Cliente vende divisa extranjera por PYG (usa tasa_compra)
+        
+        if moneda_origen.codigo == 'PYG':
+            # Cliente compra divisa extranjera con PYG → usar tasa de venta
+            precio_usado = tasa_destino.tasa_venta
+            monto_base_destino = monto / precio_usado
+        else:
+            # Cliente vende divisa extranjera por PYG → usar tasa de compra
+            precio_usado = tasa_origen.tasa_compra
+            monto_base_destino = monto * precio_usado
+        
+        # 3. Calcular subtotal en moneda origen (antes de comisiones)
+        subtotal = monto
+        
+        # 4. Calcular comisiones
+        comision_cobro = Decimal('0')
+        comision_pago = Decimal('0')
+        
+        if metodo_cobro and metodo_cobro.comision > 0:
+            comision_cobro = subtotal * (metodo_cobro.comision / 100)
+        
+        if metodo_pago and metodo_pago.comision > 0:
+            comision_pago = subtotal * (metodo_pago.comision / 100)
+        
+        comision_total = comision_cobro + comision_pago
+        
+        # 5. Calcular total a pagar (en moneda origen)
+        total_origen = subtotal + comision_total
+        
+        # 6. Aplicar descuento de cliente si existe
+        descuento_aplicado = Decimal('0')
+        descuento_pct = Decimal('0')
+        if cliente and cliente.tipo_cliente and cliente.tipo_cliente.descuento > 0:
+            descuento_pct = cliente.tipo_cliente.descuento
+            descuento_aplicado = comision_total * (descuento_pct / 100)
+            total_origen = total_origen - descuento_aplicado
+        
+        # 7. El resultado final es siempre el monto base (sin comisiones aplicadas al resultado)
+        resultado_final = monto_base_destino
+        
+        # Formatear montos
+        def formatear_monto(valor, moneda):
+            if moneda.codigo == 'PYG':
+                return f"₲ {valor:,.0f}"
+            else:
+                return f"{moneda.simbolo} {valor:,.2f}"
+        
+        return {
+            'success': True,
+            'data': {
+                # Datos originales
+                'monto_original': monto,
+                'moneda_origen': {
+                    'id': moneda_origen.id, 
+                    'codigo': moneda_origen.codigo,
+                    'nombre': moneda_origen.nombre,
+                    'simbolo': moneda_origen.simbolo
+                },
+                'moneda_destino': {
+                    'id': moneda_destino.id,
+                    'codigo': moneda_destino.codigo, 
+                    'nombre': moneda_destino.nombre,
+                    'simbolo': moneda_destino.simbolo
+                },
+                
+                # Tasas y precio usado
+                'precio_usado': float(precio_usado),
+                'tipo_operacion': 'venta' if moneda_origen.codigo == 'PYG' else 'compra',
+                'tasa_origen': {
+                    'valor': float(tasa_origen.tasa_compra if moneda_origen.codigo != 'PYG' else tasa_origen.precio_base),
+                    'precio_base': float(tasa_origen.precio_base),
+                    'tasa_compra': float(tasa_origen.tasa_compra),
+                    'tasa_venta': float(tasa_origen.tasa_venta)
+                },
+                'tasa_destino': {
+                    'valor': float(tasa_destino.tasa_venta if moneda_origen.codigo == 'PYG' else tasa_destino.precio_base),
+                    'precio_base': float(tasa_destino.precio_base),
+                    'tasa_compra': float(tasa_destino.tasa_compra),
+                    'tasa_venta': float(tasa_destino.tasa_venta)
+                },
+                
+                # Cálculos
+                'subtotal': float(subtotal),
+                'subtotal_formateado': formatear_monto(subtotal, moneda_origen),
+                
+                'comision_cobro': float(comision_cobro),
+                'comision_cobro_formateado': formatear_monto(comision_cobro, moneda_origen),
+                
+                'comision_pago': float(comision_pago), 
+                'comision_pago_formateado': formatear_monto(comision_pago, moneda_origen),
+                
+                'comision_total': float(comision_total),
+                'comision_total_formateado': formatear_monto(comision_total, moneda_origen),
+                
+                'total': float(total_origen),
+                'total_formateado': formatear_monto(total_origen, moneda_origen),
+                
+                'resultado': float(resultado_final),
+                'resultado_formateado': formatear_monto(resultado_final, moneda_destino),
+                
+                # Información de métodos
+                'metodo_cobro': {
+                    'id': metodo_cobro.id if metodo_cobro else None,
+                    'nombre': metodo_cobro.nombre if metodo_cobro else None,
+                    'comision': float(metodo_cobro.comision) if metodo_cobro else 0
+                } if metodo_cobro else None,
+                
+                'metodo_pago': {
+                    'id': metodo_pago.id if metodo_pago else None,
+                    'nombre': metodo_pago.nombre if metodo_pago else None,
+                    'comision': float(metodo_pago.comision) if metodo_pago else 0
+                } if metodo_pago else None,
+                
+                # Cliente
+                'cliente': {
+                    'id': cliente.id if cliente else None,
+                    'nombre': cliente.nombre_comercial if cliente else None,
+                    'tipo_cliente': cliente.tipo_cliente.nombre if cliente and cliente.tipo_cliente else None,
+                    'descuento': float(cliente.tipo_cliente.descuento) if cliente and cliente.tipo_cliente else 0
+                } if cliente else None,
+                
+                # Descuento aplicado
+                'descuento_aplicado': float(descuento_aplicado),
+                'descuento_aplicado_formateado': formatear_monto(descuento_aplicado, moneda_origen),
+                'descuento_pct': float(descuento_pct),
+                
+                'detalle': f"Conversión de {formatear_monto(monto, moneda_origen)} a {moneda_destino.nombre}"
+            }
+        }
+        
+    except Exception as e:
+        return {'success': False, 'error': f'Error en el cálculo: {str(e)}'}
+
+
+@login_required
+def api_calcular_compra_completa(request):
+    """
+    API endpoint para calcular compra completa con comisiones desde JavaScript
+    """
+    if request.method == 'GET':
+        try:
+            # Obtener parámetros
+            monto = Decimal(request.GET.get('monto', '0'))
+            moneda_origen_codigo = request.GET.get('origen')
+            moneda_destino_codigo = request.GET.get('destino')
+            cliente_id = request.GET.get('cliente_id')
+            metodo_cobro_id = request.GET.get('metodo_cobro_id')
+            metodo_pago_id = request.GET.get('metodo_pago_id')
+            
+            # Validaciones básicas
+            if monto <= 0 or not moneda_origen_codigo or not moneda_destino_codigo:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Parámetros inválidos'
+                })
+            
+            # Obtener objetos
+            try:
+                moneda_origen = Moneda.objects.get(codigo=moneda_origen_codigo, es_activa=True)
+                moneda_destino = Moneda.objects.get(codigo=moneda_destino_codigo, es_activa=True)
+            except Moneda.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Monedas no válidas'
+                })
+            
+            # Cliente opcional
+            cliente = None
+            if cliente_id:
+                try:
+                    cliente = Cliente.objects.get(id=cliente_id, activo=True)
+                    # Verificar permisos
+                    if not cliente.usuarios_asociados.filter(id=request.user.id).exists():
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'Sin permisos para este cliente'
+                        })
+                except Cliente.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Cliente no válido'
+                    })
+            
+            # Métodos opcionales
+            metodo_cobro = None
+            if metodo_cobro_id:
+                try:
+                    metodo_cobro = MetodoCobro.objects.get(id=metodo_cobro_id, es_activo=True)
+                except MetodoCobro.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Método de cobro no válido'
+                    })
+            
+            metodo_pago = None
+            if metodo_pago_id:
+                try:
+                    metodo_pago = MetodoPago.objects.get(id=metodo_pago_id, es_activo=True)
+                except MetodoPago.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Método de pago no válido'
+                    })
+            
+            # Realizar el cálculo completo
+            resultado = calcular_transaccion_completa(
+                monto=monto,
+                moneda_origen=moneda_origen,
+                moneda_destino=moneda_destino,
+                cliente=cliente,
+                metodo_cobro=metodo_cobro,
+                metodo_pago=metodo_pago
+            )
+            
+            return JsonResponse(resultado)
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error interno: {str(e)}'
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido'})
