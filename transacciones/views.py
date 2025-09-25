@@ -55,34 +55,52 @@ def validar_limites_transaccion(monto_origen, moneda_origen, cliente=None, usuar
     hoy = timezone.now().date()
     inicio_mes = hoy.replace(day=1)
     
-    if usuario:
-        # Transacciones del día
-        transacciones_hoy = Transaccion.objects.filter(
-            usuario=usuario,
-            fecha_creacion__date=hoy,
-            estado__nombre__in=['COMPLETADA', 'PENDIENTE']  # Solo transacciones válidas
-        ).aggregate(total=Sum('monto_origen'))['total'] or Decimal('0')
+    # Solo validar límites diarios/mensuales si hay cliente seleccionado
+    # Sin cliente no se puede procesar la transacción de todas formas
+    if usuario and cliente:
+        # IMPORTANTE: Los límites son POR CLIENTE, no por usuario
         
-        # Transacciones del mes
-        transacciones_mes = Transaccion.objects.filter(
+        # Transacciones del día para este cliente específico
+        transacciones_hoy_queryset = Transaccion.objects.filter(
             usuario=usuario,
+            cliente=cliente,
+            fecha_creacion__date=hoy,
+            estado__codigo__in=['PAGADA', 'PENDIENTE']  # Solo transacciones válidas
+        )
+        
+        # Transacciones del mes para este cliente específico
+        transacciones_mes_queryset = Transaccion.objects.filter(
+            usuario=usuario,
+            cliente=cliente,
             fecha_creacion__date__gte=inicio_mes,
-            estado__nombre__in=['COMPLETADA', 'PENDIENTE']
-        ).aggregate(total=Sum('monto_origen'))['total'] or Decimal('0')
+            estado__codigo__in=['PAGADA', 'PENDIENTE']
+        )
+        
+        # Calcular totales
+        transacciones_hoy = transacciones_hoy_queryset.aggregate(total=Sum('monto_origen'))['total'] or Decimal('0')
+        transacciones_mes = transacciones_mes_queryset.aggregate(total=Sum('monto_origen'))['total'] or Decimal('0')
         
         # Validar límite diario
         if config.limite_diario_transacciones > 0:
             total_dia_con_nueva = transacciones_hoy + monto_origen
             if total_dia_con_nueva > config.limite_diario_transacciones:
-                errores.append(f'Excede el límite diario: {config.limite_diario_transacciones} (ya usado: {transacciones_hoy})')
-            limites_aplicados.append(f'Límite diario: {config.limite_diario_transacciones} (usado: {transacciones_hoy})')
+                disponible_hoy = config.limite_diario_transacciones - transacciones_hoy
+                errores.append(f'Excede el límite diario para {cliente.nombre_comercial}: {config.limite_diario_transacciones} (ya usado: {transacciones_hoy}, disponible: {disponible_hoy})')
+            
+            limites_aplicados.append(f'Límite diario ({cliente.nombre_comercial}): {config.limite_diario_transacciones} (usado: {transacciones_hoy})')
         
         # Validar límite mensual
         if config.limite_mensual_transacciones > 0:
             total_mes_con_nueva = transacciones_mes + monto_origen
             if total_mes_con_nueva > config.limite_mensual_transacciones:
-                errores.append(f'Excede el límite mensual: {config.limite_mensual_transacciones} (ya usado: {transacciones_mes})')
-            limites_aplicados.append(f'Límite mensual: {config.limite_mensual_transacciones} (usado: {transacciones_mes})')
+                disponible_mes = config.limite_mensual_transacciones - transacciones_mes
+                errores.append(f'Excede el límite mensual para {cliente.nombre_comercial}: {config.limite_mensual_transacciones} (ya usado: {transacciones_mes}, disponible: {disponible_mes})')
+            
+            limites_aplicados.append(f'Límite mensual ({cliente.nombre_comercial}): {config.limite_mensual_transacciones} (usado: {transacciones_mes})')
+    
+    elif usuario and not cliente:
+        # Sin cliente: no validar límites diarios/mensuales, pero informar que se requiere cliente
+        limites_aplicados.append('Seleccione un cliente para aplicar límites diarios/mensuales')
     
     return {
         'valido': len(errores) == 0,
