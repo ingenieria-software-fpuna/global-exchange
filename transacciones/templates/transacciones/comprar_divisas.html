@@ -27,7 +27,7 @@
           <!-- Información -->
           <div class="alert alert-info mb-4">
             <i class="fas fa-info-circle me-2"></i>
-            Usted está comprando divisas extranjeras y pagará usando uno de nuestros métodos de cobro disponibles.
+            <strong>¿Cómo funciona?</strong> Ingrese el monto total que desea pagar y el sistema calculará cuánta divisa extranjera recibirá después de aplicar comisiones y descuentos.
           </div>
 
 
@@ -108,11 +108,15 @@
               <div class="col-12 col-md-4">
                 <label for="monto" class="form-label">
                   <i class="fas fa-calculator me-1"></i>
-                  Monto <span class="text-danger">*</span>
+                  Monto a Pagar <span class="text-danger">*</span>
                 </label>
                 <input id="monto" name="monto" type="number" class="form-control" 
-                       placeholder="0.00" step="any" min="0.01" required
+                       placeholder="100000.00" step="any" min="0.01" required
                        {% if cantidad_preseleccionada %}value="{{ cantidad_preseleccionada }}"{% endif %}>
+                <div class="form-text">
+                  <i class="fas fa-info-circle me-1"></i>
+                  Ingrese cuánto desea pagar en total
+                </div>
               </div>
               <div class="col-12 col-md-4">
                 <label for="moneda_origen" class="form-label">Pagando con</label>
@@ -175,7 +179,8 @@
           </h6>
           <ul class="mb-0">
             <li>Las transacciones tienen un tiempo límite de <strong>5 minutos</strong> para completar el pago.</li>
-            <li>Los tipos de cliente con descuentos aplican automáticamente a la comisión.</li>
+            <li>Los tipos de cliente con descuentos mejoran la tasa de cambio y reducen comisiones.</li>
+            <li>El monto ingresado es lo que <strong>pagará en total</strong>, las comisiones se descuentan de ese monto.</li>
             <li>Una vez iniciada la compra, recibirá un código de verificación único para su transacción.</li>
             <li>Puede cancelar la transacción antes de realizar el pago sin penalización.</li>
           </ul>
@@ -258,48 +263,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = result.data;
                 previewContent.innerHTML = `
                     <div class="row g-2">
+                        <div class="col-12">
+                            <div class="alert alert-primary alert-sm mb-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                <strong>Usted pagará:</strong> ${data.total_formateado}
+                            </div>
+                        </div>
                         <div class="col-6">
-                            <small class="text-muted">Subtotal:</small><br>
+                            <small class="text-muted">Monto base:</small><br>
                             <strong>${data.subtotal_formateado}</strong>
                         </div>
                         <div class="col-6">
-                            <small class="text-muted">Tasa utilizada (${data.tipo_operacion}):</small><br>
-                            <strong>₲ ${data.precio_usado.toLocaleString()}</strong>
+                            <small class="text-muted">Tasa base:</small><br>
+                            <strong>₲ ${data.tasa_base.toLocaleString()}</strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Tasa ajustada (con ${data.descuento_pct}% descuento):</small><br>
+                            <strong>₲ ${data.tasa_ajustada.toLocaleString()}</strong>
                         </div>
                         ${data.comision_cobro > 0 ? `
                         <div class="col-6">
                             <small class="text-muted">Comisión cobro:</small><br>
-                            <span class="text-danger">${data.comision_cobro_formateado} (${data.metodo_cobro.comision}%)</span>
+                            <span class="text-danger">- ${data.comision_cobro_formateado} (${data.metodo_cobro.comision}%)</span>
                         </div>
                         ` : ''}
                         ${data.comision_pago > 0 ? `
                         <div class="col-6">
                             <small class="text-muted">Comisión entrega:</small><br>
-                            <span class="text-danger">${data.comision_pago_formateado} (${data.metodo_pago.comision}%)</span>
+                            <span class="text-danger">- ${data.comision_pago_formateado} (${data.metodo_pago.comision}%)</span>
                         </div>
                         ` : ''}
-                        ${data.comision_total > 0 ? `
-                        <div class="col-12">
-                            <hr class="my-1">
-                            <small class="text-muted">Total comisiones:</small><br>
-                            <strong class="text-danger">${data.comision_total_formateado}</strong>
-                        </div>
-                        ` : ''}
-                        <div class="col-12">
-                            <hr class="my-1">
-                            <small class="text-muted">Total a pagar:</small><br>
-                            <strong class="text-primary fs-5">${data.total_formateado}</strong>
-                        </div>
-                        <div class="col-12">
-                            <small class="text-muted">Recibirá:</small><br>
-                            <strong class="text-success fs-5">${data.resultado_formateado}</strong>
-                        </div>
                         ${data.descuento_pct > 0 ? `
                         <div class="col-6">
-                            <small class="text-muted">Descuento aplicado:</small><br>
-                            <span class="text-success">${data.descuento_aplicado_formateado} (${data.descuento_pct}%)</span>
+                            <small class="text-muted">Descuento aplicado por tipo cliente:</small><br>
+                            <span class="text-success">${data.descuento_pct}%</span>
                         </div>
                         ` : ''}
+                        <div class="col-12">
+                            <hr class="my-2">
+                            <div class="alert alert-success alert-sm mb-0">
+                                <i class="fas fa-gift me-1"></i>
+                                <strong>Usted recibirá:</strong> ${data.resultado_formateado}
+                            </div>
+                        </div>
                     </div>
                     <hr class="my-2">
                     <div class="text-center">

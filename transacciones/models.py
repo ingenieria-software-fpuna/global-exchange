@@ -389,18 +389,21 @@ class Transaccion(models.Model):
         }
 
     def get_resumen_detallado(self):
-        """Retorna un diccionario con el resumen financiero detallado incluyendo comisiones por método"""
+        """Retorna un diccionario con el resumen financiero detallado con la NUEVA lógica"""
         from decimal import Decimal
         
-        # Calcular comisiones individuales usando el monto origen
+        # NUEVA LÓGICA: monto_origen es lo que el cliente PAGA (total)
+        monto_total_pagado = self.monto_origen
+        
+        # Calcular comisiones individuales sobre el monto total que paga
         comision_cobro = Decimal('0')
         comision_pago = Decimal('0')
         
         if self.metodo_cobro and self.metodo_cobro.comision > 0:
-            comision_cobro = self.monto_origen * (self.metodo_cobro.comision / 100)
+            comision_cobro = monto_total_pagado * (Decimal(str(self.metodo_cobro.comision)) / Decimal('100'))
         
         if self.metodo_pago and self.metodo_pago.comision > 0:
-            comision_pago = self.monto_origen * (self.metodo_pago.comision / 100)
+            comision_pago = monto_total_pagado * (Decimal(str(self.metodo_pago.comision)) / Decimal('100'))
         
         comision_total = comision_cobro + comision_pago
         
@@ -408,11 +411,14 @@ class Transaccion(models.Model):
         descuento_aplicado = Decimal('0')
         descuento_pct = Decimal('0')
         if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.descuento > 0:
-            descuento_pct = self.cliente.tipo_cliente.descuento
-            descuento_aplicado = comision_total * (descuento_pct / 100)
+            descuento_pct = Decimal(str(self.cliente.tipo_cliente.descuento))
+            descuento_aplicado = comision_total * (descuento_pct / Decimal('100'))
         
-        # Total a pagar por el cliente
-        total_cliente = self.monto_origen + comision_total - descuento_aplicado
+        # El monto base es lo que ingresó el cliente (sin desglose)
+        monto_base = monto_total_pagado
+        
+        # El cliente paga exactamente lo que ingresó
+        total_cliente = monto_total_pagado
         
         # Formatear montos
         def formatear_monto(valor, moneda):
@@ -447,9 +453,11 @@ class Transaccion(models.Model):
             'monto_recibe': float(self.monto_destino),
             'monto_recibe_formateado': formatear_monto(self.monto_destino, self.moneda_destino),
             
-            # Tasa
-            'tasa_cambio': float(self.tasa_cambio),
+            # Tasas de cambio (SIMPLE - usar lo que está guardado en BD)
+            'tasa_cambio': float(self.tasa_cambio),  # La tasa que se usó (YA está ajustada si había descuento)
             'tasa_cambio_tipo': self.get_tipo_tasa_utilizada(),
+            'tasa_base': self.get_tasa_base(),  # Tasa original sin descuentos
+            'tasa_ajustada': float(self.tasa_cambio),  # La tasa guardada (YA ajustada)
             
             # Información de métodos
             'metodo_cobro': {
@@ -475,3 +483,31 @@ class Transaccion(models.Model):
             return 'venta'  # Cliente compra divisa extranjera con PYG
         else:
             return 'compra'  # Cliente vende divisa extranjera por PYG
+    
+    def get_tasa_base(self):
+        """Obtiene la tasa base (sin ajustes por cliente) consultando la TasaCambio actual"""
+        from tasa_cambio.models import TasaCambio
+        
+        try:
+            if self.moneda_origen.codigo == 'PYG':
+                # Para compras (PYG -> otra moneda)
+                tasa_actual = TasaCambio.objects.filter(
+                    moneda=self.moneda_destino, 
+                    es_activa=True
+                ).first()
+                if tasa_actual:
+                    # Tasa base = precio_base + comision_venta (SIN descuento)
+                    return float(tasa_actual.precio_base + tasa_actual.comision_venta)
+            else:
+                # Para ventas (otra moneda -> PYG)
+                tasa_actual = TasaCambio.objects.filter(
+                    moneda=self.moneda_origen, 
+                    es_activa=True
+                ).first()
+                if tasa_actual:
+                    return float(tasa_actual.precio_base - tasa_actual.comision_compra)
+        except:
+            pass
+        
+        # Si no se puede obtener la tasa actual, devolver la que está guardada
+        return float(self.tasa_cambio)
