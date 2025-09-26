@@ -521,35 +521,50 @@ class Transaccion(models.Model):
         try:
             # Determinar qué moneda buscar en TasaCambio
             if self.moneda_origen.codigo == 'PYG':
-                # Para compras (PYG -> otra moneda), buscar tasa de la moneda destino
+                # COMPRAS: PYG -> otra moneda
                 tasa_actual = TasaCambio.objects.filter(
                     moneda=self.moneda_destino,
                     es_activa=True
                 ).first()
-                if tasa_actual:
-                    # Calcular tasa de venta actual
-                    tasa_actual_valor = Decimal(str(tasa_actual.precio_base + tasa_actual.comision_venta))
-                else:
+                if not tasa_actual:
                     return False
+
+                # Calcular precio de venta con descuento (como se hace en calcular_compra)
+                comision_venta_ajustada = Decimal(str(tasa_actual.comision_venta))
+                if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.descuento > 0:
+                    descuento_pct = Decimal(str(self.cliente.tipo_cliente.descuento))
+                    comision_venta_ajustada = comision_venta_ajustada * (Decimal('1') - (descuento_pct / Decimal('100')))
+
+                tasa_esperada = Decimal(str(tasa_actual.precio_base)) + comision_venta_ajustada
+
             else:
-                # Para ventas (otra moneda -> PYG), buscar tasa de la moneda origen
+                # VENTAS: otra moneda -> PYG
                 tasa_actual = TasaCambio.objects.filter(
                     moneda=self.moneda_origen,
                     es_activa=True
                 ).first()
-                if tasa_actual:
-                    # Calcular tasa de compra actual
-                    tasa_actual_valor = Decimal(str(tasa_actual.precio_base - tasa_actual.comision_compra))
-                else:
+                if not tasa_actual:
                     return False
 
-            # Comparar con la tasa guardada en la transacción (con tolerancia mínima)
-            diferencia = abs(tasa_actual_valor - self.tasa_cambio)
-            tolerancia = Decimal('0.01')  # Tolerancia de 1 centavo
+                # Calcular precio de compra con descuento (como se hace en calcular_venta)
+                precio_base_compra = Decimal(str(tasa_actual.precio_base)) - Decimal(str(tasa_actual.comision_compra))
+
+                if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.descuento > 0:
+                    descuento_pct = Decimal(str(self.cliente.tipo_cliente.descuento))
+                    # Para ventas, el descuento aumenta la tasa (cliente recibe más PYG)
+                    tasa_esperada = precio_base_compra * (Decimal('1') + (descuento_pct / Decimal('100')))
+                else:
+                    tasa_esperada = precio_base_compra
+
+            # Comparar con la tasa guardada en la transacción (con tolerancia)
+            diferencia = abs(tasa_esperada - self.tasa_cambio)
+            tolerancia = Decimal('10.00')  # Tolerancia más amplia para manejar redondeos
 
             return diferencia <= tolerancia
 
-        except Exception:
+        except Exception as e:
+            # Para debug - se puede quitar en producción
+            print(f"Error en tiene_tasa_actualizada: {e}")
             return False
 
     def cancelar_por_cambio_tasa(self):
