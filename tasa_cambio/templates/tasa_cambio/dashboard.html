@@ -109,6 +109,20 @@
                 </small>
               </div>
             </div>
+            
+            <!-- Enlace a Venta de Divisas -->
+            <div class="mt-3" id="enlace_venta_container" style="display: none;">
+              <a href="#" id="btnIrVenta" class="btn btn-warning btn-lg w-100">
+                <i class="fas fa-hand-holding-usd me-2"></i>
+                Ir a Vender Divisas
+              </a>
+              <div class="text-center mt-2">
+                <small class="text-muted">
+                  <i class="fas fa-info-circle me-1"></i>
+                  El simulador te ayuda a calcular. Para vender, usa nuestra pantalla especializada.
+                </small>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -239,9 +253,10 @@
             $resDesc.textContent = '';
           }
           
-          // Mostrar botón de comprar solo si es operación de compra y la simulación es exitosa
+          // Mostrar botón apropiado según el tipo de operación
           const esCompra = $operacionComprar.checked;
           document.getElementById('enlace_compra_container').style.display = esCompra ? 'block' : 'none';
+          document.getElementById('enlace_venta_container').style.display = !esCompra ? 'block' : 'none';
         })
         .catch(() => {
           $resValor.textContent = '—';
@@ -253,8 +268,9 @@
           if ($resSubtotal) $resSubtotal.textContent = '';
           if ($resComision) $resComision.textContent = '';
           
-          // Ocultar botón de comprar si hay error
+          // Ocultar botones si hay error
           document.getElementById('enlace_compra_container').style.display = 'none';
+          document.getElementById('enlace_venta_container').style.display = 'none';
         });
     }
     
@@ -268,6 +284,7 @@
       if ($resSubtotal) $resSubtotal.textContent = '';
       if ($resComision) $resComision.textContent = '';
       document.getElementById('enlace_compra_container').style.display = 'none';
+      document.getElementById('enlace_venta_container').style.display = 'none';
     }
 
     // Event listeners
@@ -341,6 +358,35 @@
             window.location.href = url;
         } else {
             alert('La pantalla de compras solo está disponible para operaciones de "Quiero Comprar"');
+        }
+    });
+    
+    // Configurar enlace dinámico a ventas
+    document.getElementById('btnIrVenta').addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        const esVenta = $operacionVender.checked;
+        const cantidad = $monto.value;
+        const cliente = $cliente.value;
+        
+        let url = "{% url 'transacciones:vender_divisas' %}";
+        
+        // Solo redirigir a ventas si es una operación de venta
+        if (esVenta && cantidad && $monedaOperacion.value) {
+            const params = new URLSearchParams({
+                'moneda_origen': $monedaOperacion.value,
+                'moneda_destino': 'PYG',
+                'cantidad': cantidad
+            });
+            
+            if (cliente) {
+                params.append('cliente_id', cliente);
+            }
+            
+            url += '?' + params.toString();
+            window.location.href = url;
+        } else {
+            alert('La pantalla de ventas solo está disponible para operaciones de "Quiero Vender"');
         }
     });
 

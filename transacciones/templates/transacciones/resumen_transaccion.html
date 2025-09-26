@@ -87,12 +87,19 @@
         </div>
         <div class="card-body">
           <div class="row">
-            <!-- Información principal igual que la vista previa -->
+            <!-- Información principal adaptada según tipo de operación -->
             <div class="col-12">
+              {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
+              <div class="alert alert-primary alert-sm mb-3">
+                <i class="fas fa-hand-holding-usd me-1"></i>
+                <strong>Cliente vende:</strong> {{ resumen_detallado.total_cliente_formateado }}
+              </div>
+              {% else %}
               <div class="alert alert-primary alert-sm mb-3">
                 <i class="fas fa-info-circle me-1"></i>
                 <strong>Cliente debe pagar:</strong> {{ resumen_detallado.total_cliente_formateado }}
               </div>
+              {% endif %}
             </div>
             
             <!-- Columna izquierda: Desglose -->
@@ -103,32 +110,52 @@
               </div>
               
               <div class="mb-2">
+                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
+                <label class="text-muted small">Tasa de compra base:</label>
+                {% else %}
                 <label class="text-muted small">Tasa base ({{ resumen_detallado.tasa_cambio_tipo }}):</label>
+                {% endif %}
                 <div class="fw-bold">₲ {{ resumen_detallado.tasa_base|floatformat:4 }}</div>
               </div>
               
               {% if resumen_detallado.cliente and resumen_detallado.cliente.descuento > 0 %}
               <div class="mb-2">
+                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
+                <label class="text-muted small">Tasa con {{ resumen_detallado.cliente.descuento }}% descuento VIP:</label>
+                {% else %}
                 <label class="text-muted small">Tasa ajustada (con {{ resumen_detallado.cliente.descuento }}% descuento):</label>
+                {% endif %}
                 <div class="fw-bold text-success">₲ {{ resumen_detallado.tasa_ajustada|floatformat:4 }}</div>
               </div>
               {% else %}
               <div class="mb-2">
+                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
+                <label class="text-muted small">Tasa de compra aplicada:</label>
+                {% else %}
                 <label class="text-muted small">Tasa utilizada ({{ resumen_detallado.tasa_cambio_tipo }}):</label>
+                {% endif %}
                 <div class="fw-bold">₲ {{ resumen_detallado.tasa_cambio|floatformat:4 }}</div>
               </div>
               {% endif %}
               
               {% if resumen_detallado.comision_cobro > 0 %}
               <div class="mb-2">
+                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
+                <label class="text-muted small">Comisión por recibir {{ transaccion.moneda_origen.codigo }}:</label>
+                {% else %}
                 <label class="text-muted small">Comisión cobro:</label>
+                {% endif %}
                 <div class="text-danger">- {{ resumen_detallado.comision_cobro_formateado }} ({{ resumen_detallado.metodo_cobro.comision }}%)</div>
               </div>
               {% endif %}
               
               {% if resumen_detallado.comision_pago > 0 %}
               <div class="mb-2">
+                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
+                <label class="text-muted small">Comisión por entregar PYG:</label>
+                {% else %}
                 <label class="text-muted small">Comisión entrega:</label>
+                {% endif %}
                 <div class="text-danger">- {{ resumen_detallado.comision_pago_formateado }} ({{ resumen_detallado.metodo_pago.comision }}%)</div>
               </div>
               {% endif %}
@@ -138,8 +165,13 @@
             <!-- Columna derecha: Lo que recibe (destacado) -->
             <div class="col-md-6">
               <div class="alert alert-success alert-sm mb-3">
-                <i class="fas fa-gift me-1"></i>
-                <strong>Cliente recibira:</strong> {{ resumen_detallado.monto_recibe_formateado }}
+                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
+                <i class="fas fa-money-bill-wave me-1"></i>
+                <strong>Cliente recibirá:</strong> {{ resumen_detallado.monto_recibe_formateado }}
+                {% else %}
+                <i class="fas fa-money-bill-wave me-1"></i>
+                <strong>Cliente recibirá:</strong> {{ resumen_detallado.monto_recibe_formateado }}
+                {% endif %}
               </div>
               
               {% if resumen_detallado.cliente %}

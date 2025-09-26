@@ -28,6 +28,22 @@
                 </div>
             </div>
         </div>
+        <!-- Vender Divisas (acceso directo) -->
+        <div class="col">
+            <div class="card h-100 shadow-sm border-warning">
+                <div class="card-body">
+                    <i class="fas fa-hand-holding-usd fa-3x text-warning mb-3"></i>
+                    <h5 class="card-title">Vender Divisas</h5>
+                    <p class="card-text">Realiza transacciones de venta de divisas directamente.</p>
+                </div>
+                <div class="card-footer bg-light">
+                    <a href="{% url 'transacciones:vender_divisas' %}" class="btn btn-warning w-100">
+                        <i class="fas fa-hand-holding-usd me-1"></i>
+                        Vender Ahora
+                    </a>
+                </div>
+            </div>
+        </div>
         <!-- Simulador de cambio (acceso público) -->
         <div class="col">
             <div class="card h-100 shadow-sm">
