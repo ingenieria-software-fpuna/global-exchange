@@ -214,7 +214,8 @@ def iniciar_compra(request):
         )
         
         if not resultado['success']:
-            messages.error(request, resultado['message'])
+            error_msg = resultado.get('error', 'Error desconocido en el cálculo')
+            messages.error(request, f'Error en el cálculo: {error_msg}')
             return redirect('tasa_cambio:dashboard')
         
         # Crear la transacción
@@ -224,6 +225,11 @@ def iniciar_compra(request):
             
             # Usar los datos de la nueva función de cálculo
             data = resultado['data']
+            
+            # Calcular porcentajes de comisión correctos
+            porcentaje_comision_total = Decimal('0')
+            if monto > 0:
+                porcentaje_comision_total = (Decimal(str(data.get('comision_total', 0))) / monto * Decimal('100')).quantize(Decimal('0.0001'))
             
             nueva_transaccion = Transaccion(
                 cliente=cliente,
@@ -236,10 +242,10 @@ def iniciar_compra(request):
                 metodo_cobro=metodo_cobro,  # Para compras, usamos método de cobro
                 metodo_pago=metodo_pago,    # Para compatibilidad con dashboard antiguo
                 tasa_cambio=Decimal(str(data['precio_usado'])),  # Tasa ajustada con descuento
-                porcentaje_comision=Decimal(str(data.get('comision_total', 0))),
-                monto_comision=Decimal(str(data.get('comision_total', 0))),
-                porcentaje_descuento=Decimal(str(data.get('descuento_pct', 0))),
-                monto_descuento=Decimal(str(data.get('descuento_aplicado', 0))),
+                porcentaje_comision=porcentaje_comision_total,  # Porcentaje calculado correctamente
+                monto_comision=Decimal(str(data.get('comision_total', 0))),  # Monto total de comisión
+                porcentaje_descuento=Decimal(str(data.get('descuento_pct', 0))),  # Porcentaje de descuento del cliente
+                monto_descuento=Decimal(str(data.get('descuento_aplicado', 0))),  # Monto de descuento aplicado
                 estado=estado_pendiente,
                 ip_cliente=get_client_ip(request)
             )

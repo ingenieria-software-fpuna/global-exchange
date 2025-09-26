@@ -346,63 +346,28 @@ document.addEventListener('DOMContentLoaded', function() {
                             `;
                             previewContent.innerHTML += infoLimites;
                         }
-                        btnComprar.disabled = !validarFormularioCompleto();
+                        const formularioCompleto = validarFormularioCompleto();
+                        btnComprar.disabled = !formularioCompleto;
                     }
                 } catch (limitesError) {
-                    console.warn('Error al validar límites:', limitesError);
-                    btnComprar.disabled = !validarFormularioCompleto(); // Validar formulario aunque no se puedan validar límites
+                    const formularioCompleto = validarFormularioCompleto();
+                    btnComprar.disabled = !formularioCompleto; // Validar formulario aunque no se puedan validar límites
                 }
                 
                 preview.style.display = 'block';
             } else {
-                console.error('Error en cálculo:', result.error);
                 previewContent.innerHTML = `<div class="text-danger">Error: ${result.error || 'Error desconocido'}</div>`;
                 preview.style.display = 'block';
                 btnComprar.disabled = true;
             }
         } catch (error) {
-            console.error('Error al calcular:', error);
             previewContent.innerHTML = '<div class="text-danger">Error al calcular. Intente nuevamente.</div>';
             preview.style.display = 'block';
             btnComprar.disabled = true;
         }
     }
     
-    // Función para mostrar información de límites
-    async function mostrarInfoLimites() {
-        const infoLimites = document.getElementById('info-limites');
-        const contenidoLimites = document.getElementById('contenido-limites');
-        
-        if (!monto.value || parseFloat(monto.value) <= 0) {
-            infoLimites.style.display = 'none';
-            return;
-        }
-        
-        try {
-            const params = new URLSearchParams({
-                monto: monto.value,
-                moneda_origen: 'PYG'
-            });
-            if (cliente.value) params.append('cliente_id', cliente.value);
-            
-            const response = await fetch(`{% url 'transacciones:api_validar_limites' %}?${params.toString()}`);
-            const result = await response.json();
-            
-            if (result.limites_aplicados && result.limites_aplicados.length > 0) {
-                contenidoLimites.innerHTML = `
-                    <ul class="mb-0">
-                        ${result.limites_aplicados.map(limite => `<li>${limite}</li>`).join('')}
-                    </ul>
-                `;
-                infoLimites.style.display = 'block';
-            } else {
-                infoLimites.style.display = 'none';
-            }
-        } catch (error) {
-            console.warn('Error al obtener información de límites:', error);
-            infoLimites.style.display = 'none';
-        }
-    }
+    // La información de límites se muestra directamente en el preview después del cálculo
 
     // Función para actualizar métodos de pago según moneda destino
     function actualizarMetodosPago() {
@@ -456,7 +421,6 @@ document.addEventListener('DOMContentLoaded', function() {
         element.addEventListener('change', function() {
             if (monto.value && parseFloat(monto.value) > 0) {
                 calcularPreview();
-                mostrarInfoLimites();
             } else {
                 // Si no hay monto válido, deshabilitar botón
                 btnComprar.disabled = true;
@@ -471,14 +435,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!validarFormularioCompleto()) {
                 btnComprar.disabled = true;
             }
-        });
-    });
-    
-    // Mostrar límites cuando se cargue la página o cambien valores críticos
-    [monto, cliente].forEach(element => {
-        element.addEventListener('input', function() {
-            clearTimeout(element.limitesTimer);
-            element.limitesTimer = setTimeout(mostrarInfoLimites, 300);
         });
     });
     
@@ -527,7 +483,16 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => {
             if (response.redirected) {
-                window.location.href = response.url;
+                // Si fue redirigido al dashboard, algo salió mal
+                if (response.url.includes('dashboard')) {
+                    // No redirigir automáticamente, mostrar error
+                    return response.text().then(text => {
+                        throw new Error('La transacción fue rechazada por el servidor');
+                    });
+                } else {
+                    // Redirección exitosa (probablemente al resumen)
+                    window.location.href = response.url;
+                }
             } else {
                 return response.text().then(text => {
                     throw new Error('Error en la respuesta del servidor');
@@ -535,8 +500,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('Error al procesar la compra. Intente nuevamente.');
+            alert('Error al procesar la compra: ' + error.message);
             btnComprar.disabled = false;
             btnComprar.innerHTML = '<i class="fas fa-shopping-cart me-1"></i>Proceder con la Compra';
         });
