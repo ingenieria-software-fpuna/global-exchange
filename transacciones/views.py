@@ -316,11 +316,22 @@ def procesar_pago(request, transaccion_id):
     if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
         messages.error(request, 'Esta transacción ya no se puede procesar.')
         return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
-    
+
     if transaccion.esta_expirada():
         # Marcar como cancelada automáticamente
         transaccion.cancelar_por_expiracion()
         messages.error(request, 'La transacción ha expirado y fue cancelada automáticamente.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+    # Verificar que la tasa de cambio sigue siendo actual
+    if not transaccion.tiene_tasa_actualizada():
+        # Cancelar la transacción por cambio de tasa
+        transaccion.cancelar_por_cambio_tasa()
+        messages.error(
+            request,
+            'La tasa de cambio ha sido modificada. Esta transacción fue cancelada automáticamente. '
+            'Por favor, crea una nueva transacción con la tasa actual.'
+        )
         return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
     
     # Procesar el 'pago' (por ahora solo cambiar estado)

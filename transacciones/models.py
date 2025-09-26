@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.core.validators import MinValueValidator
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -487,12 +488,12 @@ class Transaccion(models.Model):
     def get_tasa_base(self):
         """Obtiene la tasa base (sin ajustes por cliente) consultando la TasaCambio actual"""
         from tasa_cambio.models import TasaCambio
-        
+
         try:
             if self.moneda_origen.codigo == 'PYG':
                 # Para compras (PYG -> otra moneda)
                 tasa_actual = TasaCambio.objects.filter(
-                    moneda=self.moneda_destino, 
+                    moneda=self.moneda_destino,
                     es_activa=True
                 ).first()
                 if tasa_actual:
@@ -501,13 +502,82 @@ class Transaccion(models.Model):
             else:
                 # Para ventas (otra moneda -> PYG)
                 tasa_actual = TasaCambio.objects.filter(
-                    moneda=self.moneda_origen, 
+                    moneda=self.moneda_origen,
                     es_activa=True
                 ).first()
                 if tasa_actual:
                     return float(tasa_actual.precio_base - tasa_actual.comision_compra)
         except:
             pass
-        
+
         # Si no se puede obtener la tasa actual, devolver la que está guardada
         return float(self.tasa_cambio)
+
+    def tiene_tasa_actualizada(self):
+        """Verifica si la transacción tiene la tasa de cambio actualizada"""
+        from tasa_cambio.models import TasaCambio
+        from decimal import Decimal
+
+        try:
+            # Determinar qué moneda buscar en TasaCambio
+            if self.moneda_origen.codigo == 'PYG':
+                # Para compras (PYG -> otra moneda), buscar tasa de la moneda destino
+                tasa_actual = TasaCambio.objects.filter(
+                    moneda=self.moneda_destino,
+                    es_activa=True
+                ).first()
+                if tasa_actual:
+                    # Calcular tasa de venta actual
+                    tasa_actual_valor = Decimal(str(tasa_actual.precio_base + tasa_actual.comision_venta))
+                else:
+                    return False
+            else:
+                # Para ventas (otra moneda -> PYG), buscar tasa de la moneda origen
+                tasa_actual = TasaCambio.objects.filter(
+                    moneda=self.moneda_origen,
+                    es_activa=True
+                ).first()
+                if tasa_actual:
+                    # Calcular tasa de compra actual
+                    tasa_actual_valor = Decimal(str(tasa_actual.precio_base - tasa_actual.comision_compra))
+                else:
+                    return False
+
+            # Comparar con la tasa guardada en la transacción (con tolerancia mínima)
+            diferencia = abs(tasa_actual_valor - self.tasa_cambio)
+            tolerancia = Decimal('0.01')  # Tolerancia de 1 centavo
+
+            return diferencia <= tolerancia
+
+        except Exception:
+            return False
+
+    def cancelar_por_cambio_tasa(self):
+        """Cancela la transacción por cambio en la tasa de cambio"""
+        if self.estado.codigo == EstadoTransaccion.PENDIENTE:
+            estado_cancelada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.CANCELADA)
+            self.estado = estado_cancelada
+            self.observaciones += f"\nCancelada automáticamente por cambio en tasa de cambio el {timezone.now()}"
+            self.save(update_fields=['estado', 'observaciones', 'fecha_actualizacion'])
+            return True
+        return False
+
+    @classmethod
+    def cancelar_pendientes_por_moneda(cls, moneda):
+        """Cancela todas las transacciones pendientes que involucren una moneda específica"""
+        from django.db import transaction as db_transaction
+
+        # Buscar transacciones pendientes que usen la moneda como origen o destino
+        transacciones_pendientes = cls.objects.filter(
+            estado__codigo=EstadoTransaccion.PENDIENTE
+        ).filter(
+            Q(moneda_origen=moneda) | Q(moneda_destino=moneda)
+        )
+
+        canceladas = 0
+        with db_transaction.atomic():
+            for transaccion in transacciones_pendientes:
+                if transaccion.cancelar_por_cambio_tasa():
+                    canceladas += 1
+
+        return canceladas
