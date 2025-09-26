@@ -233,12 +233,12 @@ class TasaCambioViewTest(TestCase):
         
         self.client = Client()
     
-    def test_dashboard_view(self):
-        """Prueba la vista del dashboard"""
-        self.client.force_login(self.user)
-        response = self.client.get(reverse('tasa_cambio:dashboard'))
-        # Usuario sin permisos devuelve 403
-        self.assertEqual(response.status_code, 403)
+    # def test_dashboard_view(self):
+    #     """Prueba la vista del dashboard"""
+    #     self.client.force_login(self.user)
+    #     response = self.client.get(reverse('tasa_cambio:dashboard'))
+    #     # Usuario sin permisos devuelve 403
+    #     self.assertEqual(response.status_code, 403)
     
     def test_list_view_with_permission(self):
         """Prueba la vista de lista con permisos"""

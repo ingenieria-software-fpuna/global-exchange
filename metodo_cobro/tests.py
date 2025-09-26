@@ -34,7 +34,8 @@ class MetodoCobroTestCase(TestCase):
         """Prueba la representación en string del modelo"""
         metodo = MetodoCobro.objects.create(
             nombre="Efectivo",
-            descripcion="Pago en efectivo"
+            descripcion="Pago en efectivo",
+            comision=0.0
         )
         self.assertEqual(str(metodo), "Efectivo")
 
@@ -42,7 +43,8 @@ class MetodoCobroTestCase(TestCase):
         """Prueba la relación many-to-many con monedas"""
         metodo = MetodoCobro.objects.create(
             nombre="Cheque",
-            descripcion="Pago con cheque"
+            descripcion="Pago con cheque",
+            comision=2.0
         )
         metodo.monedas_permitidas.add(self.pyg, self.usd, self.eur)
         
