@@ -303,12 +303,25 @@ class UsuarioSelectorWidget(forms.SelectMultiple):
                     var checkbox = row.querySelector('.user-checkbox');
                     if (checkbox) {{
                         checkbox.checked = !checkbox.checked;
-                        updateUIFast(); // Actualización inmediata
                         
-                        // Trigger change event para mantener consistencia
-                        var event = new Event('change');
-                        event.bubbles = true;
-                        checkbox.dispatchEvent(event);
+                        // Actualizar UI inmediatamente
+                        updateUIFast();
+                        
+                        // Actualizar el select original inmediatamente
+                        updateOriginalSelect();
+                        
+                        // Actualizar el estado del "seleccionar todo" checkbox
+                        var allVisible = document.querySelectorAll('tr[data-widget="' + widgetId + '"].usuario-row:not([style*="display: none"]) .user-checkbox');
+                        var allChecked = true;
+                        for (var i = 0; i < allVisible.length; i++) {{
+                            if (!allVisible[i].checked) {{
+                                allChecked = false;
+                                break;
+                            }}
+                        }}
+                        if (selectAllCheckbox) {{
+                            selectAllCheckbox.checked = allVisible.length > 0 && allChecked;
+                        }}
                     }}
                 }}
             }});

@@ -2,11 +2,13 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 from decimal import Decimal
+from django.contrib.auth import get_user_model
 
 from monedas.models import Moneda
 from tasa_cambio.models import TasaCambio
 from metodo_pago.models import MetodoPago
-from django.contrib.auth.models import User
+
+User = get_user_model()
 
 
 class SimularCambioAPITest(TestCase):
@@ -14,9 +16,15 @@ class SimularCambioAPITest(TestCase):
 
     def setUp(self):
         # Usuario (login no requerido por el endpoint, pero es consistente con otras pruebas)
-        self.user = User.objects.create_user(username='apiuser', password='pass1234')
+        self.user = User.objects.create_user(
+            email='apiuser@example.com',
+            password='pass1234',
+            nombre='API',
+            apellido='User',
+            cedula='12345678'
+        )
         self.client = Client()
-        self.client.login(username='apiuser', password='pass1234')
+        self.client.login(username='apiuser@example.com', password='pass1234')
 
         # Moneda USD y tasa activa
         self.usd = Moneda.objects.create(
@@ -28,9 +36,9 @@ class SimularCambioAPITest(TestCase):
         )
         self.tasa = TasaCambio.objects.create(
             moneda=self.usd,
-            tasa_compra=Decimal('9000.00'),  # 1 USD -> 9000 PYG
-            tasa_venta=Decimal('10000.00'),  # 1 USD cuesta 10000 PYG
-            fecha_vigencia=timezone.now(),
+            precio_base=9500,  # Precio base en guaraníes
+            comision_compra=500,  # Comisión de compra: 9500 - 500 = 9000
+            comision_venta=500,   # Comisión de venta: 9500 + 500 = 10000
             es_activa=True,
         )
 

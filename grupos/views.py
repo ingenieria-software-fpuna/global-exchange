@@ -10,12 +10,13 @@ from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from .models import Grupo
+from .forms import GrupoCreationForm, GrupoUpdateForm
 
 # Vista para listar grupos
 class GroupListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     model = Grupo
     template_name = 'grupos/group_list.html'
-    context_object_name = 'groups'
+    context_object_name = 'grupos'
     permission_required = 'auth.view_group'
     paginate_by = 20
 
@@ -42,56 +43,44 @@ class GroupListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['q'] = self.request.GET.get('q', '')
-        context['estado_filter'] = self.request.GET.get('estado', '')
+        context['estado'] = self.request.GET.get('estado', '')
         return context
 
 # Vista para crear grupo
 class GroupCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = Grupo
+    form_class = GrupoCreationForm
     template_name = 'grupos/group_form.html'
-    fields = ['es_activo']
     success_url = reverse_lazy('grupos:group_list')
     permission_required = 'auth.add_group'
-
-    def form_valid(self, form):
-        # Crear el grupo de Django primero
-        group_name = self.request.POST.get('name')
-        if not group_name:
-            messages.error(self.request, "El nombre del grupo es requerido.")
-            return self.form_invalid(form)
-        
-        django_group = Group.objects.create(name=group_name)
-        form.instance.group = django_group
-        messages.success(self.request, "Grupo creado exitosamente.")
-        return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['titulo'] = 'Crear Nuevo Grupo'
+        context['accion'] = 'Crear'
         return context
+
+    def form_valid(self, form):
+        messages.success(self.request, "Grupo creado exitosamente.")
+        return super().form_valid(form)
 
 # Vista para editar grupo
 class GroupUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = Grupo
+    form_class = GrupoUpdateForm
     template_name = 'grupos/group_form.html'
-    fields = ['es_activo']
     success_url = reverse_lazy('grupos:group_list')
     permission_required = 'auth.change_group'
-
-    def form_valid(self, form):
-        # Actualizar el nombre del grupo de Django si se proporciona
-        group_name = self.request.POST.get('name')
-        if group_name and group_name != self.object.group.name:
-            self.object.group.name = group_name
-            self.object.group.save()
-        
-        messages.success(self.request, "Grupo actualizado exitosamente.")
-        return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['titulo'] = f'Editar Grupo: {self.object.group.name}'
+        context['accion'] = 'Actualizar'
         return context
+
+    def form_valid(self, form):
+        messages.success(self.request, "Grupo actualizado exitosamente.")
+        return super().form_valid(form)
 
 
 

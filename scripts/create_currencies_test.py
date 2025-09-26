@@ -22,84 +22,103 @@ def crear_monedas_ejemplo():
     
     monedas_datos = [
         {
+            'nombre': 'Guaraní',
+            'codigo': 'PYG',
+            'simbolo': '₲',
+            'decimales': 0,
+            'precio_base': Decimal('1.00'),
+            'comision_compra': Decimal('0.00'),
+            'comision_venta': Decimal('0.00')
+        },
+        {
             'nombre': 'Dólar Estadounidense',
             'codigo': 'USD',
             'simbolo': '$',
             'decimales': 2,
-            'tasa_compra': Decimal('7200.00'),
-            'tasa_venta': Decimal('7300.00')
+            'precio_base': Decimal('7500.00'),
+            'comision_compra': Decimal('300.00'),
+            'comision_venta': Decimal('200.00')
         },
         {
             'nombre': 'Euro',
             'codigo': 'EUR',
             'simbolo': '€',
             'decimales': 2,
-            'tasa_compra': Decimal('7800.00'),
-            'tasa_venta': Decimal('7900.00')
+            'precio_base': Decimal('8200.00'),
+            'comision_compra': Decimal('400.00'),
+            'comision_venta': Decimal('300.00')
         },
         {
             'nombre': 'Real Brasileño',
             'codigo': 'BRL',
             'simbolo': 'R$',
             'decimales': 2,
-            'tasa_compra': Decimal('1430.00'),
-            'tasa_venta': Decimal('1470.00')
+            'precio_base': Decimal('1500.00'),
+            'comision_compra': Decimal('70.00'),
+            'comision_venta': Decimal('50.00')
         },
         {
             'nombre': 'Peso Argentino',
             'codigo': 'ARS',
             'simbolo': '$',
             'decimales': 2,
-            'tasa_compra': Decimal('8.40'),
-            'tasa_venta': Decimal('8.60')
+            'precio_base': Decimal('8.50'),
+            'comision_compra': Decimal('0.10'),
+            'comision_venta': Decimal('0.10')
         },
         {
             'nombre': 'Libra Esterlina',
             'codigo': 'GBP',
             'simbolo': '£',
             'decimales': 2,
-            'tasa_compra': Decimal('9200.00'),
-            'tasa_venta': Decimal('9400.00')
+            'precio_base': Decimal('9500.00'),
+            'comision_compra': Decimal('300.00'),
+            'comision_venta': Decimal('200.00')
         },
         {
             'nombre': 'Yen Japonés',
             'codigo': 'JPY',
             'simbolo': '¥',
             'decimales': 0,
-            'tasa_compra': Decimal('48.00'),
-            'tasa_venta': Decimal('52.00')
+            'precio_base': Decimal('50.00'),
+            'comision_compra': Decimal('2.00'),
+            'comision_venta': Decimal('2.00')
         },
         {
             'nombre': 'Dólar Canadiense',
             'codigo': 'CAD',
             'simbolo': 'C$',
             'decimales': 2,
-            'tasa_compra': Decimal('5300.00'),
-            'tasa_venta': Decimal('5400.00')
+            'precio_base': Decimal('5500.00'),
+            'comision_compra': Decimal('200.00'),
+            'comision_venta': Decimal('150.00')
         },
         {
             'nombre': 'Franco Suizo',
             'codigo': 'CHF',
             'simbolo': 'CHF',
             'decimales': 2,
-            'tasa_compra': Decimal('8200.00'),
-            'tasa_venta': Decimal('8300.00')
+            'precio_base': Decimal('8500.00'),
+            'comision_compra': Decimal('300.00'),
+            'comision_venta': Decimal('200.00')
         },
         {
             'nombre': 'Dólar Australiano',
             'codigo': 'AUD',
             'simbolo': 'A$',
             'decimales': 2,
-            'tasa_compra': Decimal('4800.00'),
-            'tasa_venta': Decimal('4900.00')
+            'precio_base': Decimal('5000.00'),
+            'comision_compra': Decimal('200.00'),
+            'comision_venta': Decimal('100.00')
         },
         {
             'nombre': 'Yuan Chino',
             'codigo': 'CNY',
             'simbolo': '¥',
             'decimales': 2,
-            'tasa_compra': Decimal('1000.00'),
-            'tasa_venta': Decimal('1020.00')
+            'precio_base': Decimal('1050.00'),
+            'comision_compra': Decimal('50.00'),
+            'comision_venta': Decimal('30.00')
         }
     ]
     
@@ -135,12 +154,15 @@ def crear_monedas_ejemplo():
         if not tasa_existente:
             TasaCambio.objects.create(
                 moneda=moneda,
-                tasa_compra=datos['tasa_compra'],
-                tasa_venta=datos['tasa_venta'],
-                fecha_vigencia=timezone.now(),
+                precio_base=datos['precio_base'],
+                comision_compra=datos['comision_compra'],
+                comision_venta=datos['comision_venta'],
                 es_activa=True
             )
-            print(f"    ✅ Tasa de cambio creada: Compra {datos['tasa_compra']} - Venta {datos['tasa_venta']}")
+            # Calcular precios para mostrar
+            precio_compra = datos['precio_base'] - datos['comision_compra']
+            precio_venta = datos['precio_base'] + datos['comision_venta']
+            print(f"    ✅ Tasa de cambio creada: Base {datos['precio_base']} (Compra {precio_compra} - Venta {precio_venta})")
             tasas_creadas += 1
         else:
             print(f"    ℹ️  Tasa de cambio ya existe para {moneda.codigo}")

@@ -3,6 +3,19 @@ from django import forms
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.models import Group
 from datetime import date
+
+class DateInput(forms.DateInput):
+    """Widget personalizado para campos de fecha que asegura formato YYYY-MM-DD para HTML5"""
+    input_type = 'date'
+    
+    def format_value(self, value):
+        """Formatear el valor para que sea compatible con input type='date'"""
+        if value is None:
+            return ''
+        if hasattr(value, 'strftime'):
+            return value.strftime('%Y-%m-%d')
+        return str(value)
+
 class LoginForm(forms.Form):
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Correo electrónico'}),
@@ -28,7 +41,7 @@ class LoginForm(forms.Form):
 
 Usuario = get_user_model()
 class UsuarioCreationForm(forms.ModelForm):
-    password = forms.CharField(label="Contraseña", widget=forms.PasswordInput(attrs={'class': 'form-control'}))
+    password1 = forms.CharField(label="Contraseña", widget=forms.PasswordInput(attrs={'class': 'form-control'}))
     password2 = forms.CharField(label="Repetir Contraseña", widget=forms.PasswordInput(attrs={'class': 'form-control'}))
     groups = forms.ModelMultipleChoiceField(
         queryset=Group.objects.all().order_by('name'),
@@ -45,14 +58,14 @@ class UsuarioCreationForm(forms.ModelForm):
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),
             'apellido': forms.TextInput(attrs={'class': 'form-control'}),
             'cedula': forms.TextInput(attrs={'class': 'form-control'}),
-            'fecha_nacimiento': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'fecha_nacimiento': DateInput(attrs={'class': 'form-control'}),
         }
 
     def clean(self):
         cleaned_data = super().clean()
-        password = cleaned_data.get("password")
+        password1 = cleaned_data.get("password1")
         password2 = cleaned_data.get("password2")
-        if password and password2 and password != password2:
+        if password1 and password2 and password1 != password2:
             raise forms.ValidationError("Las contraseñas no coinciden.")
         return cleaned_data
     
@@ -69,7 +82,8 @@ class UsuarioCreationForm(forms.ModelForm):
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        user.set_password(self.cleaned_data["password"])
+        user.set_password(self.cleaned_data["password1"])
+        user.es_activo = True
         if commit:
             user.save()
 
@@ -95,7 +109,7 @@ class UsuarioUpdateForm(forms.ModelForm):
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),
             'apellido': forms.TextInput(attrs={'class': 'form-control'}),
             'cedula': forms.TextInput(attrs={'class': 'form-control'}),
-            'fecha_nacimiento': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'fecha_nacimiento': DateInput(attrs={'class': 'form-control'}),
         }
     
     def clean_fecha_nacimiento(self):
@@ -118,6 +132,9 @@ class UsuarioUpdateForm(forms.ModelForm):
         # Pre-cargar grupos asignados al usuario
         if self.instance and self.instance.pk:
             self.fields['groups'].initial = self.instance.groups.values_list('pk', flat=True)
+            # Asegurar que la fecha de nacimiento se muestre correctamente en el campo
+            if self.instance.fecha_nacimiento:
+                self.fields['fecha_nacimiento'].initial = self.instance.fecha_nacimiento.strftime('%Y-%m-%d')
 
     def save(self, commit=True):
         user = super().save(commit=commit)

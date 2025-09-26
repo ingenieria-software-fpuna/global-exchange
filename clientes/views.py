@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth.decorators import login_required, permission_required
@@ -8,39 +8,89 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from .models import TipoCliente, Cliente
-from .forms import ClienteForm
+from .forms import ClienteForm, ClienteUpdateForm, TipoClienteForm, TipoClienteUpdateForm
 
 # Create your views here.
 
 class TipoClienteListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     model = TipoCliente
     template_name = 'clientes/tipocliente_list.html'
-    context_object_name = 'tipos_cliente'
+    context_object_name = 'tipos'
     paginate_by = 10
     permission_required = 'clientes.view_tipocliente'
 
+    def get_queryset(self):
+        queryset = TipoCliente.objects.all()
+        
+        # Filtro de búsqueda
+        q = self.request.GET.get('q')
+        if q:
+            queryset = queryset.filter(
+                Q(nombre__icontains=q) |
+                Q(descripcion__icontains=q)
+            )
+        
+        # Filtro por estado
+        estado = self.request.GET.get('estado')
+        if estado == 'activo':
+            queryset = queryset.filter(activo=True)
+        elif estado == 'inactivo':
+            queryset = queryset.filter(activo=False)
+        
+        return queryset.order_by('nombre')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['q'] = self.request.GET.get('q', '')
+        context['estado'] = self.request.GET.get('estado', '')
+        context['can_create_tipocliente'] = self.request.user.has_perm('clientes.add_tipocliente')
+        context['can_edit_tipocliente'] = self.request.user.has_perm('clientes.change_tipocliente')
+        return context
+
 class TipoClienteCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = TipoCliente
+    form_class = TipoClienteForm
     template_name = 'clientes/tipocliente_form.html'
-    fields = ['nombre', 'descripcion', 'descuento', 'activo']
     success_url = reverse_lazy('clientes:tipocliente_list')
     permission_required = 'clientes.add_tipocliente'
-    
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = 'Crear Tipo de Cliente'
+        context['accion'] = 'Crear'
+        return context
+
     def form_valid(self, form):
         messages.success(self.request, 'Tipo de cliente creado exitosamente.')
         return super().form_valid(form)
 
 class TipoClienteUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = TipoCliente
+    form_class = TipoClienteUpdateForm
     template_name = 'clientes/tipocliente_form.html'
-    fields = ['nombre', 'descripcion', 'descuento', 'activo']
     success_url = reverse_lazy('clientes:tipocliente_list')
     permission_required = 'clientes.change_tipocliente'
-    
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = f'Editar Tipo de Cliente: {self.object.nombre}'
+        context['accion'] = 'Actualizar'
+        return context
+
     def form_valid(self, form):
         messages.success(self.request, 'Tipo de cliente actualizado exitosamente.')
         return super().form_valid(form)
 
+class TipoClienteDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
+    model = TipoCliente
+    template_name = 'clientes/tipocliente_confirm_delete.html'
+    success_url = reverse_lazy('clientes:tipocliente_list')
+    permission_required = 'clientes.delete_tipocliente'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Eliminar Tipo de Cliente'
+        return context
 
 
 # Vistas para Clientes
@@ -82,6 +132,8 @@ class ClienteListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         context['q'] = self.request.GET.get('q', '')
         context['tipo_cliente_filter'] = self.request.GET.get('tipo_cliente', '')
         context['estado_filter'] = self.request.GET.get('estado', '')
+        context['can_create_cliente'] = self.request.user.has_perm('clientes.add_cliente')
+        context['can_edit_cliente'] = self.request.user.has_perm('clientes.change_cliente')
         return context
 
 class ClienteCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
@@ -90,6 +142,12 @@ class ClienteCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView)
     template_name = 'clientes/cliente_form.html'
     success_url = reverse_lazy('clientes:cliente_list')
     permission_required = 'clientes.add_cliente'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = 'Crear Cliente'
+        context['accion'] = 'Crear'
+        return context
     
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -109,10 +167,16 @@ class ClienteCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView)
 
 class ClienteUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = Cliente
-    form_class = ClienteForm
+    form_class = ClienteUpdateForm
     template_name = 'clientes/cliente_form.html'
     success_url = reverse_lazy('clientes:cliente_list')
     permission_required = 'clientes.change_cliente'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = f'Editar Cliente: {self.object.nombre_comercial}'
+        context['accion'] = 'Actualizar'
+        return context
     
     def form_valid(self, form):
         response = super().form_valid(form)

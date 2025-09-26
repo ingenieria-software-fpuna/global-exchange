@@ -1,5 +1,5 @@
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -28,6 +28,12 @@ class UsuarioCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView)
     success_url = reverse_lazy('usuarios:user_list')
     permission_required = 'usuarios.add_usuario'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = 'Crear Usuario'
+        context['accion'] = 'Crear'
+        return context
+
     def form_valid(self, form):
         messages.success(self.request, "Usuario creado exitosamente.")
         return super().form_valid(form)
@@ -39,6 +45,12 @@ class UsuarioUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView)
     template_name = 'usuarios/user_form.html'
     success_url = reverse_lazy('usuarios:user_list')
     permission_required = 'usuarios.change_usuario'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = 'Editar Usuario'
+        context['accion'] = 'Actualizar'
+        return context
 
     def form_valid(self, form):
         messages.success(self.request, "Usuario actualizado exitosamente.")
@@ -94,3 +106,16 @@ def toggle_usuario_status(request, pk):
             'success': False,
             'message': f'Error al cambiar el estado: {str(e)}'
         })
+
+
+# Vista para eliminar usuarios
+class UsuarioDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
+    model = Usuario
+    template_name = 'usuarios/user_confirm_delete.html'
+    success_url = reverse_lazy('usuarios:user_list')
+    permission_required = 'usuarios.delete_usuario'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Eliminar Usuario'
+        return context

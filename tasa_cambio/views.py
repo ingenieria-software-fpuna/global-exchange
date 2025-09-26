@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
-from django.views.generic import ListView, CreateView
+from django.views.generic import ListView, CreateView, DetailView
 from django.urls import reverse_lazy
 from django.db.models import Q
 from django.core.paginator import Paginator
@@ -18,19 +18,21 @@ from .forms import TasaCambioForm, TasaCambioSearchForm
 from monedas.models import Moneda
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from metodo_pago.models import MetodoPago
+from metodo_cobro.models import MetodoCobro
 
 
 class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
-    """Vista para listar todas las tasas de cambio"""
+    """Vista para listar las cotizaciones actuales (activas)"""
     model = TasaCambio
     template_name = 'tasa_cambio/tasacambio_list.html'
-    context_object_name = 'tasas_cambio'
+    context_object_name = 'cotizaciones'
     permission_required = 'tasa_cambio.view_tasacambio'
     paginate_by = 20
 
     def get_queryset(self):
-        queryset = TasaCambio.objects.select_related('moneda').all()
-        
+        # Solo mostrar tasas activas por defecto
+        queryset = TasaCambio.objects.select_related('moneda').filter(es_activa=True)
+
         # Filtro de búsqueda
         q = self.request.GET.get('q')
         if q:
@@ -39,30 +41,13 @@ class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
                 Q(moneda__codigo__icontains=q) |
                 Q(moneda__simbolo__icontains=q)
             )
-        
+
         # Filtro por moneda específica
         moneda_id = self.request.GET.get('moneda')
         if moneda_id:
             queryset = queryset.filter(moneda_id=moneda_id)
-        
-        # Filtro por estado activo/inactivo
-        estado = self.request.GET.get('estado')
-        if estado == 'activo':
-            queryset = queryset.filter(es_activa=True)
-        elif estado == 'inactivo':
-            queryset = queryset.filter(es_activa=False)
-        
-        # Filtro por fecha desde
-        fecha_desde = self.request.GET.get('fecha_desde')
-        if fecha_desde:
-            queryset = queryset.filter(fecha_vigencia__date__gte=fecha_desde)
-        
-        # Filtro por fecha hasta
-        fecha_hasta = self.request.GET.get('fecha_hasta')
-        if fecha_hasta:
-            queryset = queryset.filter(fecha_vigencia__date__lte=fecha_hasta)
-        
-        return queryset.order_by('-fecha_vigencia', 'moneda__nombre')
+
+        return queryset.order_by('moneda__nombre')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -73,11 +58,69 @@ class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         context['estado'] = self.request.GET.get('estado', '')
         context['fecha_desde'] = self.request.GET.get('fecha_desde', '')
         context['fecha_hasta'] = self.request.GET.get('fecha_hasta', '')
+        context['monedas'] = Moneda.objects.filter(es_activa=True).order_by('nombre')
+        return context
+
+
+class TasaCambioHistorialView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    """Vista para mostrar el historial de cotizaciones de una moneda específica"""
+    model = TasaCambio
+    template_name = 'tasa_cambio/tasacambio_historial.html'
+    context_object_name = 'historial_tasas'
+    permission_required = 'tasa_cambio.view_tasacambio'
+    paginate_by = 20
+
+    def get_queryset(self):
+        self.moneda = get_object_or_404(Moneda, pk=self.kwargs['moneda_id'])
+        queryset = TasaCambio.objects.select_related('moneda').filter(
+            moneda=self.moneda
+        ).order_by('-fecha_creacion')
+
+        # Filtro por estado activo/inactivo
+        estado = self.request.GET.get('estado')
+        if estado == 'activo':
+            queryset = queryset.filter(es_activa=True)
+        elif estado == 'inactivo':
+            queryset = queryset.filter(es_activa=False)
+
+        # Filtro por fecha desde
+        fecha_desde = self.request.GET.get('fecha_desde')
+        if fecha_desde:
+            queryset = queryset.filter(fecha_creacion__date__gte=fecha_desde)
+
+        # Filtro por fecha hasta
+        fecha_hasta = self.request.GET.get('fecha_hasta')
+        if fecha_hasta:
+            queryset = queryset.filter(fecha_creacion__date__lte=fecha_hasta)
+
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['moneda'] = self.moneda
+        context['titulo'] = f'Historial de {self.moneda.nombre}'
+        context['estado'] = self.request.GET.get('estado', '')
+        context['fecha_desde'] = self.request.GET.get('fecha_desde', '')
+        context['fecha_hasta'] = self.request.GET.get('fecha_hasta', '')
+
+        # Datos para gráficos
+        historial_datos = list(self.get_queryset()[:50].values(
+            'fecha_creacion', 'precio_base', 'comision_compra',
+            'comision_venta', 'es_activa'
+        ))
+
+        # Calcular precios de compra y venta para el gráfico
+        for item in historial_datos:
+            item['precio_compra'] = float(item['precio_base']) - float(item['comision_compra'])
+            item['precio_venta'] = float(item['precio_base']) + float(item['comision_venta'])
+            item['fecha_str'] = item['fecha_creacion'].strftime('%Y-%m-%d %H:%M')
+
+        context['datos_grafico'] = json.dumps(historial_datos, default=str)
         return context
 
 
 class TasaCambioCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
-    """Vista para crear una nueva tasa de cambio"""
+    """Vista para crear una nueva cotización"""
     model = TasaCambio
     form_class = TasaCambioForm
     template_name = 'tasa_cambio/tasacambio_form.html'
@@ -91,10 +134,6 @@ class TasaCambioCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateVi
         return context
 
     def form_valid(self, form):
-        # Establecer fecha de vigencia si no se especifica
-        if not form.cleaned_data.get('fecha_vigencia'):
-            form.instance.fecha_vigencia = timezone.now()
-        
         # Verificar si había una cotización anterior para mostrar mensaje informativo
         moneda = form.instance.moneda
         
@@ -164,7 +203,6 @@ def tasacambio_detail_api(request, pk):
             'spread': float(tasacambio.spread),
             'spread_porcentual': round(tasacambio.spread_porcentual, 2),
             'es_activa': tasacambio.es_activa,
-            'fecha_vigencia': tasacambio.fecha_vigencia.strftime('%d/%m/%Y %H:%M'),
             'fecha_creacion': tasacambio.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
             'fecha_actualizacion': tasacambio.fecha_actualizacion.strftime('%d/%m/%Y %H:%M'),
         }
@@ -174,9 +212,9 @@ def tasacambio_detail_api(request, pk):
 
 
 @login_required
-@permission_required('tasa_cambio.view_tasacambio', raise_exception=True)
+# @permission_required('tasa_cambio.view_tasacambio', raise_exception=True)
 def dashboard_tasacambio(request):
-    """Vista del dashboard específico para tasas de cambio"""
+    """Vista del dashboard específico para cotizaciones"""
     # Monedas activas para el simulador (todas las activas)
     monedas_activas = Moneda.objects.filter(es_activa=True).order_by('nombre')
     # Clientes asociados al usuario
@@ -186,7 +224,7 @@ def dashboard_tasacambio(request):
     ).select_related('tipo_cliente').order_by('nombre_comercial')
 
     context = {
-        'titulo': 'Dashboard de Cotizaciones',
+        'titulo': 'Simulador de Cambio',
         'total_cotizaciones': TasaCambio.objects.count(),
         'cotizaciones_activas': TasaCambio.objects.filter(es_activa=True).count(),
         'cotizaciones_inactivas': TasaCambio.objects.filter(es_activa=False).count(),
@@ -194,7 +232,7 @@ def dashboard_tasacambio(request):
         'monedas_con_cotizacion': TasaCambio.objects.filter(es_activa=True).select_related('moneda').count(),
         'monedas': monedas_activas,
         'clientes': clientes_usuario,
-        'metodos_pago': MetodoPago.objects.filter(es_activo=True).order_by('nombre'),
+        # metodos_pago removidos - el dashboard ahora es solo simulador
     }
     
     return render(request, 'tasa_cambio/dashboard.html', context)
@@ -297,20 +335,25 @@ def simular_cambio_api(request):
         tasa_destino = get_tasa_activa(destino)
         if not tasa_destino:
             return JsonResponse({'success': False, 'message': f'No hay tasa activa para {destino.codigo}.'}, status=404)
-        # Ajustar tasa de venta por descuento (si corresponde)
-        tasa_venta_aplicada = Decimal(tasa_destino.tasa_venta)
+
+        # Calcular comisión de venta ajustada por descuento
+        comision_venta_ajustada = Decimal(tasa_destino.comision_venta)
         if descuento_pct > 0:
-            tasa_venta_aplicada = (tasa_venta_aplicada * (D('1') - (descuento_pct / D('100'))))
-        # De PYG a destino: usar tasa_venta (posiblemente ajustada)
-        resultado = (monto / tasa_venta_aplicada).quantize(Decimal('1.' + '0'*max(destino.decimales, 0)), rounding=ROUND_HALF_UP)
+            comision_venta_ajustada = comision_venta_ajustada * (D('1') - (descuento_pct / D('100')))
+        
+        # Calcular precio de venta: precio_base + comision_venta_ajustada
+        precio_venta = Decimal(tasa_destino.precio_base) + comision_venta_ajustada
+            
+        # De PYG a destino: usar precio de venta calculado
+        resultado = (monto / precio_venta).quantize(Decimal('1.' + '0'*max(destino.decimales, 0)), rounding=ROUND_HALF_UP)
         tasa_destino_usada = {
             'moneda': destino.codigo,
             'tipo': 'venta' + (' (ajustada)' if descuento_pct > 0 else ''),
-            'valor': float(tasa_venta_aplicada),
+            'valor': float(precio_venta),
         }
-        detalle = f"PYG -> {destino.codigo} usando tasa de venta"
+        detalle = f"PYG -> {destino.codigo} usando precio de venta"
         if descuento_pct > 0:
-            detalle += f" con descuento {descuento_pct}%"
+            detalle += f" con descuento {descuento_pct}% en comisión"
         resultado_formateado = destino.mostrar_monto(resultado)
         # Calcular comisión y total neto sobre la moneda destino
         subtotal = resultado
@@ -326,20 +369,25 @@ def simular_cambio_api(request):
         tasa_origen = get_tasa_activa(origen)
         if not tasa_origen:
             return JsonResponse({'success': False, 'message': f'No hay tasa activa para {origen.codigo}.'}, status=404)
-        # Ajustar tasa de compra por descuento (si corresponde)
-        tasa_compra_aplicada = Decimal(tasa_origen.tasa_compra)
+        
+        # Calcular comisión de compra ajustada por descuento
+        comision_compra_ajustada = Decimal(tasa_origen.comision_compra)
         if descuento_pct > 0:
-            tasa_compra_aplicada = (tasa_compra_aplicada * (D('1') + (descuento_pct / D('100'))))
-        # De origen a PYG: usar tasa_compra (posiblemente ajustada)
-        resultado = (monto * tasa_compra_aplicada).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+            comision_compra_ajustada = comision_compra_ajustada * (D('1') - (descuento_pct / D('100')))
+        
+        # Calcular precio de compra: precio_base - comision_compra_ajustada
+        precio_compra = Decimal(tasa_origen.precio_base) - comision_compra_ajustada
+        
+        # De origen a PYG: usar precio de compra calculado
+        resultado = (monto * precio_compra).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
         tasa_origen_usada = {
             'moneda': origen.codigo,
             'tipo': 'compra' + (' (ajustada)' if descuento_pct > 0 else ''),
-            'valor': float(tasa_compra_aplicada),
+            'valor': float(precio_compra),
         }
-        detalle = f"{origen.codigo} -> PYG usando tasa de compra"
+        detalle = f"{origen.codigo} -> PYG usando precio de compra"
         if descuento_pct > 0:
-            detalle += f" con descuento {descuento_pct}%"
+            detalle += f" con descuento {descuento_pct}% en comisión"
         resultado_formateado = f"PYG {int(resultado)}"
         # Calcular comisión y total neto sobre PYG
         subtotal = resultado

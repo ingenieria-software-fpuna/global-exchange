@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% load static %}
+{% load moneda_extras %}
+
+{% block title %}Historial {{ moneda.nombre }} - Global Exchange{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'auth:dashboard' %}">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'tasa_cambio:tasacambio_list' %}">
+                    <i class="fas fa-chart-line me-1"></i>Cotizaciones
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-history me-1"></i>Historial {{ moneda.codigo }}
+            </li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-start mb-3">
+        <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='{% url 'tasa_cambio:tasacambio_list' %}'">
+            <i class="fas fa-arrow-left me-2"></i>Volver a Cotizaciones
+        </button>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center">
+            <div class="currency-symbol bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px; font-size: 18px; font-weight: bold;">
+                {{ moneda.simbolo }}
+            </div>
+            <div>
+                <h1 class="h2 mb-0">{{ moneda.nombre }}</h1>
+                <p class="text-muted mb-0">Historial de cotizaciones - {{ moneda.codigo }}</p>
+            </div>
+        </div>
+        {% if perms.tasa_cambio.add_tasacambio %}
+        <a href="{% url 'tasa_cambio:tasacambio_create' %}?moneda={{ moneda.id }}" class="btn btn-success">
+            <i class="fas fa-plus me-2"></i>Nueva Cotización
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Gráfico de Evolución -->
+    {% if datos_grafico %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-area text-primary me-2"></i>
+                Evolución de Precios
+            </h5>
+        </div>
+        <div class="card-body p-4">
+            <div style="height: 450px; width: 100%; position: relative;">
+                <canvas id="priceChart"></canvas>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Filtros -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label for="estado" class="form-label">Estado</label>
+                    <select id="estado" name="estado" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="activo" {% if estado == 'activo' %}selected{% endif %}>Activos</option>
+                        <option value="inactivo" {% if estado == 'inactivo' %}selected{% endif %}>Inactivos</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="fecha_desde" class="form-label">Desde</label>
+                    <input type="date" id="fecha_desde" name="fecha_desde" class="form-control" value="{{ fecha_desde }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="fecha_hasta" class="form-label">Hasta</label>
+                    <input type="date" id="fecha_hasta" name="fecha_hasta" class="form-control" value="{{ fecha_hasta }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-1"></i>Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabla de Historial -->
+    {% if historial_tasas %}
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th class="text-center">Precio Base</th>
+                            <th class="text-center">Comisión Compra</th>
+                            <th class="text-center">Comisión Venta</th>
+                            <th class="text-center">Precio Compra</th>
+                            <th class="text-center">Precio Venta</th>
+                            <th class="text-center">Spread</th>
+                            <th class="text-center">Estado</th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tasa in historial_tasas %}
+                        <tr>
+                            <td>
+                                <div>
+                                    <strong>{{ tasa.fecha_creacion|date:"d/m/Y" }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ tasa.fecha_creacion|date:"H:i" }}</small>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-secondary text-white">
+                                    {{ tasa.precio_base|formatear_guaranies }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-warning text-dark">
+                                    {{ tasa.comision_compra|formatear_guaranies }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-warning text-dark">
+                                    {{ tasa.comision_venta|formatear_guaranies }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-success text-white">
+                                    {{ tasa.tasa_compra|formatear_guaranies }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-info text-white">
+                                    {{ tasa.tasa_venta|formatear_guaranies }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <div>
+                                    <span class="badge bg-primary text-white">
+                                        {{ tasa.spread|formatear_guaranies }}
+                                    </span>
+                                    <div class="small text-muted mt-1">
+                                        {{ tasa.spread_porcentual|floatformat:2 }}%
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                {% if tasa.es_activa %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>Activa
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-times me-1"></i>Inactiva
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if perms.tasa_cambio.change_tasacambio and tasa.es_activa %}
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-warning toggle-status-btn"
+                                        title="Desactivar cotización"
+                                        data-tasacambio-id="{{ tasa.pk }}">
+                                    <i class="fas fa-pause"></i>
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginación -->
+            {% if is_paginated %}
+            <nav aria-label="Navegación de páginas" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if estado %}&estado={{ estado }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if estado %}&estado={{ estado }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if estado %}&estado={{ estado }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if estado %}&estado={{ estado }}{% endif %}{% if fecha_desde %}&fecha_desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&fecha_hasta={{ fecha_hasta }}{% endif %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        No se encontraron registros de cotizaciones para {{ moneda.nombre }}.
+    </div>
+    {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Gráfico de evolución de precios
+    {% if datos_grafico %}
+    try {
+        const ctx = document.getElementById('priceChart').getContext('2d');
+        const chartData = JSON.parse('{{ datos_grafico|escapejs }}');
+
+        console.log('Chart data:', chartData); // Debug
+
+        if (chartData && chartData.length > 0) {
+            const labels = chartData.map(item => {
+                const date = new Date(item.fecha_str);
+                return date.toLocaleDateString('es-ES');
+            }).reverse();
+
+            const preciosCompra = chartData.map(item => parseFloat(item.precio_compra)).reverse();
+            const preciosVenta = chartData.map(item => parseFloat(item.precio_venta)).reverse();
+
+            console.log('Labels:', labels); // Debug
+            console.log('Precios Compra:', preciosCompra); // Debug
+            console.log('Precios Venta:', preciosVenta); // Debug
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Precio Compra',
+                        data: preciosCompra,
+                        borderColor: 'rgb(40, 167, 69)',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        tension: 0.1,
+                        fill: false
+                    }, {
+                        label: 'Precio Venta',
+                        data: preciosVenta,
+                        borderColor: 'rgb(23, 162, 184)',
+                        backgroundColor: 'rgba(23, 162, 184, 0.1)',
+                        tension: 0.1,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Evolución de Precios - {{ moneda.codigo }}',
+                            font: {
+                                size: 16
+                            }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Precio (PYG)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Fecha'
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            console.log('No chart data available');
+            document.getElementById('priceChart').parentElement.innerHTML = '<p class="text-muted">No hay datos suficientes para mostrar el gráfico.</p>';
+        }
+    } catch (error) {
+        console.error('Error creating chart:', error);
+        document.getElementById('priceChart').parentElement.innerHTML = '<p class="text-danger">Error al cargar el gráfico.</p>';
+    }
+    {% endif %}
+
+    // Toggle status functionality
+    document.querySelectorAll('.toggle-status-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const id = btn.dataset.tasacambioId;
+            try {
+                const resp = await fetch(`{% url 'tasa_cambio:toggle_status' 0 %}`.replace('/0/', `/${id}/`), {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Error al cambiar estado');
+                }
+            } catch (e) {
+                alert('Error de red');
+            }
+        });
+    });
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
+{% endblock %}

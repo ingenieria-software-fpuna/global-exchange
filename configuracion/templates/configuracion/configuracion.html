@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Configuración del Sistema - Global Exchange{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'auth:dashboard' %}"><i class="fas fa-home me-1"></i>Dashboard</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Configuración del Sistema</li>
+    </ol>
+  </nav>
+
+  <div class="card shadow-sm">
+    <div class="card-header">
+      <strong>Configuración del Sistema</strong>
+    </div>
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.limite_diario_transacciones.id_for_label }}">{{ form.limite_diario_transacciones.label }}</label>
+            <div class="input-group">
+              {{ form.limite_diario_transacciones }}
+              <span class="input-group-text">₲</span>
+            </div>
+            {% for e in form.limite_diario_transacciones.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            {% if form.limite_diario_transacciones.help_text %}
+              <div class="form-text">{{ form.limite_diario_transacciones.help_text }}</div>
+            {% endif %}
+          </div>
+          
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.limite_mensual_transacciones.id_for_label }}">{{ form.limite_mensual_transacciones.label }}</label>
+            <div class="input-group">
+              {{ form.limite_mensual_transacciones }}
+              <span class="input-group-text">₲</span>
+            </div>
+            {% for e in form.limite_mensual_transacciones.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            {% if form.limite_mensual_transacciones.help_text %}
+              <div class="form-text">{{ form.limite_mensual_transacciones.help_text }}</div>
+            {% endif %}
+          </div>
+          
+          <div class="col-12">
+            <div class="alert alert-info">
+              <i class="fas fa-info-circle me-2"></i>
+              <strong>Nota:</strong> Los valores deben especificarse en Guaraníes (PYG). Establecer el valor en 0 significa que no hay límite para ese período.
+            </div>
+          </div>
+        </div>
+
+        <!-- Errores generales del formulario -->
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger mt-3">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+
+        <div class="d-flex justify-content-end mt-4">
+          <a href="{% url 'auth:dashboard' %}" class="btn btn-outline-secondary me-2">Cancelar</a>
+          <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  </div>
+
+  {% if configuracion %}
+  <div class="card mt-4">
+    <div class="card-header">
+      <strong>Información de la Configuración</strong>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-6">
+          <small class="text-muted">Última actualización:</small>
+          <p class="mb-0">{{ configuracion.fecha_actualizacion|date:"d/m/Y H:i" }}</p>
+        </div>
+        <div class="col-md-6">
+          <small class="text-muted">Fecha de creación:</small>
+          <p class="mb-0">{{ configuracion.fecha_creacion|date:"d/m/Y H:i" }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

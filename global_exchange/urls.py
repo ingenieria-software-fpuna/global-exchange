@@ -25,11 +25,11 @@ from django.http import Http404
 import os
 
 def welcome_view(request):
-    """Vista para la pantalla de bienvenida con tasas de cambio"""
+    """Vista para la pantalla de bienvenida con cotizaciones"""
     from monedas.models import Moneda
     from tasa_cambio.models import TasaCambio
     
-    # Obtener monedas activas con sus tasas de cambio activas
+    # Obtener monedas activas con sus cotizaciones activas
     monedas_con_tasas = []
     monedas_activas = Moneda.objects.filter(es_activa=True).order_by('nombre')
     
@@ -81,6 +81,9 @@ urlpatterns = [
     path('monedas/', include('monedas.urls', namespace='monedas')),
     path('tasa-cambio/', include('tasa_cambio.urls', namespace='tasa_cambio')),
     path('metodos-pago/', include('metodo_pago.urls', namespace='metodo_pago')),
+    path('metodos-cobro/', include('metodo_cobro.urls', namespace='metodo_cobro')),
+    path('configuracion/', include('configuracion.urls', namespace='configuracion')),
+    path('transacciones/', include('transacciones.urls', namespace='transacciones')),
     path('docs/', docs_view, name='docs_index'),
     path('docs/<path:path>', docs_view, name='docs'),
 ]

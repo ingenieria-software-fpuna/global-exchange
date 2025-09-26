@@ -1,5 +1,6 @@
 from django import forms
 from .models import MetodoPago
+from .widgets import MonedaSelectorWidget
 
 
 class MetodoPagoForm(forms.ModelForm):
@@ -7,7 +8,7 @@ class MetodoPagoForm(forms.ModelForm):
 
     class Meta:
         model = MetodoPago
-        fields = ['nombre', 'descripcion', 'comision', 'es_activo']
+        fields = ['nombre', 'descripcion', 'comision', 'monedas_permitidas', 'es_activo']
         widgets = {
             'nombre': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -28,11 +29,13 @@ class MetodoPagoForm(forms.ModelForm):
             'es_activo': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             }),
+            'monedas_permitidas': MonedaSelectorWidget(),
         }
         labels = {
             'nombre': 'Nombre',
             'descripcion': 'Descripción',
             'comision': 'Comisión (%)',
+            'monedas_permitidas': 'Monedas Permitidas',
             'es_activo': 'Activo',
         }
 
