@@ -192,9 +192,10 @@ def iniciar_compra(request):
                 return redirect('tasa_cambio:dashboard')
         
         # Validar límites de transacción
+        # Para compras: validar el monto que el cliente va a pagar contra el límite de la moneda que se compra
         validacion_limites = validar_limites_transaccion(
             monto_origen=monto,
-            moneda_origen=moneda_origen,
+            moneda_origen=moneda_destino,  # Moneda que se compra (AUD) para validar su límite
             cliente=cliente,
             usuario=request.user
         )
@@ -1287,10 +1288,12 @@ def iniciar_venta(request):
         
         monto_pyg_equivalente = Decimal(str(resultado_calculo['data']['subtotal']))
         
-        # Validar límites usando el equivalente en PYG (para consistencia)
+        # Validar límites de transacción
+        # Para ventas: validar el monto que el cliente va a recibir contra el límite de la moneda que se vende
+        monto_a_recibir = Decimal(str(resultado_calculo['data']['resultado']))
         validacion_limites = validar_limites_transaccion(
-            monto_origen=monto_pyg_equivalente,
-            moneda_origen=moneda_destino,  # PYG para validar límites
+            monto_origen=monto_a_recibir,
+            moneda_origen=moneda_origen,  # Moneda que se vende (AUD) para validar su límite
             cliente=cliente,
             usuario=request.user
         )
