@@ -154,7 +154,7 @@ fi
 # Optionally create clients from env var
 if [ "${CREATE_CLIENTS:-false}" = "true" ]; then
   echo "[entrypoint] Creating clients..."
-  PYTHONPATH=/app python scripts/create_clients_test.py || {
+  PYTHONPATH=/app python scripts/create_clientes_test.py || {
     echo "⚠️  Error creating clients, but continuing..."
   }
 fi
