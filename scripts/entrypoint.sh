@@ -119,5 +119,45 @@ if [ "${CREATE_PAYMENT_METHODS:-false}" = "true" ]; then
   }
 fi
 
+# Optionally create collection methods from env var
+if [ "${CREATE_COLLECTION_METHODS:-false}" = "true" ]; then
+  echo "[entrypoint] Creating collection methods..."
+  PYTHONPATH=/app python scripts/create_metodos_cobro_test.py || {
+    echo "⚠️  Error creating collection methods, but continuing..."
+  }
+fi
+
+# Optionally create test transactions from env var
+if [ "${CREATE_TEST_TRANSACTIONS:-false}" = "true" ]; then
+  echo "[entrypoint] Creating test transactions..."
+  PYTHONPATH=/app python scripts/create_test_transactions.py || {
+    echo "⚠️  Error creating test transactions, but continuing..."
+  }
+fi
+
+# Optionally create historical rates from env var
+if [ "${CREATE_HISTORICAL_RATES:-false}" = "true" ]; then
+  echo "[entrypoint] Creating historical rates..."
+  PYTHONPATH=/app python scripts/create_historical_rates.py || {
+    echo "⚠️  Error creating historical rates, but continuing..."
+  }
+fi
+
+# Optionally create client types from env var
+if [ "${CREATE_CLIENT_TYPES:-false}" = "true" ]; then
+  echo "[entrypoint] Creating client types..."
+  PYTHONPATH=/app python scripts/create_tipos_cliente_test.py || {
+    echo "⚠️  Error creating client types, but continuing..."
+  }
+fi
+
+# Optionally create clients from env var
+if [ "${CREATE_CLIENTS:-false}" = "true" ]; then
+  echo "[entrypoint] Creating clients..."
+  PYTHONPATH=/app python scripts/create_clients_test.py || {
+    echo "⚠️  Error creating clients, but continuing..."
+  }
+fi
+
 echo "[entrypoint] Starting Django dev server on 0.0.0.0:${PORT}"
 exec python manage.py runserver 0.0.0.0:"${PORT}"

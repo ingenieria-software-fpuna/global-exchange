@@ -37,6 +37,22 @@ create-collection-methods:
 	@echo "Poblando base de datos con métodos de cobro de ejemplo..."
 	poetry run python scripts/create_metodos_cobro_test.py
 
+create-groups-users:
+	@echo "Creando grupos y usuarios de ejemplo..."
+	poetry run python scripts/create_grupos_usuarios_test.py
+
+create-historical-rates:
+	@echo "Creando datos históricos de tasas de cambio..."
+	poetry run python scripts/create_historical_rates.py
+
+create-client-types:
+	@echo "Creando tipos de cliente de ejemplo..."
+	poetry run python scripts/create_tipos_cliente_test.py
+
+create-clients:
+	@echo "Creando clientes de ejemplo con operadores asignados..."
+	poetry run python scripts/create_clientes_test.py
+
 migrate-groups:
 	@echo "Migrando grupos existentes al nuevo modelo..."
 	poetry run python manage.py migrate_grupos_existentes
@@ -71,6 +87,10 @@ endif
 	make create-currencies
 	make create-payment-methods
 	make create-collection-methods
+	make create-groups-users
+	make create-client-types
+	make create-clients
+	make create-historical-rates
 	make setup-transactions
 
 #-------------- Comandos de administración ----------------#
@@ -113,6 +133,10 @@ help:
 	@echo "  create-currencies - Poblar base de datos con monedas y tasas de ejemplo"
 	@echo "  create-payment-methods - Poblar base con métodos de pago de ejemplo"
 	@echo "  create-collection-methods - Poblar base con métodos de cobro de ejemplo"
+	@echo "  create-groups-users - Crear grupos y usuarios de ejemplo con permisos"
+	@echo "  create-client-types - Crear tipos de cliente (VIP, Minorista, Corporativo)"
+	@echo "  create-clients - Crear clientes de ejemplo con operadores asignados"
+	@echo "  create-historical-rates - Crear datos históricos de tasas de cambio"
 	@echo "  migrate-groups    - Migrar grupos existentes al nuevo modelo"
 	@echo "  test-grupo-permisos - Probar funcionalidad de permisos con grupos activos/inactivos"
 	@echo "  limpiar-codigos   - Limpiar códigos de verificación expirados"
