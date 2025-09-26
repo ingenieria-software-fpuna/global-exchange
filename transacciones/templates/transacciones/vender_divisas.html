@@ -302,13 +302,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
                         ${data.comision_cobro > 0 ? `
                         <div class="col-6">
-                            <small class="text-muted">Comisión por recibir ${data.moneda_origen.codigo}:</small><br>
+                            <small class="text-muted">Comisión cobro:</small><br>
                             <span class="text-danger">- ${data.comision_cobro_formateado} (${data.metodo_cobro.comision}%)</span>
                         </div>
                         ` : ''}
                         ${data.comision_pago > 0 ? `
                         <div class="col-6">
-                            <small class="text-muted">Comisión por entregar PYG:</small><br>
+                            <small class="text-muted">Comisión entrega:</small><br>
                             <span class="text-danger">- ${data.comision_pago_formateado} (${data.metodo_pago.comision}%)</span>
                         </div>
                         ` : ''}
