@@ -52,6 +52,30 @@
             {% for e in form.password2.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           </div>
           {% endif %}
+          <div class="col-12">
+            <label class="form-label" for="id_groups">Grupos</label>
+            <div class="border rounded p-3 bg-light">
+              {{ form.groups }}
+            </div>
+            {% for e in form.groups.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            <div class="form-text">Seleccione los grupos a los que pertenecerá este usuario.</div>
+          </div>
+          {% if form.is_staff %}
+          <div class="col-md-6 d-flex align-items-end">
+            <div class="form-check">
+              {{ form.is_staff }}
+              <label class="form-check-label" for="id_is_staff">Es Staff</label>
+            </div>
+          </div>
+          {% endif %}
+          {% if form.es_activo %}
+          <div class="col-md-6 d-flex align-items-end">
+            <div class="form-check">
+              {{ form.es_activo }}
+              <label class="form-check-label" for="id_es_activo">Activo</label>
+            </div>
+          </div>
+          {% endif %}
         </div>
 
         <div class="d-flex justify-content-end mt-4">
