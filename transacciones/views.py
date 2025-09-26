@@ -590,8 +590,7 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
         if cliente and cliente.tipo_cliente and cliente.tipo_cliente.descuento > 0:
             descuento_pct = Decimal(str(cliente.tipo_cliente.descuento))
         
-        # NUEVA LÓGICA: Cliente ingresa cuánto quiere PAGAR, sistema calcula cuánto RECIBE
-        # Esto es específico para COMPRAS (PYG → divisa extranjera)
+        # LÓGICA :Cliente ingresa cuánto quiere PAGAR, sistema calcula cuánto RECIBE
         if moneda_origen.codigo != 'PYG':
             return {'success': False, 'error': 'Las compras solo se realizan con PYG como moneda origen'}
         
@@ -610,7 +609,7 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
         precio_usado = Decimal(str(tasa_destino.precio_base)) + comision_venta_ajustada
         tipo_operacion = 'venta' + (' (ajustada)' if descuento_pct > 0 else '')
         
-        # NUEVA LÓGICA DE CÁLCULO:
+        # LÓGICA DE CÁLCULO PARA COMPRAS:
         # 1. El monto ingresado es lo que el cliente quiere PAGAR (en PYG)
         monto_a_pagar = monto
         
@@ -742,6 +741,231 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
         return {'success': False, 'error': f'Error en el cálculo: {str(e)}'}
 
 
+def calcular_venta_completa(monto, moneda_origen, moneda_destino, cliente=None, metodo_cobro=None, metodo_pago=None):
+    """
+    Calcula el resultado completo de una VENTA de divisas incluyendo:
+    - Conversión de divisa extranjera → PYG usando tasas de compra con descuento del cliente
+    - Comisiones de método de cobro (como recibimos la divisa)
+    - Comisiones de método de pago (como entregamos PYG)
+    - Descuentos de cliente aplicados a la tasa
+    - Total final en PYG
+    
+    Args:
+        monto: Cantidad de divisa extranjera que el cliente quiere vender
+        moneda_origen: Divisa extranjera que se vende
+        moneda_destino: PYG (siempre)
+        cliente: Cliente que realiza la venta
+        metodo_cobro: Cómo recibimos la divisa extranjera
+        metodo_pago: Cómo entregamos los PYG al cliente
+    
+    Returns:
+        dict: Diccionario con todos los datos de la venta o error
+    """
+    try:
+        # Validaciones iniciales
+        if monto <= 0:
+            return {'success': False, 'error': 'El monto debe ser mayor a cero'}
+        
+        # LÓGICA ESPECÍFICA PARA VENTAS (divisa extranjera → PYG)
+        if moneda_destino.codigo != 'PYG':
+            return {'success': False, 'error': 'Las ventas solo se realizan hacia PYG como moneda destino'}
+        
+        if moneda_origen.codigo == 'PYG':
+            return {'success': False, 'error': 'No se puede vender PYG por PYG'}
+        
+        # Obtener descuento del cliente
+        descuento_pct = Decimal('0')
+        if cliente and cliente.tipo_cliente and cliente.tipo_cliente.descuento > 0:
+            descuento_pct = Decimal(str(cliente.tipo_cliente.descuento))
+        
+        # Obtener tasa de la divisa que va a vender
+        try:
+            tasa_origen = TasaCambio.objects.get(moneda=moneda_origen, es_activa=True)
+        except TasaCambio.DoesNotExist:
+            return {'success': False, 'error': f'Tasa de cambio no disponible para {moneda_origen.codigo}'}
+        
+        # Para ventas: precio_base - comision_compra da la tasa base de compra
+        precio_base_compra = Decimal(str(tasa_origen.precio_base)) - Decimal(str(tasa_origen.comision_compra))
+        
+        # Aplicar descuento del cliente a la tasa base (cliente recibe más PYG)
+        if descuento_pct > 0:
+            # El descuento aumenta la tasa base para dar más PYG al cliente
+            precio_usado = precio_base_compra * (Decimal('1') + (descuento_pct / Decimal('100')))
+            tipo_operacion = 'compra (con descuento)'
+        else:
+            precio_usado = precio_base_compra
+            tipo_operacion = 'compra'
+        
+        # LÓGICA DE CÁLCULO PARA VENTAS:
+        # 1. El monto ingresado es cuánta divisa extranjera quiere VENDER
+        monto_a_vender = monto
+        
+        # 2. Convertir a PYG usando precio de compra ajustado
+        monto_pyg_bruto = monto_a_vender * precio_usado
+        
+        # 3. Calcular comisiones de métodos SOBRE el monto en PYG
+        comision_cobro = Decimal('0')
+        comision_pago = Decimal('0')
+        
+        if metodo_cobro and metodo_cobro.comision > 0:
+            comision_cobro = monto_pyg_bruto * (Decimal(str(metodo_cobro.comision)) / Decimal('100'))
+        
+        if metodo_pago and metodo_pago.comision > 0:
+            comision_pago = monto_pyg_bruto * (Decimal(str(metodo_pago.comision)) / Decimal('100'))
+        
+        comision_total = comision_cobro + comision_pago
+        
+        # 4. El descuento ya está aplicado en la tasa ajustada
+        descuento_aplicado = Decimal('0')
+        
+        # 5. Resultado final: PYG bruto menos comisiones de métodos
+        resultado_final = (monto_pyg_bruto - comision_total).quantize(
+            Decimal('1.00'), 
+            rounding=ROUND_HALF_UP
+        )
+        
+        # 6. Valores para mostrar
+        subtotal = monto_pyg_bruto  # PYG bruto de la conversión
+        total_origen = monto_a_vender  # Divisa extranjera que entrega el cliente
+        
+        # Formatear montos
+        def formatear_monto(valor, moneda):
+            if moneda.codigo == 'PYG':
+                return f"₲ {valor:,.0f}"
+            else:
+                return f"{moneda.simbolo} {valor:,.2f}"
+        
+        return {
+            'success': True,
+            'data': {
+                # Datos originales
+                'monto_original': monto,
+                'moneda_origen': {
+                    'id': moneda_origen.id, 
+                    'codigo': moneda_origen.codigo,
+                    'nombre': moneda_origen.nombre,
+                    'simbolo': moneda_origen.simbolo
+                },
+                'moneda_destino': {
+                    'id': moneda_destino.id,
+                    'codigo': moneda_destino.codigo, 
+                    'nombre': moneda_destino.nombre,
+                    'simbolo': moneda_destino.simbolo
+                },
+                
+                # Tasas y precio usado (con descuento aplicado)
+                'precio_usado': float(precio_usado),
+                'tipo_operacion': tipo_operacion,
+                'tasa_origen': {
+                    'moneda': moneda_origen.codigo,
+                    'tipo': tipo_operacion,
+                    'valor': float(precio_usado),
+                },
+                'tasa_destino': None,  # Para ventas, la tasa relevante es la de origen
+                
+                # Tasas para mostrar en el preview
+                'tasa_base': float(precio_base_compra),
+                'tasa_ajustada': float(precio_usado),
+                
+                # Cálculos
+                'subtotal': float(subtotal),
+                'subtotal_formateado': formatear_monto(subtotal, moneda_destino),
+                
+                'comision_cobro': float(comision_cobro),
+                'comision_cobro_formateado': formatear_monto(comision_cobro, moneda_destino),
+                
+                'comision_pago': float(comision_pago), 
+                'comision_pago_formateado': formatear_monto(comision_pago, moneda_destino),
+                
+                'comision_total': float(comision_total),
+                'comision_total_formateado': formatear_monto(comision_total, moneda_destino),
+                
+                'total': float(total_origen),
+                'total_formateado': formatear_monto(total_origen, moneda_origen),
+                
+                'resultado': float(resultado_final),
+                'resultado_formateado': formatear_monto(resultado_final, moneda_destino),
+                
+                # Información de descuentos
+                'descuento_pct': float(descuento_pct),
+                'descuento_aplicado': float(descuento_aplicado),
+                'descuento_aplicado_formateado': formatear_monto(descuento_aplicado, moneda_destino),
+                
+                # Información de métodos
+                'metodo_cobro': {
+                    'id': metodo_cobro.id if metodo_cobro else None,
+                    'nombre': metodo_cobro.nombre if metodo_cobro else None,
+                    'comision': float(metodo_cobro.comision) if metodo_cobro else 0
+                } if metodo_cobro else None,
+                
+                'metodo_pago': {
+                    'id': metodo_pago.id if metodo_pago else None,
+                    'nombre': metodo_pago.nombre if metodo_pago else None,
+                    'comision': float(metodo_pago.comision) if metodo_pago else 0
+                } if metodo_pago else None,
+                
+                # Información del cliente
+                'cliente': {
+                    'id': cliente.id,
+                    'nombre': cliente.nombre_comercial,
+                    'tipo': cliente.tipo_cliente.nombre,
+                    'descuento': float(descuento_pct),
+                } if cliente else None,
+                
+                # Detalle explicativo
+                'detalle': f"{moneda_origen.codigo} -> PYG usando precio de compra" + 
+                          (f" con descuento {descuento_pct}% en comisión" if descuento_pct > 0 else "")
+            }
+        }
+        
+    except Exception as e:
+        return {'success': False, 'error': f'Error en el cálculo de venta: {str(e)}'}
+
+
+@login_required
+def vender_divisas(request):
+    """
+    Vista para mostrar el formulario de venta de divisas.
+    El cliente vende una divisa extranjera y recibe PYG.
+    """
+    # Obtener parámetros de la URL (desde el simulador)
+    moneda_origen_codigo = request.GET.get('moneda_origen')
+    moneda_destino_codigo = request.GET.get('moneda_destino', 'PYG')
+    cantidad_preseleccionada = request.GET.get('cantidad')
+    cliente_preseleccionado = request.GET.get('cliente_id')
+    
+    # Obtener monedas activas (excluyendo PYG para origen)
+    monedas_origen = Moneda.objects.filter(es_activa=True).exclude(codigo='PYG').order_by('nombre')
+    
+    # Obtener clientes asociados al usuario
+    clientes = Cliente.objects.filter(
+        usuarios_asociados=request.user,
+        activo=True
+    ).select_related('tipo_cliente').order_by('nombre_comercial')
+    
+    # Obtener métodos de cobro activos - inicialmente vacío, se llena por JavaScript según moneda seleccionada
+    metodos_cobro = MetodoCobro.objects.filter(es_activo=True).order_by('nombre')
+    
+    # Obtener métodos de pago activos (cómo entregamos PYG)
+    metodos_pago = MetodoPago.objects.filter(
+        es_activo=True,
+        monedas_permitidas__codigo='PYG'
+    ).distinct().order_by('nombre')
+    
+    context = {
+        'titulo': 'Vender Divisas',
+        'monedas_origen': monedas_origen,
+        'moneda_origen_preseleccionada': moneda_origen_codigo,
+        'cantidad_preseleccionada': cantidad_preseleccionada,
+        'cliente_preseleccionado': cliente_preseleccionado,
+        'clientes': clientes,
+        'metodos_cobro': metodos_cobro,
+        'metodos_pago': metodos_pago,
+    }
+    
+    return render(request, 'transacciones/vender_divisas.html', context)
+
+
 @login_required
 def api_calcular_compra_completa(request):
     """
@@ -831,3 +1055,285 @@ def api_calcular_compra_completa(request):
             })
     
     return JsonResponse({'success': False, 'error': 'Método no permitido'})
+
+
+@login_required
+def api_calcular_venta_completa(request):
+    """
+    API endpoint para calcular venta completa con comisiones desde JavaScript
+    """
+    if request.method == 'GET':
+        try:
+            # Obtener parámetros
+            monto = Decimal(request.GET.get('monto', '0'))
+            moneda_origen_codigo = request.GET.get('origen')
+            moneda_destino_codigo = request.GET.get('destino')
+            cliente_id = request.GET.get('cliente_id')
+            metodo_cobro_id = request.GET.get('metodo_cobro_id')
+            metodo_pago_id = request.GET.get('metodo_pago_id')
+            
+            # Validaciones básicas
+            if monto <= 0 or not moneda_origen_codigo or not moneda_destino_codigo:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Parámetros inválidos'
+                })
+            
+            # Obtener objetos
+            try:
+                moneda_origen = Moneda.objects.get(codigo=moneda_origen_codigo, es_activa=True)
+                moneda_destino = Moneda.objects.get(codigo=moneda_destino_codigo, es_activa=True)
+            except Moneda.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Monedas no válidas'
+                })
+            
+            # Cliente opcional
+            cliente = None
+            if cliente_id:
+                try:
+                    cliente = Cliente.objects.get(id=cliente_id, activo=True)
+                    # Verificar permisos
+                    if not cliente.usuarios_asociados.filter(id=request.user.id).exists():
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'Sin permisos para este cliente'
+                        })
+                except Cliente.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Cliente no válido'
+                    })
+            
+            # Métodos opcionales
+            metodo_cobro = None
+            if metodo_cobro_id:
+                try:
+                    metodo_cobro = MetodoCobro.objects.get(id=metodo_cobro_id, es_activo=True)
+                except MetodoCobro.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Método de cobro no válido'
+                    })
+            
+            metodo_pago = None
+            if metodo_pago_id:
+                try:
+                    metodo_pago = MetodoPago.objects.get(id=metodo_pago_id, es_activo=True)
+                except MetodoPago.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Método de pago no válido'
+                    })
+            
+            # Realizar el cálculo completo de VENTA
+            resultado = calcular_venta_completa(
+                monto=monto,
+                moneda_origen=moneda_origen,
+                moneda_destino=moneda_destino,
+                cliente=cliente,
+                metodo_cobro=metodo_cobro,
+                metodo_pago=metodo_pago
+            )
+            
+            return JsonResponse(resultado)
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error interno: {str(e)}'
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido'})
+
+
+@login_required
+def api_metodos_cobro_por_moneda(request):
+    """
+    API endpoint para obtener métodos de cobro disponibles para una moneda específica
+    """
+    if request.method == 'GET':
+        try:
+            moneda_codigo = request.GET.get('moneda_codigo')
+            
+            if not moneda_codigo:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Código de moneda requerido'
+                })
+            
+            # Verificar que la moneda existe y está activa
+            try:
+                moneda = Moneda.objects.get(codigo=moneda_codigo, es_activa=True)
+            except Moneda.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Moneda no válida'
+                })
+            
+            # Obtener métodos de cobro que permiten esta moneda
+            metodos_cobro = MetodoCobro.objects.filter(
+                es_activo=True,
+                monedas_permitidas=moneda
+            ).order_by('nombre')
+            
+            # Convertir a lista de diccionarios
+            metodos_data = []
+            for metodo in metodos_cobro:
+                metodos_data.append({
+                    'id': metodo.id,
+                    'nombre': metodo.nombre,
+                    'comision': float(metodo.comision),
+                    'descripcion': metodo.descripcion or ''
+                })
+            
+            return JsonResponse({
+                'success': True,
+                'metodos_cobro': metodos_data
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error interno: {str(e)}'
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido'})
+
+
+@login_required
+@require_http_methods(["POST"])
+def iniciar_venta(request):
+    """
+    Vista para procesar el formulario de venta de divisas y crear la transacción.
+    El usuario ingresa la cantidad de divisa extranjera que quiere vender
+    y recibe Guaraníes a cambio.
+    """
+    try:
+        # Obtener datos del formulario
+        monto = Decimal(request.POST.get('monto', '0'))
+        moneda_origen_codigo = request.POST.get('moneda_origen', 'USD')  # Por defecto USD
+        moneda_destino_codigo = request.POST.get('moneda_destino', 'PYG')  # Siempre PYG para ventas
+        cliente_id = request.POST.get('cliente_id')
+        metodo_cobro_id = request.POST.get('metodo_cobro_id')
+        metodo_pago_id = request.POST.get('metodo_pago_id')
+        
+        # Validaciones básicas
+        if monto <= 0:
+            messages.error(request, 'El monto debe ser mayor a cero.')
+            return redirect('transacciones:vender_divisas')
+        
+        # Validar monedas
+        try:
+            moneda_origen = Moneda.objects.get(codigo=moneda_origen_codigo, es_activa=True)
+            moneda_destino = Moneda.objects.get(codigo=moneda_destino_codigo, es_activa=True)
+        except Moneda.DoesNotExist:
+            messages.error(request, 'Moneda seleccionada no válida o inactiva.')
+            return redirect('transacciones:vender_divisas')
+        
+        # Validar que destino sea PYG
+        if moneda_destino.codigo != 'PYG':
+            messages.error(request, 'Las ventas solo se realizan hacia Guaraníes (PYG).')
+            return redirect('transacciones:vender_divisas')
+        
+        # Cliente (requerido para ventas)
+        cliente = None
+        if cliente_id:
+            try:
+                cliente = Cliente.objects.get(id=cliente_id, activo=True)
+                # Verificar permisos
+                if not cliente.usuarios_asociados.filter(id=request.user.id).exists():
+                    messages.error(request, 'No tiene permisos para realizar transacciones con este cliente.')
+                    return redirect('transacciones:vender_divisas')
+            except Cliente.DoesNotExist:
+                messages.error(request, 'Cliente seleccionado no válido.')
+                return redirect('transacciones:vender_divisas')
+        
+        # Métodos opcionales
+        metodo_cobro = None
+        if metodo_cobro_id:
+            try:
+                metodo_cobro = MetodoCobro.objects.get(id=metodo_cobro_id, es_activo=True)
+            except MetodoCobro.DoesNotExist:
+                messages.error(request, 'Método de cobro seleccionado no válido.')
+                return redirect('transacciones:vender_divisas')
+        
+        metodo_pago = None
+        if metodo_pago_id:
+            try:
+                metodo_pago = MetodoPago.objects.get(id=metodo_pago_id, es_activo=True)
+            except MetodoPago.DoesNotExist:
+                messages.error(request, 'Método de pago seleccionado no válido.')
+                return redirect('transacciones:vender_divisas')
+        
+        # Calcular la transacción
+        resultado_calculo = calcular_venta_completa(
+            monto=monto,
+            moneda_origen=moneda_origen,
+            moneda_destino=moneda_destino,
+            cliente=cliente,
+            metodo_cobro=metodo_cobro,
+            metodo_pago=metodo_pago
+        )
+        
+        if not resultado_calculo['success']:
+            messages.error(request, f'Error en el cálculo: {resultado_calculo["error"]}')
+            return redirect('transacciones:vender_divisas')
+        
+        monto_pyg_equivalente = Decimal(str(resultado_calculo['data']['subtotal']))
+        
+        # Validar límites usando el equivalente en PYG (para consistencia)
+        validacion_limites = validar_limites_transaccion(
+            monto_origen=monto_pyg_equivalente,
+            moneda_origen=moneda_destino,  # PYG para validar límites
+            cliente=cliente,
+            usuario=request.user
+        )
+        
+        if not validacion_limites['valido']:
+            messages.error(request, f'Límites excedidos: {validacion_limites["mensaje"]}')
+            return redirect('transacciones:vender_divisas')
+        
+        # Crear la transacción
+        with transaction.atomic():
+            tipo_venta = TipoOperacion.objects.get(codigo=TipoOperacion.VENTA)
+            estado_pendiente = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PENDIENTE)
+            
+            # Usar los datos de la función de cálculo de venta
+            data = resultado_calculo['data']
+            
+            # Calcular porcentajes de comisión correctos
+            porcentaje_comision_total = Decimal('0')
+            if monto_pyg_equivalente > 0:
+                porcentaje_comision_total = (Decimal(str(data.get('comision_total', 0))) / monto_pyg_equivalente * Decimal('100')).quantize(Decimal('0.0001'))
+            
+            nueva_transaccion = Transaccion(
+                cliente=cliente,
+                usuario=request.user,
+                tipo_operacion=tipo_venta,
+                moneda_origen=moneda_origen,
+                moneda_destino=moneda_destino,
+                monto_origen=monto,  # Divisa extranjera que el cliente vende
+                monto_destino=Decimal(str(data['resultado'])),  # PYG que recibirá
+                metodo_cobro=metodo_cobro,  # Cómo recibimos la divisa extranjera
+                metodo_pago=metodo_pago,    # Cómo entregamos PYG
+                tasa_cambio=Decimal(str(data['precio_usado'])),  # Tasa ajustada con descuento
+                porcentaje_comision=porcentaje_comision_total,  # Porcentaje calculado correctamente
+                monto_comision=Decimal(str(data.get('comision_total', 0))),  # Monto total de comisión
+                porcentaje_descuento=Decimal(str(data.get('descuento_pct', 0))),  # Porcentaje de descuento del cliente
+                monto_descuento=Decimal(str(data.get('descuento_aplicado', 0))),  # Monto de descuento aplicado
+                estado=estado_pendiente,
+                ip_cliente=get_client_ip(request)
+            )
+            nueva_transaccion.save()
+        
+        messages.success(request, f'Transacción de venta creada exitosamente: {nueva_transaccion.id_transaccion}')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=nueva_transaccion.id_transaccion)
+        
+    except Exception as e:
+        print(f"EXCEPCIÓN EN INICIAR_VENTA: {str(e)}")
+        import traceback
+        print(f"TRACEBACK: {traceback.format_exc()}")
+        messages.error(request, f'Error al crear la transacción de venta: {str(e)}')
+        return redirect('tasa_cambio:dashboard')
