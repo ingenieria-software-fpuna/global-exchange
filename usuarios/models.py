@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin, Group
+from django.utils import timezone
 
 class UsuarioManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -42,6 +43,10 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     es_activo = models.BooleanField(default=True)
 
     is_staff = models.BooleanField(default=False)
+    
+    # Campos de auditoría
+    fecha_creacion = models.DateTimeField(default=timezone.now, verbose_name="Fecha de creación")
+    fecha_actualizacion = models.DateTimeField(auto_now=True, verbose_name="Fecha de actualización")
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['nombre', 'cedula', 'fecha_nacimiento']

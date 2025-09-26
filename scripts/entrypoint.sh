@@ -162,6 +162,7 @@ fi
 # Optionally create transactions
 if [ "${CREATE_TRANSACTIONS:-false}" = "true" ]; then
   echo "[entrypoint] Creating transactions..."
+  PYTHONPATH=/app python manage.py setup_transacciones
   PYTHONPATH=/app python scripts/create_transacciones_test.py || {
     echo "⚠️  Error creating transactions, but continuing..."
   }

@@ -312,10 +312,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
                 
                 // Validar límites antes de habilitar el botón de venta
+                // Para ventas: validar el monto que el cliente va a recibir contra el límite de la moneda que se vende
                 try {
                     const limitesParams = new URLSearchParams({
-                        monto: data.subtotal, // Usar el valor en PYG para validar límites
-                        moneda_origen: 'PYG'
+                        monto: data.resultado, // Monto a recibir en PYG
+                        moneda_origen: datos.origen // Moneda que se vende (AUD, USD, etc.)
                     });
                     if (datos.cliente_id) limitesParams.append('cliente_id', datos.cliente_id);
                     

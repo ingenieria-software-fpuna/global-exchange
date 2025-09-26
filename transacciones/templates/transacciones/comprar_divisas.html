@@ -294,10 +294,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
                 
                 // Validar límites antes de habilitar el botón de compra
+                // Para compras: validar el monto que el cliente va a pagar contra el límite de la moneda que se compra
                 try {
                     const limitesParams = new URLSearchParams({
-                        monto: datos.monto,
-                        moneda_origen: 'PYG'
+                        monto: datos.monto, // Monto a pagar
+                        moneda_origen: datos.destino // Moneda que se compra (AUD, USD, etc.)
                     });
                     if (datos.cliente_id) limitesParams.append('cliente_id', datos.cliente_id);
                     

@@ -11,6 +11,10 @@ Bienvenido a la documentación del proyecto Global Exchange.
    overview
    architecture
    apps
+   transacciones
+   metodo_cobro
+   metodo_pago
+   scripts
    security-permissions
    configuration
    data-model

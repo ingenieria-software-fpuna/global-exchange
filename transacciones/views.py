@@ -192,9 +192,10 @@ def iniciar_compra(request):
                 return redirect('tasa_cambio:dashboard')
         
         # Validar límites de transacción
+        # Para compras: validar el monto que el cliente va a pagar contra el límite de la moneda que se compra
         validacion_limites = validar_limites_transaccion(
             monto_origen=monto,
-            moneda_origen=moneda_origen,
+            moneda_origen=moneda_destino,  # Moneda que se compra (AUD) para validar su límite
             cliente=cliente,
             usuario=request.user
         )
@@ -315,11 +316,22 @@ def procesar_pago(request, transaccion_id):
     if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
         messages.error(request, 'Esta transacción ya no se puede procesar.')
         return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
-    
+
     if transaccion.esta_expirada():
         # Marcar como cancelada automáticamente
         transaccion.cancelar_por_expiracion()
         messages.error(request, 'La transacción ha expirado y fue cancelada automáticamente.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+    # Verificar que la tasa de cambio sigue siendo actual
+    if not transaccion.tiene_tasa_actualizada():
+        # Cancelar la transacción por cambio de tasa
+        transaccion.cancelar_por_cambio_tasa()
+        messages.error(
+            request,
+            'La tasa de cambio ha sido modificada. Esta transacción fue cancelada automáticamente. '
+            'Por favor, crea una nueva transacción con la tasa actual.'
+        )
         return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
     
     # Procesar el 'pago' (por ahora solo cambiar estado)
@@ -1287,10 +1299,12 @@ def iniciar_venta(request):
         
         monto_pyg_equivalente = Decimal(str(resultado_calculo['data']['subtotal']))
         
-        # Validar límites usando el equivalente en PYG (para consistencia)
+        # Validar límites de transacción
+        # Para ventas: validar el monto que el cliente va a recibir contra el límite de la moneda que se vende
+        monto_a_recibir = Decimal(str(resultado_calculo['data']['resultado']))
         validacion_limites = validar_limites_transaccion(
-            monto_origen=monto_pyg_equivalente,
-            moneda_origen=moneda_destino,  # PYG para validar límites
+            monto_origen=monto_a_recibir,
+            moneda_origen=moneda_origen,  # Moneda que se vende (AUD) para validar su límite
             cliente=cliente,
             usuario=request.user
         )
