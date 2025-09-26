@@ -20,10 +20,30 @@
             <span class="badge bg-light text-dark">Base: PYG</span>
           </div>
 
-          <!-- Selector de Cliente (solo los asociados al usuario) -->
-          <div class="row g-3 mb-1">
+          <!-- Selector de Tipo de Operación -->
+          <div class="row g-3 mb-4">
             <div class="col-12">
-              <label class="form-label">Cliente</label>
+              <label class="form-label"><i class="fas fa-exchange-alt me-1"></i>Tipo de Operación</label>
+              <div class="btn-group w-100" role="group" aria-label="Tipo de operación">
+                <input type="radio" class="btn-check" name="tipoOperacion" id="operacionComprar" value="comprar" checked>
+                <label class="btn btn-outline-success" for="operacionComprar">
+                  <i class="fas fa-shopping-cart me-2"></i>Quiero Comprar
+                </label>
+                <input type="radio" class="btn-check" name="tipoOperacion" id="operacionVender" value="vender">
+                <label class="btn btn-outline-warning" for="operacionVender">
+                  <i class="fas fa-hand-holding-usd me-2"></i>Quiero Vender
+                </label>
+              </div>
+              <div class="form-text" id="operacionAyuda">
+                Comprando: Selecciona qué moneda quieres comprar y paga en Guaraníes
+              </div>
+            </div>
+          </div>
+
+          <!-- Selector de Cliente -->
+          <div class="row g-3 mb-4">
+            <div class="col-12">
+              <label class="form-label"><i class="fas fa-user me-1"></i>Cliente</label>
               <select id="cliente" class="form-select">
                 <option value="">Sin cliente (sin descuento)</option>
                 {% for c in clientes %}
@@ -35,40 +55,24 @@
             </div>
           </div>
 
-          <!-- Selector de Método de Pago -->
-          <div class="row g-3 mb-3">
-            <div class="col-12">
-              <label class="form-label">Método de Pago</label>
-              <select id="metodo_pago" class="form-select">
-                <option value="">Sin método (sin comisión)</option>
-                {% for mp in metodos_pago %}
-                  <option value="{{ mp.id }}">{{ mp.nombre }} ({{ mp.comision }}%)</option>
-                {% empty %}
-                  <option value="" disabled>No hay métodos de pago activos</option>
-                {% endfor %}
-              </select>
+          <!-- Configuración de la Operación -->
+          <div class="row g-3 mb-4">
+            <div class="col-12 col-md-6">
+              <label class="form-label" id="labelMonto">
+                <i class="fas fa-calculator me-1"></i>
+                <span id="textoMonto">Monto a pagar (en Guaraníes)</span>
+              </label>
+              <div class="input-group">
+                <span class="input-group-text" id="simboloMonto">₲</span>
+                <input id="monto" type="number" class="form-control" placeholder="0" step="any" min="0" value="1000000">
+              </div>
             </div>
-          </div>
-
-          <div class="row g-3">
-            <div class="col-12 col-md-4">
-              <label class="form-label">Monto</label>
-              <input id="monto" type="number" class="form-control" placeholder="0.00" step="any" min="0" value="1000">
-            </div>
-            <div class="col-12 col-md-3">
-              <label class="form-label">De</label>
-              <select id="origen" class="form-select">
-                <option value="PYG" selected>Guaraní (PYG)</option>
-              </select>
-            </div>
-            <div class="col-12 col-md-2 d-flex align-items-end justify-content-center">
-              <button id="btnToggleDir" type="button" class="btn btn-outline-secondary btn-rounded w-100" title="Cambiar dirección" aria-label="Cambiar dirección">
-                <i class="fas fa-right-left"></i>
-              </button>
-            </div>
-            <div class="col-12 col-md-3">
-              <label class="form-label">A</label>
-              <select id="destino" class="form-select">
+            <div class="col-12 col-md-6">
+              <label class="form-label" id="labelMoneda">
+                <i class="fas fa-coins me-1"></i>
+                <span id="textoMoneda">Moneda que quiero comprar</span>
+              </label>
+              <select id="monedaOperacion" class="form-select">
                 {% for m in monedas %}
                   {% if m.codigo != 'PYG' %}
                     <option value="{{ m.codigo }}" {% if m.codigo == 'USD' %}selected{% endif %}>{{ m.nombre }} ({{ m.codigo }})</option>
@@ -91,6 +95,20 @@
             <div class="small text-danger" id="resultado_comision"></div>
             <div class="small" id="resultado_tasas"></div>
             <div class="small text-success" id="resultado_descuento"></div>
+            
+            <!-- Enlace a Compra de Divisas -->
+            <div class="mt-3" id="enlace_compra_container" style="display: none;">
+              <a href="#" id="btnIrCompra" class="btn btn-success btn-lg w-100">
+                <i class="fas fa-shopping-cart me-2"></i>
+                Ir a Comprar Divisas
+              </a>
+              <div class="text-center mt-2">
+                <small class="text-muted">
+                  <i class="fas fa-info-circle me-1"></i>
+                  El simulador te ayuda a calcular. Para comprar, usa nuestra pantalla especializada.
+                </small>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -102,59 +120,86 @@
 <script type="application/json" id="monedas-data">{% for m in monedas %}{"codigo": "{{ m.codigo }}", "nombre": "{{ m.nombre|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}</script>
 <script>
   (function() {
+    // Elementos del DOM
     const $monto = document.getElementById('monto');
-    const $origen = document.getElementById('origen');
-    const $destino = document.getElementById('destino');
+    const $monedaOperacion = document.getElementById('monedaOperacion');
+    const $cliente = document.getElementById('cliente');
     const $resValor = document.getElementById('resultado_valor');
     const $resDetalle = document.getElementById('resultado_detalle');
     const $resTasas = document.getElementById('resultado_tasas');
     const $resDesc = document.getElementById('resultado_descuento');
-    const $btnToggle = document.getElementById('btnToggleDir');
-    const $cliente = document.getElementById('cliente');
-    const $metodoPago = document.getElementById('metodo_pago');
+    
+    // Elementos de la interfaz de operación
+    const $operacionComprar = document.getElementById('operacionComprar');
+    const $operacionVender = document.getElementById('operacionVender');
+    const $textoMonto = document.getElementById('textoMonto');
+    const $textoMoneda = document.getElementById('textoMoneda');
+    const $simboloMonto = document.getElementById('simboloMonto');
+    const $operacionAyuda = document.getElementById('operacionAyuda');
 
-    // Dataset de monedas activas (no incluye PYG normalmente)
+    // Dataset de monedas activas
     const monedasData = JSON.parse('[' + document.getElementById('monedas-data').textContent + ']');
     const MONEDAS = monedasData.filter(m => m.codigo !== 'PYG');
 
-    function setOptions(el, options, selected) {
-      el.innerHTML = options.map(o => `<option value="${o.codigo}" ${o.codigo===selected?'selected':''}>${o.nombre} (${o.codigo})</option>`).join('');
-    }
-
-    let monedaToPYG = false; // false: PYG -> Moneda (default), true: Moneda -> PYG
-
-    function applyDirection(preserveCode) {
-      if (monedaToPYG) {
-        // Moneda -> PYG
-        const prefer = preserveCode || 'USD';
-        setOptions($origen, MONEDAS, prefer);
-        $origen.disabled = false;
-        $destino.innerHTML = '<option value="PYG" selected>Guaraní (PYG)</option>';
-        $destino.disabled = true;
+    // Función para actualizar la interfaz según el tipo de operación
+    function actualizarInterfazOperacion() {
+      const esCompra = $operacionComprar.checked;
+      
+      if (esCompra) {
+        // QUIERO COMPRAR: Pagar en PYG, recibir otra moneda
+        $textoMonto.textContent = 'Monto a pagar (en Guaraníes)';
+        $textoMoneda.textContent = 'Moneda que quiero comprar';
+        $simboloMonto.textContent = '₲';
+        $operacionAyuda.textContent = 'Comprando: Selecciona qué moneda quieres comprar y paga en Guaraníes';
+        $monto.placeholder = '1000000';
       } else {
-        // PYG -> Moneda
-        $origen.innerHTML = '<option value="PYG" selected>Guaraní (PYG)</option>';
-        $origen.disabled = true;
-        const prefer = preserveCode || 'USD';
-        const sel = MONEDAS.find(m => m.codigo === prefer) ? prefer : (MONEDAS[0]?.codigo || '');
-        setOptions($destino, MONEDAS, sel);
-        $destino.disabled = false;
+        // QUIERO VENDER: Entregar otra moneda, recibir PYG
+        $textoMonto.textContent = 'Monto que quiero vender';
+        $textoMoneda.textContent = 'Moneda que quiero vender';
+        const monedaSeleccionada = MONEDAS.find(m => m.codigo === $monedaOperacion.value);
+        const simboloMoneda = monedaSeleccionada ? getSimboloMoneda(monedaSeleccionada.codigo) : '$';
+        $simboloMonto.textContent = simboloMoneda;
+        $operacionAyuda.textContent = 'Vendiendo: Selecciona qué moneda quieres vender y recibe Guaraníes';
+        $monto.placeholder = '100';
       }
+      
+      simulate();
     }
-
-    function getCurrentNonPYG() {
-      // Devuelve el código de la moneda no-PYG actualmente seleccionada
-      if (monedaToPYG) return $origen.value;
-      return $destino.value;
+    
+    // Función para obtener símbolo de moneda
+    function getSimboloMoneda(codigo) {
+      const simbolos = {
+        'USD': '$',
+        'EUR': '€',
+        'ARS': '$',
+        'BRL': 'R$',
+        'PYG': '₲'
+      };
+      return simbolos[codigo] || codigo;
     }
 
     function simulate() {
       const monto = $monto.value;
-      const origen = $origen.value;
-      const destino = $destino.value;
+      const monedaOperacion = $monedaOperacion.value;
       const cliente = $cliente.value;
-      const metodoPago = $metodoPago ? $metodoPago.value : '';
-      if (!monto || !origen || !destino) return;
+      const esCompra = $operacionComprar.checked;
+      
+      if (!monto || !monedaOperacion || parseFloat(monto) <= 0) {
+        limpiarResultados();
+        return;
+      }
+
+      // Determinar origen y destino según el tipo de operación
+      let origen, destino;
+      if (esCompra) {
+        // COMPRAR: PYG -> Otra moneda
+        origen = 'PYG';
+        destino = monedaOperacion;
+      } else {
+        // VENDER: Otra moneda -> PYG
+        origen = monedaOperacion;
+        destino = 'PYG';
+      }
 
       const params = new URLSearchParams({
         monto: String(monto),
@@ -162,7 +207,6 @@
         destino: String(destino),
       });
       if (cliente) params.append('cliente_id', cliente);
-      if (metodoPago) params.append('metodo_pago_id', metodoPago);
 
       fetch(`{% url 'tasa_cambio:simular_cambio_api' %}?${params.toString()}`)
         .then(r => r.json())
@@ -194,6 +238,10 @@
           } else {
             $resDesc.textContent = '';
           }
+          
+          // Mostrar botón de comprar solo si es operación de compra y la simulación es exitosa
+          const esCompra = $operacionComprar.checked;
+          document.getElementById('enlace_compra_container').style.display = esCompra ? 'block' : 'none';
         })
         .catch(() => {
           $resValor.textContent = '—';
@@ -204,20 +252,38 @@
           const $resComision = document.getElementById('resultado_comision');
           if ($resSubtotal) $resSubtotal.textContent = '';
           if ($resComision) $resComision.textContent = '';
+          
+          // Ocultar botón de comprar si hay error
+          document.getElementById('enlace_compra_container').style.display = 'none';
         });
     }
+    
+    function limpiarResultados() {
+      $resValor.textContent = '—';
+      $resDetalle.textContent = 'Ingresa un monto válido para simular.';
+      $resTasas.textContent = '';
+      $resDesc.textContent = '';
+      const $resSubtotal = document.getElementById('resultado_subtotal');
+      const $resComision = document.getElementById('resultado_comision');
+      if ($resSubtotal) $resSubtotal.textContent = '';
+      if ($resComision) $resComision.textContent = '';
+      document.getElementById('enlace_compra_container').style.display = 'none';
+    }
 
+    // Event listeners
     $monto.addEventListener('input', simulate);
-    $origen.addEventListener('change', simulate);
-    $destino.addEventListener('change', simulate);
-    $cliente.addEventListener('change', simulate);
-    if ($metodoPago) $metodoPago.addEventListener('change', simulate);
-    $btnToggle.addEventListener('click', () => {
-      const keep = getCurrentNonPYG();
-      monedaToPYG = !monedaToPYG;
-      applyDirection(keep);
+    $monedaOperacion.addEventListener('change', function() {
+      // Actualizar símbolo de moneda si estamos vendiendo
+      if ($operacionVender.checked) {
+        const monedaSeleccionada = MONEDAS.find(m => m.codigo === $monedaOperacion.value);
+        const simboloMoneda = monedaSeleccionada ? getSimboloMoneda(monedaSeleccionada.codigo) : '$';
+        $simboloMonto.textContent = simboloMoneda;
+      }
       simulate();
     });
+    $cliente.addEventListener('change', simulate);
+    $operacionComprar.addEventListener('change', actualizarInterfazOperacion);
+    $operacionVender.addEventListener('change', actualizarInterfazOperacion);
 
     // Inicializar dirección por defecto (PYG -> USD)
     // Helpers: format numbers with dot thousands separators
@@ -249,8 +315,39 @@
       return `${prefix}${numFinal}${suffix}`;
     }
 
-    applyDirection();
+    // Configurar enlace dinámico a compras
+    document.getElementById('btnIrCompra').addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        const esCompra = $operacionComprar.checked;
+        const cantidad = $monto.value;
+        const cliente = $cliente.value;
+        
+        let url = "{% url 'transacciones:comprar_divisas' %}";
+        
+        // Solo redirigir a compras si es una operación de compra
+        if (esCompra && cantidad && $monedaOperacion.value) {
+            const params = new URLSearchParams({
+                'moneda_origen': 'PYG',
+                'moneda_destino': $monedaOperacion.value,
+                'cantidad': cantidad
+            });
+            
+            if (cliente) {
+                params.append('cliente_id', cliente);
+            }
+            
+            url += '?' + params.toString();
+            window.location.href = url;
+        } else {
+            alert('La pantalla de compras solo está disponible para operaciones de "Quiero Comprar"');
+        }
+    });
+
+    // Inicialización
+    actualizarInterfazOperacion();
     simulate();
   })();
 </script>
+
 {% endblock %}

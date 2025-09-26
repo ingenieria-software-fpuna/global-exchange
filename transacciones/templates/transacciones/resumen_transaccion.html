@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% load moneda_extras %}
+
+{% block title %}Resumen de Transacción{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-8">
+      
+      <!-- Header con estado -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-body text-center">
+          <h1 class="h3 mb-2">Resumen de Transacción</h1>
+          <div class="mb-3">
+            <span class="badge fs-6 px-3 py-2 
+              {% if transaccion.estado.codigo == 'PENDIENTE' %}bg-warning text-dark
+              {% elif transaccion.estado.codigo == 'PAGADA' %}bg-success
+              {% elif transaccion.estado.codigo == 'CANCELADA' %}bg-danger
+              {% elif transaccion.estado.codigo == 'ANULADA' %}bg-secondary
+              {% endif %}">
+              {{ transaccion.estado.nombre }}
+            </span>
+          </div>
+          <p class="text-muted mb-0">ID: <strong>{{ transaccion.id_transaccion }}</strong></p>
+          <p class="text-muted mb-0">Código de verificación: <strong>{{ transaccion.codigo_verificacion }}</strong></p>
+        </div>
+      </div>
+
+      <!-- Temporizador de expiración (solo si está pendiente) -->
+      {% if transaccion.estado.codigo == 'PENDIENTE' and puede_pagar %}
+      <div class="alert alert-warning" id="temporizador-alert">
+        <div class="d-flex align-items-center">
+          <i class="fas fa-clock me-2"></i>
+          <div>
+            <strong>Tiempo restante para completar el pago:</strong>
+            <span id="tiempo-restante" class="fw-bold"></span>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Detalles de la operación -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">
+          <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>Detalles de la Operación</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <p><strong>Tipo:</strong> {{ transaccion.tipo_operacion.nombre }}</p>
+              <p><strong>Fecha:</strong> {{ transaccion.fecha_creacion|date:"d/m/Y H:i" }}</p>
+              {% if transaccion.cliente %}
+                <p><strong>Cliente:</strong> {{ transaccion.cliente.nombre_comercial }}</p>
+              {% else %}
+                <p><strong>Cliente:</strong> <em>Walk-in</em></p>
+              {% endif %}
+            </div>
+            <div class="col-md-6">
+              <p><strong>Procesado por:</strong> {{ transaccion.usuario.nombre }} {{ transaccion.usuario.apellido }}</p>
+              {% if transaccion.fecha_pago %}
+                <p><strong>Fecha de pago:</strong> {{ transaccion.fecha_pago|date:"d/m/Y H:i" }}</p>
+              {% endif %}
+              {% if transaccion.metodo_cobro %}
+                <p><strong>Método de cobro:</strong> {{ transaccion.metodo_cobro.nombre }}
+                  {% if transaccion.metodo_cobro.comision > 0 %}
+                    <small class="text-danger">({{ transaccion.metodo_cobro.comision }}% comisión)</small>
+                  {% endif %}
+                </p>
+              {% endif %}
+              {% if transaccion.metodo_pago %}
+                <p><strong>Método de entrega:</strong> {{ transaccion.metodo_pago.nombre }}
+                  {% if transaccion.metodo_pago.comision > 0 %}
+                    <small class="text-danger">({{ transaccion.metodo_pago.comision }}% comisión)</small>
+                  {% endif %}
+                </p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Información financiera -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">
+          <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Resumen Financiero</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <!-- Información principal igual que la vista previa -->
+            <div class="col-12">
+              <div class="alert alert-primary alert-sm mb-3">
+                <i class="fas fa-info-circle me-1"></i>
+                <strong>Cliente debe pagar:</strong> {{ resumen_detallado.total_cliente_formateado }}
+              </div>
+            </div>
+            
+            <!-- Columna izquierda: Desglose -->
+            <div class="col-md-6">
+              <div class="mb-2">
+                <label class="text-muted small">Monto base:</label>
+                <div class="fw-bold">{{ resumen_detallado.subtotal_formateado }}</div>
+              </div>
+              
+              <div class="mb-2">
+                <label class="text-muted small">Tasa base ({{ resumen_detallado.tasa_cambio_tipo }}):</label>
+                <div class="fw-bold">₲ {{ resumen_detallado.tasa_base|floatformat:4 }}</div>
+              </div>
+              
+              {% if resumen_detallado.cliente and resumen_detallado.cliente.descuento > 0 %}
+              <div class="mb-2">
+                <label class="text-muted small">Tasa ajustada (con {{ resumen_detallado.cliente.descuento }}% descuento):</label>
+                <div class="fw-bold text-success">₲ {{ resumen_detallado.tasa_ajustada|floatformat:4 }}</div>
+              </div>
+              {% else %}
+              <div class="mb-2">
+                <label class="text-muted small">Tasa utilizada ({{ resumen_detallado.tasa_cambio_tipo }}):</label>
+                <div class="fw-bold">₲ {{ resumen_detallado.tasa_cambio|floatformat:4 }}</div>
+              </div>
+              {% endif %}
+              
+              {% if resumen_detallado.comision_cobro > 0 %}
+              <div class="mb-2">
+                <label class="text-muted small">Comisión cobro:</label>
+                <div class="text-danger">- {{ resumen_detallado.comision_cobro_formateado }} ({{ resumen_detallado.metodo_cobro.comision }}%)</div>
+              </div>
+              {% endif %}
+              
+              {% if resumen_detallado.comision_pago > 0 %}
+              <div class="mb-2">
+                <label class="text-muted small">Comisión entrega:</label>
+                <div class="text-danger">- {{ resumen_detallado.comision_pago_formateado }} ({{ resumen_detallado.metodo_pago.comision }}%)</div>
+              </div>
+              {% endif %}
+              
+            </div>
+            
+            <!-- Columna derecha: Lo que recibe (destacado) -->
+            <div class="col-md-6">
+              <div class="alert alert-success alert-sm mb-3">
+                <i class="fas fa-gift me-1"></i>
+                <strong>Cliente recibira:</strong> {{ resumen_detallado.monto_recibe_formateado }}
+              </div>
+              
+              {% if resumen_detallado.cliente %}
+              <!-- <div class="p-3 bg-light rounded">
+                <h6 class="text-muted mb-2">Información del Cliente</h6>
+                <p class="mb-1"><strong>{{ resumen_detallado.cliente.nombre }}</strong></p>
+                {% if resumen_detallado.cliente.tipo %}
+                  <p class="mb-1">Tipo: {{ resumen_detallado.cliente.tipo }}</p>
+                {% endif %}
+                {% if resumen_detallado.cliente.descuento > 0 %}
+                  <p class="mb-0 text-success">Descuento: {{ resumen_detallado.cliente.descuento }}%</p>
+                {% endif %}
+              </div> -->
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botones de acción -->
+      <div class="card shadow-sm">
+        <div class="card-body text-center">
+          {% if puede_pagar %}
+            <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+              <form method="post" action="{% url 'transacciones:procesar_pago' transaccion.id_transaccion %}" class="me-md-2">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success btn-lg" onclick="return confirm('¿Confirma que desea procesar el pago de esta transacción?')">
+                  <i class="fas fa-credit-card me-2"></i>
+                  Procesar Pago
+                </button>
+              </form>
+              
+              <form method="post" action="{% url 'transacciones:cancelar_transaccion' transaccion.id_transaccion %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-lg" onclick="return confirm('¿Está seguro que desea cancelar esta transacción?')">
+                  <i class="fas fa-times me-2"></i>
+                  Cancelar
+                </button>
+              </form>
+            </div>
+          {% else %}
+            <div class="text-muted">
+              {% if transaccion.estado.codigo == 'PAGADA' %}
+                <i class="fas fa-check-circle text-success fs-3"></i>
+                <p class="mt-2">Esta transacción ha sido completada exitosamente.</p>
+              {% elif transaccion.estado.codigo == 'CANCELADA' %}
+                <i class="fas fa-times-circle text-danger fs-3"></i>
+                <p class="mt-2">Esta transacción fue cancelada.</p>
+              {% elif transaccion.estado.codigo == 'ANULADA' %}
+                <i class="fas fa-ban text-secondary fs-3"></i>
+                <p class="mt-2">Esta transacción fue anulada.</p>
+              {% else %}
+                <p>Esta transacción ya no se puede modificar.</p>
+              {% endif %}
+            </div>
+          {% endif %}
+          
+          <div class="mt-3">
+            <a href="{% url 'tasa_cambio:dashboard' %}" class="btn btn-outline-primary">
+              <i class="fas fa-arrow-left me-2"></i>
+              Volver al Dashboard
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Observaciones (si las hay) -->
+      {% if transaccion.observaciones %}
+      <div class="card shadow-sm mt-4">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Observaciones</h6>
+        </div>
+        <div class="card-body">
+          <pre class="mb-0">{{ transaccion.observaciones }}</pre>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<!-- Script para el temporizador -->
+{% if transaccion.estado.codigo == 'PENDIENTE' and puede_pagar %}
+<script>
+(function() {
+  // Obtener tiempo restante de forma segura
+  let tiempoRestante = parseInt('{{ tiempo_restante|default:0|floatformat:0 }}') || 0;
+  const elementoTiempo = document.getElementById('tiempo-restante');
+  const alertElement = document.getElementById('temporizador-alert');
+  
+  // Verificar que los elementos existen
+  if (!elementoTiempo || !alertElement) {
+    console.error('Elementos del temporizador no encontrados');
+    return;
+  }
+  
+  function formatearTiempo(segundos) {
+    const minutos = Math.floor(segundos / 60);
+    const segs = Math.floor(segundos % 60);
+    return `${minutos}:${segs.toString().padStart(2, '0')}`;
+  }
+  
+  function actualizarTemporizador() {
+    if (tiempoRestante <= 0) {
+      elementoTiempo.textContent = 'EXPIRADO - Cancelando...';
+      alertElement.className = 'alert alert-danger';
+      alertElement.innerHTML = `
+        <div class="d-flex align-items-center">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          <div>
+            <strong>¡Tiempo agotado!</strong><br>
+            <span>La transacción está siendo cancelada automáticamente...</span>
+          </div>
+        </div>
+      `;
+      
+      // Llamar al servidor para cancelar automáticamente
+      fetch('{% url "transacciones:cancelar_por_expiracion" transaccion.id_transaccion %}', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': '{{ csrf_token }}',
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          alertElement.innerHTML = `
+            <div class="d-flex align-items-center">
+              <i class="fas fa-times-circle me-2"></i>
+              <div>
+                <strong>Transacción cancelada automáticamente</strong><br>
+                <span>El tiempo de pago ha expirado</span>
+              </div>
+            </div>
+          `;
+          // Recargar después de 3 segundos para mostrar el nuevo estado
+          setTimeout(function() { location.reload(); }, 3000);
+        } else {
+          // Si falla la cancelación automática, recargar para verificar estado
+          setTimeout(function() { location.reload(); }, 2000);
+        }
+      })
+      .catch(error => {
+        console.error('Error al cancelar automáticamente:', error);
+        // Recargar la página como fallback
+        setTimeout(function() { location.reload(); }, 2000);
+      });
+      
+      return;
+    }
+    
+    elementoTiempo.textContent = formatearTiempo(tiempoRestante);
+    
+    // Cambiar color cuando queden menos de 60 segundos
+    if (tiempoRestante <= 60) {
+      alertElement.className = 'alert alert-danger';
+    }
+    
+    tiempoRestante--;
+    setTimeout(actualizarTemporizador, 1000);
+  }
+  
+  // Iniciar el temporizador
+  actualizarTemporizador();
+})();
+</script>
+{% endif %}
+
+{% endblock %}
