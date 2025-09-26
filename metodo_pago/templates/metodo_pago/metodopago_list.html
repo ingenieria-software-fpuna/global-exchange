@@ -70,6 +70,7 @@
                             <th>Nombre</th>
                             <th>Descripción</th>
                             <th>Comisión</th>
+                            <th>Monedas Permitidas</th>
                             <th>Estado</th>
                             <th>Creado</th>
                             <th>Actualizado</th>
@@ -82,6 +83,15 @@
                             <td><strong>{{ m.nombre }}</strong></td>
                             <td class="text-muted">{{ m.descripcion|default:"-" }}</td>
                             <td><span class="badge bg-info text-dark">{{ m.comision }}%</span></td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% for moneda in m.monedas_permitidas.all %}
+                                    <span class="badge bg-secondary">{{ moneda.codigo }}</span>
+                                    {% empty %}
+                                    <span class="text-muted">-</span>
+                                    {% endfor %}
+                                </div>
+                            </td>
                             <td>
                                 {% if m.es_activo %}
                                 <span class="badge bg-success"><i class="fas fa-check me-1"></i>Activo</span>

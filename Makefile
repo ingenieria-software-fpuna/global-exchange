@@ -53,6 +53,10 @@ limpiar-codigos-dry:
 	@echo "Simulando limpieza de códigos de verificación expirados..."
 	poetry run python manage.py limpiar_codigos --dry-run
 
+setup-transactions:
+	@echo "Configurando tipos y estados de transacciones..."
+	poetry run python manage.py setup_transacciones
+
 app-setup:
 	@echo "Configurando el proyecto Django..."
 	make db-clean
@@ -67,6 +71,7 @@ endif
 	make create-currencies
 	make create-payment-methods
 	make create-collection-methods
+	make setup-transactions
 
 #-------------- Comandos de administración ----------------#
 
