@@ -169,19 +169,58 @@
                                 {{ form.non_field_errors }}
                             </div>
                         {% endif %}
+                    </div>
 
-                        <!-- Botones de acción -->
-                        <div class="d-flex justify-content-end gap-2 mt-4">
-                            <a href="{% url 'tasa_cambio:tasacambio_list' %}" class="btn btn-secondary">
-                                <i class="fas fa-times"></i> Cancelar
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> {{ accion|default:"Guardar" }}
-                            </button>
-                        </div>
-                    </form>
+                    <!-- Tasa de Compra -->
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ form.tasa_compra.id_for_label }}">
+                            {{ form.tasa_compra.label }} <span class="text-danger">*</span>
+                        </label>
+                        {{ form.tasa_compra }}
+                        {% for e in form.tasa_compra.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                        {% if form.tasa_compra.help_text %}
+                            <div class="form-text">{{ form.tasa_compra.help_text }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Tasa de Venta -->
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ form.tasa_venta.id_for_label }}">
+                            {{ form.tasa_venta.label }} <span class="text-danger">*</span>
+                        </label>
+                        {{ form.tasa_venta }}
+                        {% for e in form.tasa_venta.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                        {% if form.tasa_venta.help_text %}
+                            <div class="form-text">{{ form.tasa_venta.help_text }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Fecha de Vigencia -->
+                    <div class="col-md-12">
+                        <label class="form-label" for="{{ form.fecha_vigencia.id_for_label }}">
+                            {{ form.fecha_vigencia.label }}
+                        </label>
+                        {{ form.fecha_vigencia }}
+                        {% for e in form.fecha_vigencia.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                        {% if form.fecha_vigencia.help_text %}
+                            <div class="form-text">{{ form.fecha_vigencia.help_text }}</div>
+                        {% endif %}
+                    </div>
                 </div>
-            </div>
+
+                <!-- Errores generales del formulario -->
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger mt-3">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <!-- Botones de acción -->
+                <div class="d-flex justify-content-end mt-4">
+                    <a href="{% url 'tasa_cambio:tasacambio_list' %}" class="btn btn-outline-secondary me-2">Cancelar</a>
+                    <button type="submit" class="btn btn-primary">{{ accion|default:"Guardar" }}</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -189,24 +228,7 @@
 
 {% block extra_js %}
 <script>
-// Validación de formulario de Bootstrap
-(function() {
-    'use strict';
-    window.addEventListener('load', function() {
-        var forms = document.getElementsByClassName('needs-validation');
-        var validation = Array.prototype.filter.call(forms, function(form) {
-            form.addEventListener('submit', function(event) {
-                if (form.checkValidity() === false) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                }
-                form.classList.add('was-validated');
-            }, false);
-        });
-    }, false);
-})();
-
-// Validación en tiempo real y cálculo de precios
+// Validación en tiempo real de tasas
 document.addEventListener('DOMContentLoaded', function() {
     const precioBase = document.getElementById('{{ form.precio_base.id_for_label }}');
     const comisionCompra = document.getElementById('{{ form.comision_compra.id_for_label }}');
