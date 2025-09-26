@@ -3,6 +3,7 @@ from django.template.loader import render_to_string
 from django.conf import settings
 from django.utils import timezone
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,32 @@ class EmailService:
     def enviar_codigo_verificacion(usuario, codigo_obj, request=None):
         """
         Envía email con código de verificación usando template HTML
+        En modo desarrollo, puede mostrar el código en consola sin enviar email
         """
+        # Verificar configuración de 2FA
+        enable_2fa = os.environ.get('ENABLE_2FA', 'true').lower() in ['true', '1', 'yes', 'on']
+        dev_mode = os.environ.get('ENABLE_2FA_DEV_MODE', 'false').lower() in ['true', '1', 'yes', 'on']
+        fixed_code = os.environ.get('FIXED_2FA_CODE', '').strip()
+
+        # Si está deshabilitada la 2FA completamente, no hacer nada
+        if not enable_2fa:
+            logger.info(f"2FA deshabilitada - no se envía código a {usuario.email}")
+            return True, "2FA deshabilitada"
+
+        # Modo desarrollo: mostrar código en consola y logs sin enviar email
+        if dev_mode:
+            print(f"\n{'='*60}")
+            print(f"🔐 CÓDIGO DE VERIFICACIÓN 2FA - MODO DESARROLLO")
+            print(f"{'='*60}")
+            print(f"Usuario: {usuario.email}")
+            print(f"Código: {codigo_obj.codigo}")
+            print(f"Tipo: {codigo_obj.get_tipo_display()}")
+            print(f"Expira en: 5 minutos")
+            print(f"{'='*60}\n")
+
+            logger.info(f"DEV MODE - Código 2FA para {usuario.email}: {codigo_obj.codigo}")
+            return True, "Código mostrado en consola (modo desarrollo)"
+
         try:
             # Calcular tiempo de expiración en minutos
             tiempo_restante = codigo_obj.fecha_expiracion - timezone.now()
@@ -85,7 +111,39 @@ Equipo de {context['sitio_web']}
     def enviar_reset_password(usuario, token_obj, request=None):
         """
         Envía email con enlace de reset de contraseña
+        En modo desarrollo, puede mostrar el enlace en consola
         """
+        # Verificar configuración de 2FA para reset de contraseña
+        enable_2fa = os.environ.get('ENABLE_2FA', 'true').lower() in ['true', '1', 'yes', 'on']
+        dev_mode = os.environ.get('ENABLE_2FA_DEV_MODE', 'false').lower() in ['true', '1', 'yes', 'on']
+
+        # Si está deshabilitada la 2FA, no enviar email de reset
+        if not enable_2fa:
+            logger.info(f"2FA deshabilitada - no se envía enlace de reset a {usuario.email}")
+            return True, "2FA deshabilitada"
+
+        # Modo desarrollo: mostrar enlace en consola
+        if dev_mode:
+            # Generar URL de reset
+            if request:
+                reset_url = request.build_absolute_uri(
+                    f"/auth/reset-contrasena/{token_obj.token}/"
+                )
+            else:
+                base_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+                reset_url = f"{base_url}/auth/reset-contrasena/{token_obj.token}/"
+
+            print(f"\n{'='*60}")
+            print(f"🔑 ENLACE DE RESET DE CONTRASEÑA - MODO DESARROLLO")
+            print(f"{'='*60}")
+            print(f"Usuario: {usuario.email}")
+            print(f"Enlace: {reset_url}")
+            print(f"Expira en: {int((token_obj.fecha_expiracion - timezone.now()).total_seconds() / 60)} minutos")
+            print(f"{'='*60}\n")
+
+            logger.info(f"DEV MODE - Enlace de reset para {usuario.email}: {reset_url}")
+            return True, "Enlace mostrado en consola (modo desarrollo)"
+
         try:
             # Calcular tiempo de expiración en minutos
             tiempo_restante = token_obj.fecha_expiracion - timezone.now()

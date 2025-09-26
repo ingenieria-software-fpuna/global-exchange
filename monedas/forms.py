@@ -11,7 +11,7 @@ class MonedaForm(forms.ModelForm):
     class Meta:
         model = Moneda
         fields = [
-            'nombre', 'codigo', 'simbolo', 'decimales', 'monto_limite_transaccion', 'es_activa'
+            'nombre', 'codigo', 'simbolo', 'decimales', 'monto_limite_transaccion'
         ]
         widgets = {
             'nombre': forms.TextInput(attrs={
@@ -39,23 +39,18 @@ class MonedaForm(forms.ModelForm):
                 'min': '0',
                 'step': '0.01'
             }),
-            'es_activa': forms.CheckboxInput(attrs={
-                'class': 'form-check-input'
-            }),
         }
         labels = {
             'nombre': 'Nombre de la Moneda',
             'codigo': 'Código ISO 4217',
             'simbolo': 'Símbolo',
             'monto_limite_transaccion': 'Monto límite por transacción',
-            'es_activa': 'Moneda Activa',
         }
         help_texts = {
             'nombre': 'Nombre completo de la moneda',
             'codigo': 'Código de 3 letras según ISO 4217',
             'simbolo': 'Símbolo usado para representar la moneda',
             'monto_limite_transaccion': 'El monto límite debe estar expresado en guaraníes (PYG). Vacío = sin límite.',
-            'es_activa': 'Indica si la moneda está disponible para operaciones',
         }
 
     def __init__(self, *args, **kwargs):
@@ -68,6 +63,17 @@ class MonedaForm(forms.ModelForm):
                 message='El código debe tener exactamente 3 letras mayúsculas.'
             )
         )
+
+    def save(self, commit=True):
+        """
+        Sobrescribir save para establecer es_activa=True por defecto
+        """
+        instance = super().save(commit=False)
+        if not instance.pk:  # Solo para nuevas monedas
+            instance.es_activa = True
+        if commit:
+            instance.save()
+        return instance
 
     def clean_codigo(self):
         codigo = self.cleaned_data.get('codigo')

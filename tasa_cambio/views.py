@@ -74,6 +74,7 @@ class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         context['estado'] = self.request.GET.get('estado', '')
         context['fecha_desde'] = self.request.GET.get('fecha_desde', '')
         context['fecha_hasta'] = self.request.GET.get('fecha_hasta', '')
+        context['monedas'] = Moneda.objects.filter(es_activa=True).order_by('nombre')
         return context
 
 
@@ -182,7 +183,7 @@ def dashboard_tasacambio(request):
     ).select_related('tipo_cliente').order_by('nombre_comercial')
 
     context = {
-        'titulo': 'Dashboard de Cotizaciones',
+        'titulo': 'Simulador de Cambio',
         'total_cotizaciones': TasaCambio.objects.count(),
         'cotizaciones_activas': TasaCambio.objects.filter(es_activa=True).count(),
         'cotizaciones_inactivas': TasaCambio.objects.filter(es_activa=False).count(),

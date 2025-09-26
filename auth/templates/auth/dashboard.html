@@ -3,206 +3,406 @@
 {% block title %}Dashboard - Global Exchange{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="row">
-        <div class="col text-center">
-            <h1 class="display-4">¡Bienvenido, {{ user.nombre|default:user.email }}!</h1>
-            <p class="lead">Dashboard de administración para Global Exchange.</p>
+<div class="dashboard-bg min-vh-100">
+    <div class="container-fluid px-4 py-2">
+        <!-- Compact Header Section -->
+        <div class="row mb-2">
+            <div class="col-12 d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h4 fw-bold text-dark mb-1">¡Bienvenido, {{ user.nombre|default:user.email }}!</h1>
+                    <p class="text-muted small mb-0">Panel de administración - Global Exchange</p>
+                </div>
+            </div>
+        </div>
+
+    <!-- Quick Actions Section -->
+    <div class="row mb-3">
+        <div class="col-12 mb-1">
+            <h2 class="h6 fw-semibold text-dark mb-0">
+                <i class="fas fa-bolt text-primary me-2"></i>Acciones Rápidas
+            </h2>
+        </div>
+        <div class="col-lg-4 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm h-100 hover-shadow">
+                <div class="card-body text-center p-3">
+                    <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                        <i class="fas fa-shopping-cart fa-lg text-primary"></i>
+                    </div>
+                    <h6 class="card-title fw-semibold mb-1">Comprar Divisas</h6>
+                    <p class="card-text text-muted" style="font-size: 0.8rem;">Transacciones de compra directas</p>
+                </div>
+                <div class="card-footer border-0 bg-transparent p-2">
+                    <a href="{% url 'transacciones:comprar_divisas' %}" class="btn btn-primary w-100 btn-sm fw-semibold">
+                        <i class="fas fa-shopping-cart me-1"></i>Comprar
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm h-100 hover-shadow">
+                <div class="card-body text-center p-3">
+                    <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                        <i class="fas fa-hand-holding-usd fa-lg text-success"></i>
+                    </div>
+                    <h6 class="card-title fw-semibold mb-1">Vender Divisas</h6>
+                    <p class="card-text text-muted" style="font-size: 0.8rem;">Transacciones de venta directas</p>
+                </div>
+                <div class="card-footer border-0 bg-transparent p-2">
+                    <a href="{% url 'transacciones:vender_divisas' %}" class="btn btn-success w-100 btn-sm fw-semibold">
+                        <i class="fas fa-hand-holding-usd me-1"></i>Vender
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm h-100 hover-shadow">
+                <div class="card-body text-center p-3">
+                    <div class="bg-info bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                        <i class="fas fa-calculator fa-lg text-info"></i>
+                    </div>
+                    <h6 class="card-title fw-semibold mb-1">Simulador</h6>
+                    <p class="card-text text-muted" style="font-size: 0.8rem;">Calcula cambios entre monedas</p>
+                </div>
+                <div class="card-footer border-0 bg-transparent p-2">
+                    <a href="{% url 'tasa_cambio:dashboard' %}" class="btn btn-outline-info w-100 btn-sm fw-semibold">
+                        <i class="fas fa-calculator me-1"></i>Simulador
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
-    <hr>
-    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4 text-center">
-        <!-- Comprar Divisas (acceso directo) -->
-        <div class="col">
-            <div class="card h-100 shadow-sm border-primary">
-                <div class="card-body">
-                    <i class="fas fa-shopping-cart fa-3x text-primary mb-3"></i>
-                    <h5 class="card-title">Comprar Divisas</h5>
-                    <p class="card-text">Realiza transacciones de compra de divisas directamente.</p>
-                </div>
-                <div class="card-footer bg-light">
-                    <a href="{% url 'transacciones:comprar_divisas' %}" class="btn btn-primary w-100">
-                        <i class="fas fa-shopping-cart me-1"></i>
-                        Comprar Ahora
-                    </a>
-                </div>
+
+    <!-- Administration Sections Row 1: User & Client Management -->
+    {% if can_view_usuarios or can_view_groups or can_view_tipocliente or can_view_cliente %}
+    <div class="admin-section-container p-3 mb-3">
+    <div class="row">
+        <!-- User Management Section -->
+        {% if can_view_usuarios or can_view_groups %}
+        <div class="col-lg-6 mb-2">
+            <div class="group-header p-2 mb-2">
+                <h2 class="h6 fw-bold text-dark mb-0">
+                    <i class="fas fa-users-cog text-primary me-2"></i>Gestión de Usuarios
+                </h2>
             </div>
-        </div>
-        <!-- Vender Divisas (acceso directo) -->
-        <div class="col">
-            <div class="card h-100 shadow-sm border-warning">
-                <div class="card-body">
-                    <i class="fas fa-hand-holding-usd fa-3x text-warning mb-3"></i>
-                    <h5 class="card-title">Vender Divisas</h5>
-                    <p class="card-text">Realiza transacciones de venta de divisas directamente.</p>
+            <div class="row">
+                {% if can_view_usuarios %}
+                <div class="col-12 mb-1">
+                    <div class="card border-0 shadow-sm hover-shadow">
+                        <div class="card-body d-flex align-items-center p-2">
+                            <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 30px; height: 30px;">
+                                <i class="fas fa-users text-primary" style="font-size: 0.8rem;"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="card-title fw-semibold mb-0" style="font-size: 0.85rem;">Usuarios</h6>
+                                <p class="card-text text-muted mb-0" style="font-size: 0.65rem;">Administra usuarios y perfiles</p>
+                            </div>
+                            <a href="{% url 'usuarios:user_list' %}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-footer bg-light">
-                    <a href="{% url 'transacciones:vender_divisas' %}" class="btn btn-warning w-100">
-                        <i class="fas fa-hand-holding-usd me-1"></i>
-                        Vender Ahora
-                    </a>
+                {% endif %}
+                {% if can_view_groups %}
+                <div class="col-12 mb-1">
+                    <div class="card border-0 shadow-sm hover-shadow">
+                        <div class="card-body d-flex align-items-center p-3">
+                            <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 35px; height: 35px;">
+                                <i class="fas fa-layer-group text-primary"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="card-title fw-semibold mb-1">Grupos</h6>
+                                <p class="card-text text-muted mb-0" style="font-size: 0.7rem;">Gestiona grupos y permisos</p>
+                            </div>
+                            <a href="{% url 'grupos:group_list' %}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-        <!-- Simulador de cambio (acceso público) -->
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <i class="fas fa-calculator fa-3x text-secondary mb-3"></i>
-                    <h5 class="card-title">Simulador de Cambio</h5>
-                    <p class="card-text">Calcula cuánto recibes al cambiar entre monedas.</p>
-                </div>
-                <div class="card-footer bg-light">
-                    <a href="{% url 'tasa_cambio:dashboard' %}" class="btn btn-outline-secondary w-100">
-                        Abrir Simulador
-                    </a>
-                </div>
-            </div>
-        </div>
-        {% if can_view_usuarios %}
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <i class="fas fa-users fa-3x text-primary mb-3"></i>
-                    <h5 class="card-title">Usuarios</h5>
-                    <p class="card-text">Administra los usuarios del sistema. Crea, edita y elimina perfiles.</p>
-                </div>
-                <div class="card-footer bg-light">
-                    <a href="{% url 'usuarios:user_list' %}"  class="btn btn-primary w-100">
-                        Ir a Usuarios
-                    </a>
-                </div>
+                {% endif %}
             </div>
         </div>
         {% endif %}
-        {% if can_view_groups %}
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <i class="fas fa-layer-group fa-3x text-info mb-3"></i>
-                    <h5 class="card-title">Grupos</h5>
-                    <p class="card-text">Gestiona los grupos y permisos para controlar el acceso a la aplicación.</p>
+
+        <!-- Client Management Section -->
+        {% if can_view_tipocliente or can_view_cliente %}
+        <div class="col-lg-6 mb-2">
+            <div class="group-header p-2 mb-2">
+                <h2 class="h6 fw-bold text-dark mb-0">
+                    <i class="fas fa-user-tie text-success me-2"></i>Gestión de Clientes
+                </h2>
+            </div>
+            <div class="row">
+                {% if can_view_tipocliente %}
+                <div class="col-12 mb-1">
+                    <div class="card border-0 shadow-sm hover-shadow">
+                        <div class="card-body d-flex align-items-center p-3">
+                            <div class="bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 35px; height: 35px;">
+                                <i class="fas fa-tags text-success"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="card-title fw-semibold mb-1">Tipos de Cliente</h6>
+                                <p class="card-text text-muted mb-0" style="font-size: 0.7rem;">Gestiona tipos de clientes</p>
+                            </div>
+                            <a href="{% url 'clientes:tipocliente_list' %}" class="btn btn-outline-success btn-sm">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-footer bg-light">
-                    <a href="{% url 'grupos:group_list' %}" class="btn btn-info w-100 text-white">
-                        Ir a Grupos
+                {% endif %}
+                {% if can_view_cliente %}
+                <div class="col-12 mb-1">
+                    <div class="card border-0 shadow-sm hover-shadow">
+                        <div class="card-body d-flex align-items-center p-3">
+                            <div class="bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 35px; height: 35px;">
+                                <i class="fas fa-user-tie text-success"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="card-title fw-semibold mb-1">Clientes</h6>
+                                <p class="card-text text-muted mb-0" style="font-size: 0.7rem;">Administra información de clientes</p>
+                            </div>
+                            <a href="{% url 'clientes:cliente_list' %}" class="btn btn-outline-success btn-sm">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    </div>
+    {% endif %}
+
+    <!-- Administration Sections Row 2: Exchange & Payment Management -->
+    {% if can_view_monedas or can_view_tasacambio or can_view_metodopago or can_view_metodocobro %}
+    <div class="admin-section-container p-3 mb-3">
+    <div class="row">
+        <!-- Exchange Management Section -->
+        {% if can_view_monedas or can_view_tasacambio %}
+        <div class="col-lg-6 mb-2">
+            <div class="group-header p-2 mb-2">
+                <h2 class="h6 fw-bold text-dark mb-0">
+                    <i class="fas fa-exchange-alt text-info me-2"></i>Gestión de Divisas
+                </h2>
+            </div>
+            <div class="row">
+                {% if can_view_monedas %}
+                <div class="col-12 mb-1">
+                    <div class="card border-0 shadow-sm hover-shadow">
+                        <div class="card-body d-flex align-items-center p-3">
+                            <div class="bg-info bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 35px; height: 35px;">
+                                <i class="fas fa-coins text-info"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="card-title fw-semibold mb-1">Monedas</h6>
+                                <p class="card-text text-muted mb-0" style="font-size: 0.7rem;">Gestiona monedas del sistema</p>
+                            </div>
+                            <a href="{% url 'monedas:moneda_list' %}" class="btn btn-outline-info btn-sm">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if can_view_tasacambio %}
+                <div class="col-12 mb-1">
+                    <div class="card border-0 shadow-sm hover-shadow">
+                        <div class="card-body d-flex align-items-center p-3">
+                            <div class="bg-info bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 35px; height: 35px;">
+                                <i class="fas fa-chart-line text-info"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="card-title fw-semibold mb-1">Cotizaciones</h6>
+                                <p class="card-text text-muted mb-0" style="font-size: 0.7rem;">Administra cotizaciones de monedas</p>
+                            </div>
+                            <a href="{% url 'tasa_cambio:tasacambio_list' %}" class="btn btn-outline-info btn-sm">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Payment Management Section -->
+        {% if can_view_metodopago or can_view_metodocobro %}
+        <div class="col-lg-6 mb-2">
+            <div class="group-header p-2 mb-2">
+                <h2 class="h6 fw-bold text-dark mb-0">
+                    <i class="fas fa-credit-card text-warning me-2"></i>Gestión de Pagos
+                </h2>
+            </div>
+            <div class="row">
+                {% if can_view_metodopago %}
+                <div class="col-12 mb-1">
+                    <div class="card border-0 shadow-sm hover-shadow">
+                        <div class="card-body d-flex align-items-center p-3">
+                            <div class="bg-warning bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 35px; height: 35px;">
+                                <i class="fas fa-credit-card text-warning"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="card-title fw-semibold mb-1">Métodos de Pago</h6>
+                                <p class="card-text text-muted mb-0" style="font-size: 0.7rem;">Configura pagos y comisiones</p>
+                            </div>
+                            <a href="{% url 'metodo_pago:metodopago_list' %}" class="btn btn-outline-warning btn-sm">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if can_view_metodocobro %}
+                <div class="col-12 mb-1">
+                    <div class="card border-0 shadow-sm hover-shadow">
+                        <div class="card-body d-flex align-items-center p-3">
+                            <div class="bg-warning bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 35px; height: 35px;">
+                                <i class="fas fa-money-bill-wave text-warning"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="card-title fw-semibold mb-1">Métodos de Cobro</h6>
+                                <p class="card-text text-muted mb-0" style="font-size: 0.7rem;">Configura cobros y restricciones</p>
+                            </div>
+                            <a href="{% url 'metodo_cobro:metodocobro_list' %}" class="btn btn-outline-warning btn-sm">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    </div>
+    {% endif %}
+
+    <!-- Administration Sections Row 3: Configuration (can share row if needed) -->
+    {% if can_view_configuracion %}
+    <div class="admin-section-container p-3 mb-3">
+    <div class="row">
+        <!-- System Configuration Section -->
+        <div class="col-lg-6 mb-2">
+            <div class="group-header p-2 mb-2">
+                <h2 class="h6 fw-bold text-dark mb-0">
+                    <i class="fas fa-cog text-secondary me-2"></i>Configuración del Sistema
+                </h2>
+            </div>
+            <div class="card border-0 shadow-sm hover-shadow">
+                <div class="card-body d-flex align-items-center p-3">
+                    <div class="bg-secondary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 35px; height: 35px;">
+                        <i class="fas fa-cog text-secondary"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="card-title fw-semibold mb-1">Configuración</h6>
+                        <p class="card-text text-muted mb-0" style="font-size: 0.7rem;">Configura límites y parámetros del sistema</p>
+                    </div>
+                    <a href="{% url 'configuracion:configuracion' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-right"></i>
                     </a>
                 </div>
             </div>
         </div>
-        {% endif %}
-        {% if can_view_tipocliente %}
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <i class="fas fa-tags fa-3x text-warning mb-3"></i>
-                    <h5 class="card-title">Tipos de Cliente</h5>
-                    <p class="card-text">Gestiona los tipos de clientes del sistema.</p>
-                </div>
-                <div class="card-footer bg-light">
-                    <a href="{% url 'clientes:tipocliente_list' %}" class="btn btn-warning w-100 text-dark">
-                        Ir a Tipos de Cliente
-                    </a>
-                </div>
-            </div>
+
+        <!-- Empty space for potential future modules or asymmetric layouts -->
+        <div class="col-lg-6 mb-2">
+            <!-- This space is available for future modules or remains empty for better visual balance -->
         </div>
-        {% endif %}
-        {% if can_view_cliente %}
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <i class="fas fa-user-tie fa-3x text-success mb-3"></i>
-                    <h5 class="card-title">Clientes</h5>
-                    <p class="card-text">Administra la información de tus clientes y su segmentación.</p>
-                </div>
-                <div class="card-footer bg-light">
-                    <a href="{% url 'clientes:cliente_list' %}" class="btn btn-success w-100">
-                        Ir a Clientes
-                    </a>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        {% if can_view_monedas %}
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <i class="fas fa-coins fa-3x text-success mb-3"></i>
-                    <h5 class="card-title">Monedas</h5>
-                    <p class="card-text">Gestiona las monedas del sistema para las operaciones de cambio.</p>
-                </div>
-                <div class="card-footer bg-light">
-                    <a href="{% url 'monedas:moneda_list' %}" class="btn btn-success w-100 text-white">
-                        Ir a Monedas
-                    </a>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        {% if can_view_tasacambio %}
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <i class="fas fa-chart-line fa-3x text-primary mb-3"></i>
-                    <h5 class="card-title">Cotizaciones</h5>
-                    <p class="card-text">Administra las cotizaciones para todas las monedas.</p>
-                </div>
-                <div class="card-footer bg-light">
-                    <a href="{% url 'tasa_cambio:tasacambio_list' %}" class="btn btn-primary w-100">
-                        Ir a Cotizaciones
-                    </a>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        {% if can_view_metodopago %}
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <i class="fas fa-credit-card fa-3x text-secondary mb-3"></i>
-                    <h5 class="card-title">Métodos de Pago</h5>
-                    <p class="card-text">Configura métodos de pago y sus comisiones.</p>
-                </div>
-                <div class="card-footer bg-light">
-                    <a href="{% url 'metodo_pago:metodopago_list' %}" class="btn btn-secondary w-100">
-                        Ir a Métodos de Pago
-                    </a>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        {% if can_view_metodocobro %}
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <i class="fas fa-money-bill-wave fa-3x text-danger mb-3"></i>
-                    <h5 class="card-title">Métodos de Cobro</h5>
-                    <p class="card-text">Configura métodos de cobro y sus restricciones de moneda.</p>
-                </div>
-                <div class="card-footer bg-light">
-                    <a href="{% url 'metodo_cobro:metodocobro_list' %}" class="btn btn-danger w-100">
-                        Ir a Métodos de Cobro
-                    </a>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        {% if can_view_configuracion %}
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <i class="fas fa-cog fa-3x text-dark mb-3"></i>
-                    <h5 class="card-title">Configuración</h5>
-                    <p class="card-text">Configura los límites de transacciones diarias y mensuales del sistema.</p>
-                </div>
-                <div class="card-footer bg-light">
-                    <a href="{% url 'configuracion:configuracion' %}" class="btn btn-dark w-100">
-                        Ir a Configuración
-                    </a>
-                </div>
-            </div>
-        </div>
-        {% endif %}
+    </div>
+    </div>
+    {% endif %}
     </div>
 </div>
+
+<style>
+/* Dashboard Background */
+.dashboard-bg {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    min-height: 100vh;
+}
+
+/* Admin Section Containers */
+.admin-section-container {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 1rem;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* Group Headers */
+.group-header {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 0.75rem;
+    border: none;
+    box-shadow: none;
+}
+
+/* Compact admin cards */
+.admin-section-container .card-body {
+    padding: 0.5rem !important;
+}
+
+.admin-section-container .card-body .rounded-circle {
+    width: 30px !important;
+    height: 30px !important;
+    margin-right: 0.5rem !important;
+}
+
+.admin-section-container .card-body .rounded-circle i {
+    font-size: 0.8rem !important;
+}
+
+.admin-section-container .card-title {
+    font-size: 0.85rem !important;
+    margin-bottom: 0 !important;
+}
+
+.admin-section-container .card-text {
+    font-size: 0.65rem !important;
+    margin-bottom: 0 !important;
+}
+
+/* Card Hover Effects */
+.hover-shadow {
+    transition: all 0.3s ease-in-out;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.hover-shadow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    background: rgba(255, 255, 255, 1);
+}
+
+/* Card Styles */
+.card {
+    border-radius: 0.75rem;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* Button Styles */
+.btn {
+    border-radius: 0.5rem;
+    font-weight: 500;
+    letter-spacing: 0.025em;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+/* Quick Actions Section */
+.row .col-lg-4 .card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(5px);
+}
+</style>
+
 {% endblock %}

@@ -1,191 +1,169 @@
 {% extends "base.html" %}
 {% load moneda_extras %}
 
-{% block title %}Vender Divisas{% endblock %}
+{% block title %}{{ titulo }} - Transacciones{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-  <div class="row justify-content-center">
-    <div class="col-12 col-lg-8">
-      
-      <!-- Header -->
-      <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0">
-          <i class="fas fa-hand-holding-usd me-2 text-warning"></i>
-          {{ titulo }}
-        </h1>
-        <a href="{% url 'tasa_cambio:dashboard' %}" class="btn btn-outline-secondary">
-          <i class="fas fa-chart-line me-1"></i>
-          Ir al Simulador
-        </a>
+<div class="container mt-4">
+  <nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'auth:dashboard' %}"><i class="fas fa-home me-1"></i>Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'tasa_cambio:dashboard' %}"><i class="fas fa-chart-line me-1"></i>Simulador</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ titulo }}</li>
+    </ol>
+  </nav>
+
+  <div class="card shadow-sm">
+    <div class="card-header">
+      <strong>{{ titulo }}</strong>
+    </div>
+    <div class="card-body">
+      <!-- Información -->
+      <div class="alert alert-warning mb-4">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>¿Cómo funciona?</strong> Ingrese la cantidad de divisa extranjera que desea vender y el sistema calculará cuántos Guaraníes recibirá después de aplicar comisiones y descuentos.
       </div>
 
-      <!-- Formulario de Venta -->
-      <div class="card shadow-sm">
-        <div class="card-body">
-
-          <!-- Información -->
-          <div class="alert alert-warning mb-4">
-            <i class="fas fa-info-circle me-2"></i>
-            <strong>¿Cómo funciona?</strong> Ingrese la cantidad de divisa extranjera que desea vender y el sistema calculará cuántos Guaraníes recibirá después de aplicar comisiones y descuentos.
+      <form id="formVenta" novalidate>
+        {% csrf_token %}
+        <div class="row g-3">
+          <!-- Cliente -->
+          <div class="col-md-12">
+            <label for="cliente" class="form-label">Cliente <span class="text-danger">*</span></label>
+            <select id="cliente" name="cliente_id" class="form-select" required>
+              <option value="" {% if not cliente_preseleccionado %}selected{% endif %}>Seleccione un cliente</option>
+              {% for cliente in clientes %}
+                <option value="{{ cliente.id }}" data-descuento="{{ cliente.tipo_cliente.descuento }}" 
+                        {% if cliente_preseleccionado and cliente.id|stringformat:"s" == cliente_preseleccionado %}selected{% endif %}>
+                  {{ cliente.nombre_comercial }} — {{ cliente.tipo_cliente.nombre }} 
+                  ({{ cliente.tipo_cliente.descuento }}% descuento)
+                </option>
+              {% empty %}
+                <option value="" disabled>No hay clientes asociados</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              Las ventas de divisas requieren cliente para aplicar descuentos y controlar límites.
+            </div>
           </div>
 
+          <!-- Método de Cobro -->
+          <div class="col-md-6">
+            <label for="metodo_cobro" class="form-label">Método de Cobro <span class="text-danger">*</span></label>
+            <select id="metodo_cobro" name="metodo_cobro_id" class="form-select" required>
+              <option value="">Cargando métodos de cobro...</option>
+            </select>
+            <div class="form-text">Seleccione cómo recibiremos la divisa extranjera.</div>
+          </div>
 
-          <form id="formVenta">
-            {% csrf_token %}
-            
-            <!-- Selector de Cliente -->
-            <div class="row g-3 mb-4">
-              <div class="col-12">
-                <label for="cliente" class="form-label">
-                  <i class="fas fa-user me-1"></i>
-                  Cliente <span class="text-danger">*</span>
-                </label>
-                <select id="cliente" name="cliente_id" class="form-select" required>
-                  <option value="" {% if not cliente_preseleccionado %}selected{% endif %}>Seleccione un cliente</option>
-                  {% for cliente in clientes %}
-                    <option value="{{ cliente.id }}" data-descuento="{{ cliente.tipo_cliente.descuento }}" 
-                            {% if cliente_preseleccionado and cliente.id|stringformat:"s" == cliente_preseleccionado %}selected{% endif %}>
-                      {{ cliente.nombre_comercial }} — {{ cliente.tipo_cliente.nombre }} 
-                      ({{ cliente.tipo_cliente.descuento }}% descuento)
-                    </option>
-                  {% empty %}
-                    <option value="" disabled>No hay clientes asociados</option>
-                  {% endfor %}
-                </select>
-                <div class="form-text">
-                Las ventas de divisas requieren cliente para aplicar descuentos y controlar límites.
-                </div>
+          <!-- Método de Entrega/Pago -->
+          <div class="col-md-6">
+            <label for="metodo_pago" class="form-label">Método de Pago <span class="text-danger">*</span></label>
+            <select id="metodo_pago" name="metodo_pago_id" class="form-select" required>
+              <option value="">Seleccione cómo pagará los Guaraníes</option>
+              {% for metodo in metodos_pago %}
+                <option value="{{ metodo.id }}" data-comision="{{ metodo.comision }}">
+                  {{ metodo.nombre }} 
+                  {% if metodo.comision > 0 %}({{ metodo.comision }}% comisión){% else %}(sin comisión){% endif %}
+                </option>
+              {% empty %}
+                <option value="" disabled>No hay métodos de pago activos</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Seleccione cómo entregaremos los Guaraníes al cliente.</div>
+          </div>
+
+          <!-- Monto -->
+          <div class="col-md-4">
+            <label for="monto" class="form-label">Monto a Vender <span class="text-danger">*</span></label>
+            <input id="monto" name="monto" type="number" class="form-control" 
+                   placeholder="100.00" step="any" min="0.01" required
+                   {% if cantidad_preseleccionada %}value="{{ cantidad_preseleccionada }}"{% endif %}>
+            <div class="form-text">
+              Ingrese cuánta divisa extranjera quiere vender
+            </div>
+          </div>
+
+          <!-- Moneda Origen -->
+          <div class="col-md-4">
+            <label for="moneda_origen" class="form-label">Moneda a Vender</label>
+            <select id="moneda_origen" name="moneda_origen" class="form-select" required>
+              {% for moneda in monedas_origen %}
+                <option value="{{ moneda.codigo }}" 
+                  {% if moneda_origen_preseleccionada == moneda.codigo %}selected
+                  {% elif not moneda_origen_preseleccionada and moneda.codigo == 'USD' %}selected
+                  {% endif %}>
+                  {{ moneda.nombre }} ({{ moneda.codigo }})
+                </option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              Divisa extranjera que está vendiendo
+            </div>
+          </div>
+
+          <!-- Moneda Destino -->
+          <div class="col-md-4">
+            <label for="moneda_destino" class="form-label">Recibiendo</label>
+            <select id="moneda_destino" name="moneda_destino" class="form-select" required readonly>
+              <option value="PYG" selected>Guaraní (PYG)</option>
+            </select>
+            <div class="form-text">
+              Las ventas siempre reciben Guaraníes
+            </div>
+          </div>
+
+          <!-- Preview del Cálculo -->
+          <div class="col-md-12">
+            <div id="preview" class="card bg-light mt-3" style="display: none;">
+              <div class="card-header">
+                <h6 class="mb-0">
+                  <i class="fas fa-calculator me-2"></i>
+                  Vista Previa del Cálculo
+                </h6>
+              </div>
+              <div class="card-body" id="preview-content">
+                <!-- Content will be loaded dynamically -->
               </div>
             </div>
-
-            <!-- Método de Cobro -->
-            <div class="row g-3 mb-4">
-              <div class="col-12">
-                <label for="metodo_cobro" class="form-label">
-                  <i class="fas fa-credit-card me-1"></i>
-                  Método de Cobro <span class="text-danger">*</span>
-                </label>
-                <select id="metodo_cobro" name="metodo_cobro_id" class="form-select" required>
-                  <option value="">Cargando métodos de cobro...</option>
-                </select>
-                <div class="form-text">Seleccione cómo recibiremos la divisa extranjera.</div>
-              </div>
-            </div>
-
-            <!-- Método de Entrega/Pago -->
-            <div class="row g-3 mb-4">
-              <div class="col-12">
-                <label for="metodo_pago" class="form-label">
-                  <i class="fas fa-hand-holding-usd me-1"></i>
-                  Método de Pago <span class="text-danger">*</span>
-                </label>
-                <select id="metodo_pago" name="metodo_pago_id" class="form-select" required>
-                  <option value="">Seleccione cómo pagará los Guaraníes</option>
-                  {% for metodo in metodos_pago %}
-                    <option value="{{ metodo.id }}" data-comision="{{ metodo.comision }}">
-                      {{ metodo.nombre }} 
-                      {% if metodo.comision > 0 %}({{ metodo.comision }}% comisión){% else %}(sin comisión){% endif %}
-                    </option>
-                  {% empty %}
-                    <option value="" disabled>No hay métodos de pago activos</option>
-                  {% endfor %}
-                </select>
-                <div class="form-text">Seleccione cómo entregaremos los Guaraníes al cliente.</div>
-              </div>
-            </div>
-
-            <!-- Configuración de la Operación -->
-            <div class="row g-3 mb-4">
-              <div class="col-12 col-md-4">
-                <label for="monto" class="form-label">
-                  <i class="fas fa-calculator me-1"></i>
-                  Monto a Vender <span class="text-danger">*</span>
-                </label>
-                <input id="monto" name="monto" type="number" class="form-control" 
-                       placeholder="100.00" step="any" min="0.01" required
-                       {% if cantidad_preseleccionada %}value="{{ cantidad_preseleccionada }}"{% endif %}>
-                <div class="form-text">
-                  <i class="fas fa-info-circle me-1"></i>
-                  Ingrese cuánta divisa extranjera quiere vender
-                </div>
-              </div>
-              <div class="col-12 col-md-4">
-                <label for="moneda_origen" class="form-label">Moneda a Vender</label>
-                <select id="moneda_origen" name="moneda_origen" class="form-select" required>
-                  {% for moneda in monedas_origen %}
-                    <option value="{{ moneda.codigo }}" 
-                      {% if moneda_origen_preseleccionada == moneda.codigo %}selected
-                      {% elif not moneda_origen_preseleccionada and moneda.codigo == 'USD' %}selected
-                      {% endif %}>
-                      {{ moneda.nombre }} ({{ moneda.codigo }})
-                    </option>
-                  {% endfor %}
-                </select>
-                <div class="form-text">
-                  <i class="fas fa-info-circle me-1"></i>
-                  Divisa extranjera que está vendiendo
-                </div>
-              </div>
-              <div class="col-12 col-md-4">
-                <label for="moneda_destino" class="form-label">Recibiendo</label>
-                <select id="moneda_destino" name="moneda_destino" class="form-select" required readonly>
-                  <option value="PYG" selected>Guaraní (PYG)</option>
-                </select>
-                <div class="form-text">
-                  <i class="fas fa-info-circle me-1"></i>
-                  Las ventas siempre reciben Guaraníes
-                </div>
-              </div>
-            </div>
-
-            <!-- Preview del Cálculo -->
-            <div id="preview" class="alert alert-light border mb-4" style="display: none;">
-              <div class="d-flex align-items-center mb-2">
-                <i class="fas fa-calculator me-2 text-primary"></i>
-                <strong>Vista Previa del Cálculo</strong>
-              </div>
-              <div id="preview-content">
-                <!-- Se llenará dinámicamente -->
-              </div>
-            </div>
-
-
-            <!-- Botones de Acción -->
-            <div class="d-flex gap-2 justify-content-end">
-              <button type="button" id="btnCalcular" class="btn btn-outline-primary">
-                <i class="fas fa-calculator me-1"></i>
-                Calcular
-              </button>
-              <button type="submit" id="btnVender" class="btn btn-warning" disabled>
-                <i class="fas fa-hand-holding-usd me-1"></i>
-                Proceder con la Venta
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
-      </div>
 
-      <!-- Información adicional -->
-      <div class="card shadow-sm mt-4">
-        <div class="card-body">
-          <h6 class="card-title">
-            <i class="fas fa-info-circle me-2 text-info"></i>
-            Información Importante
-          </h6>
-          <ul class="mb-0">
-            <li>Las transacciones tienen un tiempo límite de <strong>5 minutos</strong> para completar el pago.</li>
-            <li>Los tipos de cliente con descuentos mejoran la tasa de cambio y reducen comisiones.</li>
-            <li>El monto ingresado es la divisa que <strong>venderá</strong>, las comisiones se descuentan del PYG que recibirá.</li>
-            <li>Una vez iniciada la venta, recibirá un código de verificación único para su transacción.</li>
-            <li>Puede cancelar la transacción antes de realizar el intercambio sin penalización.</li>
-          </ul>
+        <!-- Botones de Acción -->
+        <div class="d-flex justify-content-end mt-4">
+          <button type="button" id="btnCalcular" class="btn btn-outline-primary me-2">
+            <i class="fas fa-calculator me-1"></i>
+            Calcular
+          </button>
+          <button type="submit" id="btnVender" class="btn btn-warning" disabled>
+            <i class="fas fa-hand-holding-usd me-1"></i>
+            Proceder con la Venta
+          </button>
         </div>
-      </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Información adicional -->
+  <div class="card shadow-sm mt-4">
+    <div class="card-header">
+      <strong><i class="fas fa-info-circle me-2"></i>Información Importante</strong>
+    </div>
+    <div class="card-body">
+      <ul class="mb-0">
+        <li>Las transacciones tienen un tiempo límite de <strong>5 minutos</strong> para completar el pago.</li>
+        <li>Los tipos de cliente con descuentos mejoran la tasa de cambio y reducen comisiones.</li>
+        <li>El monto ingresado es la divisa que <strong>venderá</strong>, las comisiones se descuentan del PYG que recibirá.</li>
+        <li>Una vez iniciada la venta, recibirá un código de verificación único para su transacción.</li>
+        <li>Puede cancelar la transacción antes de realizar el intercambio sin penalización.</li>
+      </ul>
     </div>
   </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('formVenta');
