@@ -55,14 +55,6 @@
                     <label for="q" class="form-label">Buscar</label>
                     <input type="text" id="q" name="q" class="form-control" value="{{ q }}" placeholder="Código o nombre..." />
                 </div>
-                <div class="col-md-3">
-                    <label for="estado" class="form-label">Estado</label>
-                    <select id="estado" name="estado" class="form-select">
-                        <option value="">Todos</option>
-                        <option value="activo" {% if estado == 'activo' %}selected{% endif %}>Activos</option>
-                        <option value="inactivo" {% if estado == 'inactivo' %}selected{% endif %}>Inactivos</option>
-                    </select>
-                </div>
                 <div class="col-md-3 d-flex align-items-end">
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="fas fa-search me-1"></i>Filtrar
@@ -72,62 +64,7 @@
         </div>
     </div>
 
-    {% if tasas_cambio %}
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Moneda</th>
-                            <th>Tasa Compra</th>
-                            <th>Tasa Venta</th>
-                            <th>Estado</th>
-                            <th>Creado</th>
-                            <th>Actualizado</th>
-                            <th class="text-center">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for cotizacion in tasas_cambio %}
-                        <tr>
-                            <td>
-                                <strong>{{ cotizacion.moneda.codigo }}</strong>
-                                <br><small class="text-muted">{{ cotizacion.moneda.nombre }}</small>
-                            </td>
-                            <td><span class="badge bg-success">{{ cotizacion.tasa_compra }}</span></td>
-                            <td><span class="badge bg-info text-dark">{{ cotizacion.tasa_venta }}</span></td>
-                            <td>
-                                {% if cotizacion.es_activa %}
-                                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Activa</span>
-                                {% else %}
-                                <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Inactiva</span>
-                                {% endif %}
-                            </td>
-                            <td><small class="text-muted">{{ cotizacion.fecha_creacion|date:"d/m/Y H:i" }}</small></td>
-                            <td><small class="text-muted">{{ cotizacion.fecha_actualizacion|date:"d/m/Y H:i" }}</small></td>
-                            <td class="text-center">
-                                <div class="btn-group" role="group">
-                                    {% if perms.tasa_cambio.change_tasacambio %}
-                                    <a href="{% url 'tasa_cambio:tasacambio_create' %}" class="btn btn-sm btn-outline-primary" title="Ver">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <button type="button"
-                                            class="btn btn-sm {% if cotizacion.es_activa %}btn-outline-warning{% else %}btn-outline-success{% endif %} toggle-status-btn"
-                                            data-id="{{ cotizacion.pk }}"
-                                            title="{% if cotizacion.es_activa %}Desactivar{% else %}Activar{% endif %}">
-                                        {% if cotizacion.es_activa %}<i class="fas fa-eye-slash"></i>{% else %}<i class="fas fa-eye"></i>{% endif %}
-                                    </button>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            {% if cotizaciones %}
+    {% if cotizaciones %}
             <div class="card shadow-sm">
                 <div class="card-body">
                     <div class="table-responsive">
@@ -199,12 +136,17 @@
                                             </span>
                                         {% endif %}
                                     </td>
-                                
+
                                     <td class="text-center">
                                         <div class="btn-group" role="group">
+                                            <a href="{% url 'tasa_cambio:tasacambio_historial' tasacambio.moneda.id %}"
+                                               class="btn btn-sm btn-outline-primary"
+                                               title="Ver historial">
+                                                <i class="fas fa-chart-line"></i>
+                                            </a>
                                             {% if perms.tasa_cambio.change_tasacambio %}
-                                            <button type="button" 
-                                                    class="btn btn-sm {% if tasacambio.es_activa %}btn-outline-warning{% else %}btn-outline-success{% endif %} toggle-status-btn" 
+                                            <button type="button"
+                                                    class="btn btn-sm {% if tasacambio.es_activa %}btn-outline-warning{% else %}btn-outline-success{% endif %} toggle-status-btn"
                                                     title="{% if tasacambio.es_activa %}Desactivar{% else %}Activar{% endif %}"
                                                     data-tasacambio-id="{{ tasacambio.pk }}"
                                                     data-current-status="{% if tasacambio.es_activa %}true{% else %}false{% endif %}">
@@ -261,16 +203,8 @@
                         </ul>
                     </nav>
                     {% endif %}
-                    <li class="page-item active"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
-                    {% if page_obj.has_next %}
-                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if moneda %}&moneda={{ moneda }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}"><i class="fas fa-angle-right"></i></a></li>
-                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if q %}&q={{ q }}{% endif %}{% if moneda %}&moneda={{ moneda }}{% endif %}{% if estado %}&estado={{ estado }}{% endif %}"><i class="fas fa-angle-double-right"></i></a></li>
-                    {% endif %}
-                </ul>
-            </nav>
-            {% endif %}
-        </div>
-    </div>
+                </div>
+            </div>
     {% else %}
     <div class="alert alert-info">
         No se encontraron tasas de cambio.
@@ -282,7 +216,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.toggle-status-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const id = btn.dataset.id;
+      const id = btn.dataset.tasacambioId;
       try {
         const resp = await fetch(`{% url 'tasa_cambio:toggle_status' 0 %}`.replace('/0/', `/${id}/`), {
           method: 'POST',

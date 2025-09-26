@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
-from django.views.generic import ListView, CreateView
+from django.views.generic import ListView, CreateView, DetailView
 from django.urls import reverse_lazy
 from django.db.models import Q
 from django.core.paginator import Paginator
@@ -22,7 +22,7 @@ from metodo_cobro.models import MetodoCobro
 
 
 class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
-    """Vista para listar todas las cotizaciones"""
+    """Vista para listar las cotizaciones actuales (activas)"""
     model = TasaCambio
     template_name = 'tasa_cambio/tasacambio_list.html'
     context_object_name = 'cotizaciones'
@@ -30,8 +30,9 @@ class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        queryset = TasaCambio.objects.select_related('moneda').all()
-        
+        # Solo mostrar tasas activas por defecto
+        queryset = TasaCambio.objects.select_related('moneda').filter(es_activa=True)
+
         # Filtro de búsqueda
         q = self.request.GET.get('q')
         if q:
@@ -40,30 +41,13 @@ class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
                 Q(moneda__codigo__icontains=q) |
                 Q(moneda__simbolo__icontains=q)
             )
-        
+
         # Filtro por moneda específica
         moneda_id = self.request.GET.get('moneda')
         if moneda_id:
             queryset = queryset.filter(moneda_id=moneda_id)
-        
-        # Filtro por estado activo/inactivo
-        estado = self.request.GET.get('estado')
-        if estado == 'activo':
-            queryset = queryset.filter(es_activa=True)
-        elif estado == 'inactivo':
-            queryset = queryset.filter(es_activa=False)
-        
-        # Filtro por fecha desde
-        fecha_desde = self.request.GET.get('fecha_desde')
-        if fecha_desde:
-            queryset = queryset.filter(fecha_creacion__date__gte=fecha_desde)
-        
-        # Filtro por fecha hasta
-        fecha_hasta = self.request.GET.get('fecha_hasta')
-        if fecha_hasta:
-            queryset = queryset.filter(fecha_creacion__date__lte=fecha_hasta)
-        
-        return queryset.order_by('-fecha_creacion', 'moneda__nombre')
+
+        return queryset.order_by('moneda__nombre')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -75,6 +59,63 @@ class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         context['fecha_desde'] = self.request.GET.get('fecha_desde', '')
         context['fecha_hasta'] = self.request.GET.get('fecha_hasta', '')
         context['monedas'] = Moneda.objects.filter(es_activa=True).order_by('nombre')
+        return context
+
+
+class TasaCambioHistorialView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    """Vista para mostrar el historial de cotizaciones de una moneda específica"""
+    model = TasaCambio
+    template_name = 'tasa_cambio/tasacambio_historial.html'
+    context_object_name = 'historial_tasas'
+    permission_required = 'tasa_cambio.view_tasacambio'
+    paginate_by = 20
+
+    def get_queryset(self):
+        self.moneda = get_object_or_404(Moneda, pk=self.kwargs['moneda_id'])
+        queryset = TasaCambio.objects.select_related('moneda').filter(
+            moneda=self.moneda
+        ).order_by('-fecha_creacion')
+
+        # Filtro por estado activo/inactivo
+        estado = self.request.GET.get('estado')
+        if estado == 'activo':
+            queryset = queryset.filter(es_activa=True)
+        elif estado == 'inactivo':
+            queryset = queryset.filter(es_activa=False)
+
+        # Filtro por fecha desde
+        fecha_desde = self.request.GET.get('fecha_desde')
+        if fecha_desde:
+            queryset = queryset.filter(fecha_creacion__date__gte=fecha_desde)
+
+        # Filtro por fecha hasta
+        fecha_hasta = self.request.GET.get('fecha_hasta')
+        if fecha_hasta:
+            queryset = queryset.filter(fecha_creacion__date__lte=fecha_hasta)
+
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['moneda'] = self.moneda
+        context['titulo'] = f'Historial de {self.moneda.nombre}'
+        context['estado'] = self.request.GET.get('estado', '')
+        context['fecha_desde'] = self.request.GET.get('fecha_desde', '')
+        context['fecha_hasta'] = self.request.GET.get('fecha_hasta', '')
+
+        # Datos para gráficos
+        historial_datos = list(self.get_queryset()[:50].values(
+            'fecha_creacion', 'precio_base', 'comision_compra',
+            'comision_venta', 'es_activa'
+        ))
+
+        # Calcular precios de compra y venta para el gráfico
+        for item in historial_datos:
+            item['precio_compra'] = float(item['precio_base']) - float(item['comision_compra'])
+            item['precio_venta'] = float(item['precio_base']) + float(item['comision_venta'])
+            item['fecha_str'] = item['fecha_creacion'].strftime('%Y-%m-%d %H:%M')
+
+        context['datos_grafico'] = json.dumps(historial_datos, default=str)
         return context
 
 
