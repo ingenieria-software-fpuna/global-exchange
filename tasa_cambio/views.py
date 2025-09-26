@@ -183,7 +183,7 @@ def dashboard_tasacambio(request):
     ).select_related('tipo_cliente').order_by('nombre_comercial')
 
     context = {
-        'titulo': 'Dashboard de Cotizaciones',
+        'titulo': 'Simulador de Cambio',
         'total_cotizaciones': TasaCambio.objects.count(),
         'cotizaciones_activas': TasaCambio.objects.filter(es_activa=True).count(),
         'cotizaciones_inactivas': TasaCambio.objects.filter(es_activa=False).count(),
