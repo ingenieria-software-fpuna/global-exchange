@@ -620,13 +620,11 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
         
         comision_total = comision_cobro + comision_pago
         
-        # 3. Aplicar descuento del cliente a las comisiones de métodos
-        descuento_aplicado = Decimal('0')
-        if descuento_pct > 0 and comision_total > 0:
-            descuento_aplicado = comision_total * (descuento_pct / Decimal('100'))
+        # 3. NO aplicar descuento a las comisiones - el descuento ya está en la tasa ajustada
+        descuento_aplicado = Decimal('0')  # El descuento se aplica solo en la tasa, no en comisiones
         
-        # 4. Calcular el monto neto disponible para la conversión (después de comisiones y descuentos)
-        monto_neto_conversion = monto_a_pagar - comision_total + descuento_aplicado
+        # 4. Calcular el monto neto disponible para la conversión (después de comisiones)
+        monto_neto_conversion = monto_a_pagar - comision_total  # Sin sumar descuento adicional
         
         # 5. Convertir el monto neto a la divisa destino usando la tasa ajustada
         resultado_final = (monto_neto_conversion / precio_usado).quantize(
