@@ -5,7 +5,6 @@
 
 {% block content %}
 <div class="container mt-4">
-    <!-- Breadcrumbs -->
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
             <li class="breadcrumb-item">
@@ -19,70 +18,62 @@
         </ol>
     </nav>
 
-    <div class="row">
-        <div class="col-12">
-            <div class="d-flex justify-content-start mb-3">
-                <button type="button"
-                        class="btn btn-outline-secondary"
-                        onclick="window.location.href='{% url "auth:dashboard" %}'"
-                        title="Volver a la página anterior">
-                    <i class="fas fa-arrow-left me-2"></i>
-                    {{ text|default:"Volver al Dashboard" }}
-                </button>
-            </div>
-            
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="h2">
-                    <i class="fas fa-user-tie text-success me-2"></i>
-                    Clientes
-                </h1>
-                {% if can_create_cliente %}
-                <a href="{% url 'clientes:cliente_create' %}" class="btn btn-success">
-                    <i class="fas fa-plus me-2"></i>Crear Nuevo Cliente
-                </a>
-                {% endif %}
-            </div>
+    <div class="d-flex justify-content-start mb-3">
+        <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='{% url "auth:dashboard" %}'">
+            <i class="fas fa-arrow-left me-2"></i>Volver al Dashboard
+        </button>
+    </div>
 
-            <!-- Filtros y búsqueda -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-body">
-                    <form method="get" class="row g-3">
-                        <div class="col-md-4">
-                            <label for="q" class="form-label">Buscar</label>
-                            <input type="text" class="form-control" id="q" name="q" 
-                                   value="{{ q }}" placeholder="Nombre, RUC, correo...">
-                        </div>
-                        <div class="col-md-3">
-                            <label for="tipo_cliente" class="form-label">Tipo de Cliente</label>
-                            <select class="form-select" id="tipo_cliente" name="tipo_cliente">
-                                <option value="">Todos los tipos</option>
-                                {% for tipo in tipos_cliente %}
-                                <option value="{{ tipo.id }}" {% if tipo_cliente_filter == tipo.id|stringformat:"s" %}selected{% endif %}>
-                                    {{ tipo.nombre }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label for="estado" class="form-label">Estado</label>
-                            <select class="form-select" id="estado" name="estado">
-                                <option value="">Todos los estados</option>
-                                <option value="activo" {% if estado_filter == 'activo' %}selected{% endif %}>Activo</option>
-                                <option value="inactivo" {% if estado_filter == 'inactivo' %}selected{% endif %}>Inactivo</option>
-                            </select>
-                        </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary w-100">
-                                <i class="fas fa-search me-1"></i>Filtrar
-                            </button>
-                        </div>
-                    </form>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-user-tie text-primary me-2"></i>
+            Clientes
+        </h1>
+        {% if can_create_cliente %}
+        <a href="{% url 'clientes:cliente_create' %}" class="btn btn-success">
+            <i class="fas fa-plus me-2"></i>Nuevo Cliente
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label for="q" class="form-label">Buscar</label>
+                    <input type="text" id="q" name="q" class="form-control" value="{{ q }}" placeholder="Nombre, RUC, correo..." />
                 </div>
-            </div>
+                <div class="col-md-3">
+                    <label for="tipo_cliente" class="form-label">Tipo de Cliente</label>
+                    <select id="tipo_cliente" name="tipo_cliente" class="form-select">
+                        <option value="">Todos</option>
+                        {% for tipo in tipos_cliente %}
+                        <option value="{{ tipo.id }}" {% if tipo_cliente_filter == tipo.id|stringformat:"s" %}selected{% endif %}>
+                            {{ tipo.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="estado" class="form-label">Estado</label>
+                    <select id="estado" name="estado" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="activo" {% if estado_filter == 'activo' %}selected{% endif %}>Activos</option>
+                        <option value="inactivo" {% if estado_filter == 'inactivo' %}selected{% endif %}>Inactivos</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-1"></i>Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-            {% if clientes %}
-            <div class="card shadow-sm">
-                <div class="card-body">
+    {% if clientes %}
+    <div class="card shadow-sm">
+        <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead class="table-light">
@@ -109,68 +100,45 @@
                                     <td>
                                         <code>{{ cliente.ruc }}</code>
                                     </td>
-                                    <td>
-                                        <span class="badge bg-info">
-                                            {{ cliente.tipo_cliente.nombre }}
-                                        </span>
+                                                                        <td>
+                                        <span class="badge bg-info">{{ cliente.tipo_cliente.nombre }}</span>
                                         {% if cliente.tipo_cliente.descuento > 0 %}
                                         <br><small class="text-muted">{{ cliente.tipo_cliente.descuento }}% desc.</small>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <div><i class="fas fa-envelope me-1"></i>{{ cliente.correo_electronico }}</div>
+                                        <div>{{ cliente.correo_electronico }}</div>
                                         {% if cliente.numero_telefono %}
-                                        <div><i class="fas fa-phone me-1"></i>{{ cliente.numero_telefono }}</div>
+                                        <small class="text-muted">{{ cliente.numero_telefono }}</small>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if cliente.usuarios_asociados.all %}
-                                            {% for usuario in cliente.usuarios_asociados.all|slice:":3" %}
-                                            <span class="badge bg-secondary me-1">{{ usuario.nombre|default:usuario.email }}</span>
-                                            {% endfor %}
-                                            {% if cliente.usuarios_asociados.count > 3 %}
-                                            <span class="badge bg-light text-dark">+{{ cliente.usuarios_asociados.count|add:"-3" }} más</span>
-                                            {% endif %}
-                                        {% else %}
-                                            <span class="text-muted">Sin usuarios</span>
+                                        <span class="badge bg-secondary">{{ cliente.usuarios_asociados.count }}</span>
+                                        {% if cliente.usuarios_asociados.count == 0 %}
+                                        <br><small class="text-warning">Sin usuarios</small>
                                         {% endif %}
                                     </td>
                                     <td>
                                         {% if cliente.activo %}
-                                            <span class="badge bg-success">
-                                                <i class="fas fa-check me-1"></i>Activo
-                                            </span>
+                                        <span class="badge bg-success"><i class="fas fa-check me-1"></i>Activo</span>
                                         {% else %}
-                                            <span class="badge bg-danger">
-                                                <i class="fas fa-times me-1"></i>Inactivo
-                                            </span>
+                                        <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Inactivo</span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <small class="text-muted">
-                                            {{ cliente.fecha_creacion|date:"d/m/Y H:i" }}
-                                        </small>
+                                        <small class="text-muted">{{ cliente.fecha_creacion|date:"d/m/Y H:i" }}</small>
                                     </td>
                                     <td class="text-center">
                                         <div class="btn-group" role="group">
                                             {% if can_edit_cliente %}
-                                            <a href="{% url 'clientes:cliente_update' cliente.pk %}" 
-                                               class="btn btn-sm btn-outline-primary" 
-                                               title="Editar">
+                                            <a href="{% url 'clientes:cliente_update' cliente.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            {% endif %}
-                                            {% if can_edit_cliente %}
-                                            <button type="button" 
-                                                    class="btn btn-sm {% if cliente.activo %}btn-outline-warning{% else %}btn-outline-success{% endif %} toggle-status-btn" 
-                                                    title="{% if cliente.activo %}Desactivar{% else %}Activar{% endif %}"
-                                                    data-cliente-id="{{ cliente.pk }}"
-                                                    data-current-status="{% if cliente.activo %}true{% else %}false{% endif %}">
-                                                {% if cliente.activo %}
-                                                    <i class="fas fa-eye-slash"></i>
-                                                {% else %}
-                                                    <i class="fas fa-eye"></i>
-                                                {% endif %}
+                                            <button type="button"
+                                                    class="btn btn-sm {% if cliente.activo %}btn-outline-warning{% else %}btn-outline-success{% endif %} toggle-status-btn"
+                                                    data-id="{{ cliente.pk }}"
+                                                    title="{% if cliente.activo %}Desactivar{% else %}Activar{% endif %}">
+                                                {% if cliente.activo %}<i class="fas fa-eye-slash"></i>{% else %}<i class="fas fa-eye"></i>{% endif %}
                                             </button>
                                             {% endif %}
                                         </div>
@@ -181,170 +149,61 @@
                         </table>
                     </div>
 
-                    {% if is_paginated %}
-                    <nav aria-label="Navegación de páginas" class="mt-4">
-                        <ul class="pagination justify-content-center">
-                            {% if page_obj.has_previous %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?page=1{% if q %}&q={{ q }}{% endif %}{% if tipo_cliente_filter %}&tipo_cliente={{ tipo_cliente_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}">
-                                        <i class="fas fa-angle-double-left"></i>
-                                    </a>
-                                </li>
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if tipo_cliente_filter %}&tipo_cliente={{ tipo_cliente_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}">
-                                        <i class="fas fa-angle-left"></i>
-                                    </a>
-                                </li>
-                            {% endif %}
-
-                            <li class="page-item active">
-                                <span class="page-link">
-                                    Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
-                                </span>
-                            </li>
-
-                            {% if page_obj.has_next %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if tipo_cliente_filter %}&tipo_cliente={{ tipo_cliente_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}">
-                                        <i class="fas fa-angle-right"></i>
-                                    </a>
-                                </li>
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if q %}&q={{ q }}{% endif %}{% if tipo_cliente_filter %}&tipo_cliente={{ tipo_cliente_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}">
-                                        <i class="fas fa-angle-double-right"></i>
-                                    </a>
-                                </li>
-                            {% endif %}
-                        </ul>
-                    </nav>
+            {% if is_paginated %}
+            <nav aria-label="Navegación de páginas" class="mt-3">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page=1{% if q %}&q={{ q }}{% endif %}{% if tipo_cliente_filter %}&tipo_cliente={{ tipo_cliente_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}"><i class="fas fa-angle-double-left"></i></a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if tipo_cliente_filter %}&tipo_cliente={{ tipo_cliente_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}"><i class="fas fa-angle-left"></i></a></li>
                     {% endif %}
-                </div>
-            </div>
-            {% else %}
-            <div class="card shadow-sm">
-                <div class="card-body text-center py-5">
-                    <i class="fas fa-user-tie fa-3x text-muted mb-3"></i>
-                    <h4 class="text-muted">No hay clientes registrados</h4>
-                    <p class="text-muted">Comienza creando el primer cliente para organizar tu sistema.</p>
-                    {% if can_create_cliente %}
-                    <a href="{% url 'clientes:cliente_create' %}" class="btn btn-success">
-                        <i class="fas fa-plus me-2"></i>Crear Primer Cliente
-                    </a>
+                    <li class="page-item active"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+                    {% if page_obj.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if tipo_cliente_filter %}&tipo_cliente={{ tipo_cliente_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}"><i class="fas fa-angle-right"></i></a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if q %}&q={{ q }}{% endif %}{% if tipo_cliente_filter %}&tipo_cliente={{ tipo_cliente_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}"><i class="fas fa-angle-double-right"></i></a></li>
                     {% endif %}
-                </div>
-            </div>
+                </ul>
+            </nav>
             {% endif %}
         </div>
     </div>
-</div>
-
-<!-- Modal para confirmación de cambio de estado -->
-<div class="modal fade" id="statusModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Confirmar Cambio de Estado</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p id="statusMessage"></p>
-                <div id="relationsInfo" class="mt-3" style="display: none;">
-                    <div class="alert alert-warning">
-                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Relaciones Asociadas:</h6>
-                        <ul id="relationsList" class="mb-0"></ul>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="confirmStatusChange">Confirmar</button>
-            </div>
-        </div>
+    {% else %}
+    <div class="alert alert-info">
+        No se encontraron clientes.
     </div>
-</div>
+    {% endif %}
+ </div>
 
 <script>
-let currentClienteId = null;
-let currentAction = null;
-
-// Event listener para los botones de toggle status
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.toggle-status-btn').forEach(function(button) {
-        button.addEventListener('click', function() {
-            const clienteId = this.getAttribute('data-cliente-id');
-            const currentStatus = this.getAttribute('data-current-status');
-            const newStatus = currentStatus === 'true' ? 'false' : 'true';
-            
-            toggleClienteStatus(clienteId, newStatus);
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.toggle-status-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      try {
+        const resp = await fetch(`{% url 'clientes:toggle_status' 0 %}`.replace('/0/', `/${id}/`), {
+          method: 'POST',
+          headers: { 'X-CSRFToken': getCookie('csrftoken') },
         });
+        const data = await resp.json();
+        if (data.success) { window.location.reload(); }
+        else { alert(data.message || 'Error al cambiar estado'); }
+      } catch (e) { alert('Error de red'); }
     });
-});
+  });
 
-function toggleClienteStatus(clienteId, newStatus) {
-    currentClienteId = clienteId;
-    currentAction = newStatus;
-    
-    const action = newStatus === 'true' ? 'activar' : 'desactivar';
-    document.getElementById('statusMessage').textContent = 
-        `¿Estás seguro de que quieres ${action} este cliente?`;
-    
-    // Ocultar información de relaciones inicialmente
-    document.getElementById('relationsInfo').style.display = 'none';
-    
-    // Solo mostrar relaciones si se va a desactivar
-    if (newStatus === 'false') {
-        fetch(`/clientes/relations/${clienteId}/`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.has_relations) {
-                    const relationsList = document.getElementById('relationsList');
-                    relationsList.innerHTML = '';
-                    data.relations.forEach(relation => {
-                        const li = document.createElement('li');
-                        li.textContent = relation;
-                        relationsList.appendChild(li);
-                    });
-                    document.getElementById('relationsInfo').style.display = 'block';
-                }
-            })
-            .catch(error => {
-                console.error('Error al obtener relaciones:', error);
-            });
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
     }
-    
-    const modal = new bootstrap.Modal(document.getElementById('statusModal'));
-    modal.show();
-}
-
-document.getElementById('confirmStatusChange').addEventListener('click', function() {
-    if (currentClienteId && currentAction) {
-        fetch(`/clientes/toggle-status/${currentClienteId}/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                'activo': currentAction === 'true'
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error al cambiar el estado del cliente: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error al cambiar el estado del cliente');
-        });
-        
-        bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide();
-    }
+    return cookieValue;
+  }
 });
 </script>
-
-{% csrf_token %}
 {% endblock %}

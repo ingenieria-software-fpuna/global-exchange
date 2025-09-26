@@ -1,211 +1,76 @@
 {% extends "base.html" %}
 
-{% block title %}{% if form.instance.pk %}Editar{% else %}Crear{% endif %} Cliente - Global Exchange{% endblock %}
+{% block title %}{{ titulo }} - Clientes{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <!-- Breadcrumbs -->
-    <nav aria-label="breadcrumb" class="mb-4">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item">
-                <a href="{% url 'auth:dashboard' %}">
-                    <i class="fas fa-home me-1"></i>Dashboard
-                </a>
-            </li>
-            <li class="breadcrumb-item">
-                <a href="{% url 'clientes:cliente_list' %}">
-                    <i class="fas fa-user-tie me-1"></i>Clientes
-                </a>
-            </li>
-            <li class="breadcrumb-item active" aria-current="page">
-                {% if form.instance.pk %}Editar{% else %}Crear{% endif %}
-            </li>
-        </ol>
-    </nav>
+  <nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'auth:dashboard' %}"><i class="fas fa-home me-1"></i>Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'clientes:cliente_list' %}"><i class="fas fa-user-tie me-1"></i>Clientes</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ titulo }}</li>
+    </ol>
+  </nav>
 
-    {% include 'includes/back_button.html' with text="Volver a Clientes" %}
-    
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
-            <div class="card shadow-sm">
-                <div class="card-header bg-success text-white">
-                    <h4 class="mb-0">
-                        <i class="fas fa-user-tie me-2"></i>
-                        {% if form.instance.pk %}Editar{% else %}Crear{% endif %} Cliente
-                    </h4>
-                </div>
-                <div class="card-body">
-                    <form method="post">
-                        {% csrf_token %}
-                        
-                        <div class="row">
-                            <!-- Información Básica -->
-                            <div class="col-md-6">
-                                <h5 class="text-success mb-3">
-                                    <i class="fas fa-info-circle me-2"></i>Información Básica
-                                </h5>
-                                
-                                <div class="mb-3">
-                                    <label for="{{ form.nombre_comercial.id_for_label }}" class="form-label">
-                                        <strong>Nombre Comercial:</strong> <span class="text-danger">*</span>
-                                    </label>
-                                    {{ form.nombre_comercial }}
-                                    {% if form.nombre_comercial.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.nombre_comercial.errors.0 }}
-                                        </div>
-                                    {% endif %}
-                                    <div class="form-text">Nombre comercial o razón social del cliente.</div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="{{ form.ruc.id_for_label }}" class="form-label">
-                                        <strong>RUC:</strong> <span class="text-danger">*</span>
-                                    </label>
-                                    {{ form.ruc }}
-                                    {% if form.ruc.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.ruc.errors.0 }}
-                                        </div>
-                                    {% endif %}
-                                    <div class="form-text">Número de RUC del cliente (solo números).</div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="{{ form.tipo_cliente.id_for_label }}" class="form-label">
-                                        <strong>Tipo de Cliente:</strong> <span class="text-danger">*</span>
-                                    </label>
-                                    {{ form.tipo_cliente }}
-                                    {% if form.tipo_cliente.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.tipo_cliente.errors.0 }}
-                                        </div>
-                                    {% endif %}
-                                    <div class="form-text">Tipo de cliente que determina el descuento aplicable.</div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="{{ form.monto_limite_transaccion.id_for_label }}" class="form-label">
-                                        <strong>Monto límite por transacción:</strong>
-                                    </label>
-                                    {{ form.monto_limite_transaccion }}
-                                    {% if form.monto_limite_transaccion.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.monto_limite_transaccion.errors.0 }}
-                                        </div>
-                                    {% endif %}
-                                    <div class="form-text">El monto límite debe estar expresado en guaraníes (PYG). Vacío = sin límite.</div>
-                                </div>
-                            </div>
-
-                            <!-- Información de Contacto -->
-                            <div class="col-md-6">
-                                <h5 class="text-success mb-3">
-                                    <i class="fas fa-address-book me-2"></i>Información de Contacto
-                                </h5>
-                                
-                                <div class="mb-3">
-                                    <label for="{{ form.correo_electronico.id_for_label }}" class="form-label">
-                                        <strong>Correo Electrónico:</strong> <span class="text-danger">*</span>
-                                    </label>
-                                    {{ form.correo_electronico }}
-                                    {% if form.correo_electronico.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.correo_electronico.errors.0 }}
-                                        </div>
-                                    {% endif %}
-                                    <div class="form-text">Correo electrónico de contacto del cliente.</div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="{{ form.numero_telefono.id_for_label }}" class="form-label">
-                                        <strong>Número de Teléfono:</strong>
-                                    </label>
-                                    {{ form.numero_telefono }}
-                                    {% if form.numero_telefono.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.numero_telefono.errors.0 }}
-                                        </div>
-                                    {% endif %}
-                                    <div class="form-text">Número de teléfono de contacto.</div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="{{ form.direccion.id_for_label }}" class="form-label">
-                                        <strong>Dirección:</strong>
-                                    </label>
-                                    {{ form.direccion }}
-                                    {% if form.direccion.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.direccion.errors.0 }}
-                                        </div>
-                                    {% endif %}
-                                    <div class="form-text">Dirección completa del cliente.</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Usuarios Asociados -->
-                        <div class="row mt-4">
-                            <div class="col-12">
-                                <h5 class="text-success mb-3">
-                                    <i class="fas fa-users me-2"></i>Usuarios Asociados
-                                </h5>
-                                
-                                <div class="mb-3">
-                                    <div class="border rounded p-3 bg-light">
-                                        {{ form.usuarios_asociados }}
-                                        {% if form.usuarios_asociados.errors %}
-                                            <div class="invalid-feedback d-block mt-2">
-                                                {{ form.usuarios_asociados.errors.0 }}
-                                            </div>
-                                        {% endif %}
-                                        <div class="form-text mt-2">
-                                            {{ form.usuarios_asociados.help_text }}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Estado -->
-                        <div class="row mt-4">
-                            <div class="col-12">
-                                <h5 class="text-success mb-3">
-                                    <i class="fa-solid fa-shield-halved"></i> Estado
-                                </h5>
-                                
-                                <div class="mb-4">
-                                    <div class="form-check">
-                                        {{ form.activo }}
-                                        <label class="form-check-label" for="{{ form.activo.id_for_label }}">
-                                            <strong>Activo</strong>
-                                        </label>
-                                        {% if form.activo.errors %}
-                                            <div class="invalid-feedback d-block">
-                                                {{ form.activo.errors.0 }}
-                                            </div>
-                                        {% endif %}
-                                        <div class="form-text">Indica si el cliente está activo en el sistema.</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Botones de acción -->
-                        <div class="d-flex justify-content-end gap-2 mt-4">
-                            <a href="{% url 'clientes:cliente_list' %}" class="btn btn-secondary">
-                                <i class="fas fa-times"></i> Cancelar
-                            </a>
-                            <button type="submit" class="btn btn-success">
-                                <i class="fas fa-save"></i> 
-                                {% if form.instance.pk %}Actualizar{% else %}Crear{% endif %}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+  <div class="card shadow-sm">
+    <div class="card-header">
+      <strong>{{ titulo }}</strong>
     </div>
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="id_nombre_comercial">Nombre Comercial</label>
+            {{ form.nombre_comercial }}
+            {% for e in form.nombre_comercial.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="id_ruc">RUC</label>
+            {{ form.ruc }}
+            {% for e in form.ruc.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="id_tipo_cliente">Tipo de Cliente</label>
+            {{ form.tipo_cliente }}
+            {% for e in form.tipo_cliente.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="id_correo_electronico">Correo Electrónico</label>
+            {{ form.correo_electronico }}
+            {% for e in form.correo_electronico.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="id_numero_telefono">Teléfono</label>
+            {{ form.numero_telefono }}
+            {% for e in form.numero_telefono.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="id_direccion">Dirección</label>
+            {{ form.direccion }}
+            {% for e in form.direccion.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="id_usuarios_asociados">Usuarios Asociados</label>
+            {{ form.usuarios_asociados }}
+            {% for e in form.usuarios_asociados.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          {% if form.activo %}
+          <div class="col-md-3 d-flex align-items-end">
+            <div class="form-check">
+              {{ form.activo }}
+              <label class="form-check-label" for="id_activo">Activo</label>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="d-flex justify-content-end mt-4">
+          <a href="{% url 'clientes:cliente_list' %}" class="btn btn-outline-secondary me-2">Cancelar</a>
+          <button type="submit" class="btn btn-primary">{{ accion }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 {% endblock %}
