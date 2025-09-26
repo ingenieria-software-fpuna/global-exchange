@@ -4,6 +4,7 @@ from . import views
 app_name = 'transacciones'
 
 urlpatterns = [
+    path('mis-transacciones/', views.MisTransaccionesListView.as_view(), name='mis_transacciones'),
     path('comprar/', views.comprar_divisas, name='comprar_divisas'),
     path('iniciar-compra/', views.iniciar_compra, name='iniciar_compra'),
     path('vender/', views.vender_divisas, name='vender_divisas'),

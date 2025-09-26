@@ -127,14 +127,6 @@ if [ "${CREATE_COLLECTION_METHODS:-false}" = "true" ]; then
   }
 fi
 
-# Optionally create test transactions from env var
-if [ "${CREATE_TEST_TRANSACTIONS:-false}" = "true" ]; then
-  echo "[entrypoint] Creating test transactions..."
-  PYTHONPATH=/app python scripts/create_test_transactions.py || {
-    echo "⚠️  Error creating test transactions, but continuing..."
-  }
-fi
-
 # Optionally create groups and users from env var
 if [ "${CREATE_GROUPS_USERS:-false}" = "true" ]; then
   echo "[entrypoint] Creating groups and users..."
@@ -164,6 +156,14 @@ if [ "${CREATE_CLIENTS:-false}" = "true" ]; then
   echo "[entrypoint] Creating clients..."
   PYTHONPATH=/app python scripts/create_clientes_test.py || {
     echo "⚠️  Error creating clients, but continuing..."
+  }
+fi
+
+# Optionally create transactions
+if [ "${CREATE_TRANSACTIONS:-false}" = "true" ]; then
+  echo "[entrypoint] Creating transactions..."
+  PYTHONPATH=/app python scripts/create_transacciones_test.py || {
+    echo "⚠️  Error creating transactions, but continuing..."
   }
 fi
 

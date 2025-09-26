@@ -73,6 +73,10 @@ setup-transactions:
 	@echo "Configurando tipos y estados de transacciones..."
 	poetry run python manage.py setup_transacciones
 
+create-transactions:
+	@echo "Creando transacciones de ejemplo..."
+	poetry run python scripts/create_transacciones_test.py
+
 app-setup:
 	@echo "Configurando el proyecto Django..."
 	make db-clean
@@ -92,6 +96,7 @@ endif
 	make create-clients
 	make create-historical-rates
 	make setup-transactions
+	make create-transactions
 
 #-------------- Comandos de administración ----------------#
 
@@ -137,6 +142,7 @@ help:
 	@echo "  create-client-types - Crear tipos de cliente (VIP, Minorista, Corporativo)"
 	@echo "  create-clients - Crear clientes de ejemplo con operadores asignados"
 	@echo "  create-historical-rates - Crear datos históricos de tasas de cambio"
+	@echo "  create-transactions - Crear transacciones de ejemplo para operadores"
 	@echo "  migrate-groups    - Migrar grupos existentes al nuevo modelo"
 	@echo "  test-grupo-permisos - Probar funcionalidad de permisos con grupos activos/inactivos"
 	@echo "  limpiar-codigos   - Limpiar códigos de verificación expirados"

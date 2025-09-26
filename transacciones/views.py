@@ -3,10 +3,14 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, Http404
 from django.views.decorators.http import require_http_methods
+from django.views.generic import ListView
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import Q, Count
 from decimal import Decimal, ROUND_HALF_UP
 import json
+from datetime import datetime, date
 
 from .models import Transaccion, TipoOperacion, EstadoTransaccion
 from monedas.models import Moneda
@@ -1337,3 +1341,149 @@ def iniciar_venta(request):
         print(f"TRACEBACK: {traceback.format_exc()}")
         messages.error(request, f'Error al crear la transacción de venta: {str(e)}')
         return redirect('tasa_cambio:dashboard')
+
+
+class MisTransaccionesListView(LoginRequiredMixin, ListView):
+    """
+    Vista para mostrar las transacciones del usuario con filtros y estadísticas
+    """
+    model = Transaccion
+    template_name = 'transacciones/mis_transacciones.html'
+    context_object_name = 'transacciones'
+    paginate_by = 20
+
+    def get_queryset(self):
+        """
+        Filtrar transacciones del usuario actual con filtros opcionales
+        """
+        queryset = Transaccion.objects.filter(
+            usuario=self.request.user
+        ).select_related(
+            'cliente',
+            'tipo_operacion',
+            'estado',
+            'moneda_origen',
+            'moneda_destino'
+        ).order_by('-fecha_creacion')
+
+        # Aplicar filtros
+        fecha_desde = self.request.GET.get('fecha_desde')
+        fecha_hasta = self.request.GET.get('fecha_hasta')
+        tipo = self.request.GET.get('tipo')
+        estado = self.request.GET.get('estado')
+        cliente = self.request.GET.get('cliente')
+
+        if fecha_desde:
+            try:
+                fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+                queryset = queryset.filter(fecha_creacion__date__gte=fecha_desde_obj)
+            except ValueError:
+                pass
+
+        if fecha_hasta:
+            try:
+                fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+                queryset = queryset.filter(fecha_creacion__date__lte=fecha_hasta_obj)
+            except ValueError:
+                pass
+
+        if tipo:
+            queryset = queryset.filter(tipo_operacion__pk=tipo)
+
+        if estado:
+            queryset = queryset.filter(estado__pk=estado)
+
+        if cliente:
+            queryset = queryset.filter(cliente__pk=cliente)
+
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        """
+        Agregar datos adicionales para filtros y estadísticas
+        """
+        context = super().get_context_data(**kwargs)
+
+        # Datos para filtros
+        context['tipos_operacion'] = TipoOperacion.objects.filter(activo=True)
+        context['estados_transaccion'] = EstadoTransaccion.objects.filter(activo=True)
+
+        # Clientes asociados al usuario
+        context['clientes'] = Cliente.objects.filter(
+            usuarios_asociados=self.request.user,
+            activo=True
+        ).order_by('nombre_comercial')
+
+        # Preservar filtros en el contexto
+        context['filtros'] = {
+            'fecha_desde': self.request.GET.get('fecha_desde', ''),
+            'fecha_hasta': self.request.GET.get('fecha_hasta', ''),
+            'tipo': self.request.GET.get('tipo', ''),
+            'estado': self.request.GET.get('estado', ''),
+            'cliente': self.request.GET.get('cliente', ''),
+        }
+
+        # Estadísticas
+        todas_transacciones = self.get_queryset()
+
+        context['estadisticas'] = {
+            'total_transacciones': todas_transacciones.count(),
+            'pendientes': todas_transacciones.filter(estado__codigo='PENDIENTE').count(),
+            'pagadas': todas_transacciones.filter(estado__codigo='PAGADA').count(),
+            'canceladas': todas_transacciones.filter(estado__codigo='CANCELADA').count(),
+            'anuladas': todas_transacciones.filter(estado__codigo='ANULADA').count(),
+        }
+
+        # Estadísticas por tipo de operación
+        context['estadisticas_tipo'] = {
+            'compras': todas_transacciones.filter(tipo_operacion__codigo='COMPRA').count(),
+            'ventas': todas_transacciones.filter(tipo_operacion__codigo='VENTA').count(),
+        }
+
+        # Datos para gráficos - usar las mismas transacciones filtradas
+        # pero agrupar por fecha para mostrar tendencia
+        transacciones_para_grafico = todas_transacciones.order_by('fecha_creacion')
+
+        # Si no hay filtros de fecha, usar últimos 30 días
+        if not self.request.GET.get('fecha_desde') and not self.request.GET.get('fecha_hasta'):
+            desde_30_dias = timezone.now().date() - timedelta(days=30)
+            transacciones_para_grafico = transacciones_para_grafico.filter(
+                fecha_creacion__date__gte=desde_30_dias
+            )
+            fecha_inicio = desde_30_dias
+            fecha_fin = timezone.now().date()
+        else:
+            # Usar el rango de fechas de los filtros o de los datos disponibles
+            if transacciones_para_grafico.exists():
+                fecha_inicio = transacciones_para_grafico.first().fecha_creacion.date()
+                fecha_fin = transacciones_para_grafico.last().fecha_creacion.date()
+
+                # Asegurar un rango mínimo de 7 días para el gráfico
+                if (fecha_fin - fecha_inicio).days < 7:
+                    fecha_inicio = fecha_fin - timedelta(days=7)
+            else:
+                # Si no hay datos, mostrar últimos 7 días
+                fecha_fin = timezone.now().date()
+                fecha_inicio = fecha_fin - timedelta(days=7)
+
+        # Crear diccionario de fechas con valores 0
+        fechas_datos = {}
+        fecha_actual = fecha_inicio
+        while fecha_actual <= fecha_fin:
+            fechas_datos[fecha_actual.isoformat()] = 0
+            fecha_actual += timedelta(days=1)
+
+        # Contar transacciones por fecha
+        for transaccion in transacciones_para_grafico:
+            fecha_str = transaccion.fecha_creacion.date().isoformat()
+            if fecha_str in fechas_datos:
+                fechas_datos[fecha_str] += 1
+
+        # Preparar datos para el gráfico
+        fechas_ordenadas = sorted(fechas_datos.keys())
+        context['datos_grafico'] = json.dumps({
+            'fechas': fechas_ordenadas,
+            'cantidades': [fechas_datos[fecha] for fecha in fechas_ordenadas]
+        })
+
+        return context

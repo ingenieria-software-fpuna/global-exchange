@@ -131,7 +131,7 @@ class Transaccion(models.Model):
         verbose_name="Cliente",
         null=True,
         blank=True,
-        help_text="Cliente que realiza la transacción (opcional para walk-ins)"
+        help_text="Cliente que realiza la transacción (opcional para clientes casuales)"
     )
     usuario = models.ForeignKey(
         User,
