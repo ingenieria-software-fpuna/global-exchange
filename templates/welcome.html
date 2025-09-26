@@ -29,6 +29,11 @@
 .btn-swap { border-radius: 999px; height: 52px; display:flex; align-items:center; justify-content:center; font-size: 1.1rem; }
 .btn-swap i { transition: transform .2s ease; }
 .btn-swap:hover i { transform: rotate(180deg); }
+
+/* Cotizaciones styles */
+.hover-row { transition: all 0.2s ease; }
+.hover-row:hover { background-color: rgba(13, 110, 253, 0.05) !important; transform: scale(1.01); }
+.hover-text-primary:hover { color: #0d6efd !important; }
 </style>
 {% endblock %}
 
@@ -105,39 +110,130 @@
 </section>
 {% endif %}
 
-<!-- Cotizaciones -->
+<!-- Cotizaciones y Simulador -->
 {% if monedas_con_tasas %}
 <section class="py-5">
     <div class="container">
-        <div class="text-center mb-5">
-            <h2 class="h1 text-primary mb-2">Cotizaciones</h2>
-            <p class="text-muted">Moneda base: Guaraní (PYG)</p>
-        </div>
-
-        <div class="row g-4 justify-content-center">
-            {% for item in monedas_con_tasas %}
-            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <div class="display-6 text-primary mb-2">
-                            <i class="{{ item.moneda.codigo|get_icono_moneda }}"></i>
+        <div class="row g-4">
+            <!-- Cotizaciones - Columna izquierda -->
+            <div class="col-12 col-lg-6">
+                <div class="mb-4">
+                    <h2 class="h3 text-primary mb-2">
+                        <i class="fas fa-coins me-2"></i>Cotizaciones
+                    </h2>
+                    <p class="text-muted mb-0">Moneda base: Guaraní (PYG)</p>
+                </div>
+                
+                <div class="card border-0 shadow-soft overflow-hidden">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr class="table-primary">
+                                        <th class="border-0 py-3 px-3 fw-bold">
+                                            <i class="fas fa-coins me-1 text-primary"></i>Moneda
+                                        </th>
+                                        <th class="border-0 py-3 px-3 text-center fw-bold">
+                                            <i class="text-success"></i>Compra
+                                        </th>
+                                        <th class="border-0 py-3 px-3 text-center fw-bold">
+                                            <i class="fas fa-arrow-up me-1 text-danger"></i>Venta
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in monedas_con_tasas %}
+                                    <tr class="align-middle hover-row">
+                                        {% if user.is_authenticated and perms.tasa_cambio.view_tasacambio %}
+                                        <td class="py-2 px-3 clickable-row" onclick="window.location.href='{% url 'tasa_cambio:tasacambio_historial' item.moneda.id %}'" style="cursor: pointer;">
+                                        {% else %}
+                                        <td class="py-2 px-3">
+                                        {% endif %}
+                                            <div class="d-flex align-items-center">
+                                                <div class="me-2">
+                                                    <div class="bg-primary bg-opacity-10 rounded-circle p-1">
+                                                        <i class="{{ item.moneda.codigo|get_icono_moneda }} text-primary" style="font-size: 0.9rem;"></i>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div class="fw-bold text-dark" style="font-size: 0.85rem;">{{ item.moneda.nombre }}</div>
+                                                    <small class="text-muted" style="font-size: 0.75rem;">{{ item.moneda.codigo }}</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="py-2 px-3 text-center">
+                                            <span class="fw-bold text-success" style="font-size: 0.9rem;">
+                                                {{ item.tasa.tasa_compra|formatear_guaranies }}
+                                            </span>
+                                        </td>
+                                        <td class="py-2 px-3 text-center">
+                                            <span class="fw-bold text-danger" style="font-size: 0.9rem;">
+                                                {{ item.tasa.tasa_venta|formatear_guaranies }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
-                        <h5 class="card-title">{{ item.moneda.nombre }}</h5>
-                        <p class="mb-1">
-                            <span class="h4 text-success">{{ item.tasa.tasa_venta|formatear_guaranies }}</span>
-                            <small class="text-muted"> PYG/{{ item.moneda.codigo }}</small>
-                        </p>
-                        <small class="text-muted">
-                            Compra: {{ item.tasa.tasa_compra|formatear_guaranies }} · 
-                            Venta: {{ item.tasa.tasa_venta|formatear_guaranies }}
-                        </small>
                     </div>
                 </div>
             </div>
-            {% endfor %}
+
+            <!-- Simulador - Columna derecha -->
+            <div class="col-12 col-lg-6">
+                <div class="mb-4">
+                    <h2 class="h3 text-primary mb-2">
+                        <i class="fas fa-calculator me-2"></i>Simulador de cambio
+                    </h2>
+                    <p class="text-muted mb-0">Calcula tu cambio al instante</p>
+                </div>
+                
+                <div class="card sim-card shadow-soft">
+                    <div class="card-body p-4">
+                        <div class="row g-3 align-items-end mb-4">
+                            <div class="col-12 col-md-5">
+                                <label class="form-label">De</label>
+                                <select id="origen_pub" class="form-select">
+                                    <option value="PYG" selected>Guaraní (PYG)</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-2 d-flex align-items-end justify-content-center">
+                                <button id="btnToggleDir_pub" type="button" class="btn btn-outline-secondary btn-swap w-100" title="Cambiar dirección" aria-label="Cambiar dirección">
+                                    <i class="fas fa-right-left"></i>
+                                </button>
+                            </div>
+                            <div class="col-12 col-md-5">
+                                <label class="form-label">A</label>
+                                <select id="destino_pub" class="form-select">
+                                    {% for m in monedas %}
+                                        {% if m.codigo != 'PYG' %}
+                                            <option value="{{ m.codigo }}" {% if m.codigo == 'USD' %}selected{% endif %}>{{ m.nombre }} ({{ m.codigo }})</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">Monto</label>
+                            <input id="monto_pub" type="number" class="form-control" placeholder="0,00" step="any" min="0" value="1000">
+                        </div>
+
+                        <div id="resultado_pub" class="p-4 rounded sim-result" style="min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
+                            <div class="text-muted small mb-2">Resultado</div>
+                            <div class="fs-3 fw-bold mb-2" id="resultado_valor_pub">—</div>
+                            <div class="small text-muted mb-1" id="resultado_detalle_pub">Selecciona monedas y monto para simular.</div>
+                            <div class="small" id="resultado_tasas_pub"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="row mt-5">
+
+
+        <div class="row mt-4">
             <div class="col-12">
                 <div class="alert alert-info shadow-sm text-center" role="alert">
                     <i class="fas fa-circle-info me-2"></i>
@@ -162,68 +258,6 @@
     </div>
 </section>
 {% endif %}
-
-<!-- Simulador público -->
-<section id="simulador" class="py-5 bg-light">
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-12">
-        <div class="card sim-card shadow-soft">
-          <div class="card-body p-4 p-md-5">
-            <div class="d-flex align-items-center justify-content-between mb-4">
-              <h3 class="h4 mb-0"><i class="fas fa-calculator text-primary me-2"></i>Simulador de cambio</h3>
-              <span class="badge sim-header-badge">Base: PYG</span>
-            </div>
-
-            <div class="row g-4 align-items-stretch">
-              <div class="col-12 col-lg-7">
-                <div class="row g-3 align-items-end">
-                  <div class="col-12 col-md-5">
-                    <label class="form-label">De</label>
-                    <select id="origen_pub" class="form-select form-select-lg">
-                      <option value="PYG" selected>Guaraní (PYG)</option>
-                    </select>
-                  </div>
-                  <div class="col-12 col-md-2 d-flex align-items-end justify-content-center">
-                    <button id="btnToggleDir_pub" type="button" class="btn btn-outline-secondary btn-swap w-100" title="Cambiar dirección" aria-label="Cambiar dirección">
-                      <i class="fas fa-right-left"></i>
-                    </button>
-                  </div>
-                  <div class="col-12 col-md-5">
-                    <label class="form-label">A</label>
-                    <select id="destino_pub" class="form-select form-select-lg">
-                      {% for m in monedas %}
-                        {% if m.codigo != 'PYG' %}
-                          <option value="{{ m.codigo }}" {% if m.codigo == 'USD' %}selected{% endif %}>{{ m.nombre }} ({{ m.codigo }})</option>
-                        {% endif %}
-                      {% endfor %}
-                    </select>
-                  </div>
-                </div>
-
-                <div class="row g-3 mt-1">
-                  <div class="col-12">
-                    <label class="form-label">Monto</label>
-                    <input id="monto_pub" type="number" class="form-control form-control-lg" placeholder="0,00" step="any" min="0" value="1000">
-                  </div>
-                </div>
-              </div>
-              <div class="col-12 col-lg-5">
-                <div id="resultado_pub" class="p-4 rounded sim-result">
-                  <div class="text-muted small mb-1">Resultado</div>
-                  <div class="fs-2 fw-bold" id="resultado_valor_pub">—</div>
-                  <div class="small text-muted" id="resultado_detalle_pub">Selecciona monedas y monto para simular.</div>
-                  <div class="small mt-2" id="resultado_tasas_pub"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="bg-white" style="height: 16px;"></div>
-</section>
 
 <!-- Características -->
 <section class="py-5 bg-light">
