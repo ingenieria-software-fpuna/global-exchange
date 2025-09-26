@@ -135,6 +135,14 @@ if [ "${CREATE_TEST_TRANSACTIONS:-false}" = "true" ]; then
   }
 fi
 
+# Optionally create groups and users from env var
+if [ "${CREATE_GROUPS_USERS:-false}" = "true" ]; then
+  echo "[entrypoint] Creating groups and users..."
+  PYTHONPATH=/app python scripts/create_grupos_usuarios_test.py || {
+    echo "⚠️  Error creating groups and users, but continuing..."
+  }
+fi
+
 # Optionally create historical rates from env var
 if [ "${CREATE_HISTORICAL_RATES:-false}" = "true" ]; then
   echo "[entrypoint] Creating historical rates..."
