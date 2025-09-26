@@ -140,25 +140,27 @@ class TipoClienteViewsTestCase(TestCase):
         
         self.assertEqual(TipoClienteListView.model, TipoCliente)
         self.assertEqual(TipoClienteListView.template_name, 'clientes/tipocliente_list.html')
-        self.assertEqual(TipoClienteListView.context_object_name, 'tipos_cliente')
+        self.assertEqual(TipoClienteListView.context_object_name, 'tipos')
         self.assertEqual(TipoClienteListView.paginate_by, 10)
 
     def test_tipo_cliente_create_view_attributes(self):
         """Test unitario de atributos de la vista de creación"""
         from .views import TipoClienteCreateView
+        from .forms import TipoClienteForm
         
         self.assertEqual(TipoClienteCreateView.model, TipoCliente)
         self.assertEqual(TipoClienteCreateView.template_name, 'clientes/tipocliente_form.html')
-        self.assertEqual(TipoClienteCreateView.fields, ['nombre', 'descripcion', 'descuento', 'activo'])
+        self.assertEqual(TipoClienteCreateView.form_class, TipoClienteForm)
         self.assertEqual(str(TipoClienteCreateView.success_url), '/clientes/tipos/')
 
     def test_tipo_cliente_update_view_attributes(self):
         """Test unitario de atributos de la vista de actualización"""
         from .views import TipoClienteUpdateView
+        from .forms import TipoClienteUpdateForm
         
         self.assertEqual(TipoClienteUpdateView.model, TipoCliente)
         self.assertEqual(TipoClienteUpdateView.template_name, 'clientes/tipocliente_form.html')
-        self.assertEqual(TipoClienteUpdateView.fields, ['nombre', 'descripcion', 'descuento', 'activo'])
+        self.assertEqual(TipoClienteUpdateView.form_class, TipoClienteUpdateForm)
         self.assertEqual(str(TipoClienteUpdateView.success_url), '/clientes/tipos/')
 
     def test_tipo_cliente_delete_view_attributes(self):

@@ -101,12 +101,14 @@ class TransaccionViewsTest(TestCase):
             'monto': '100',
             'origen': 'PYG',
             'destino': 'USD',
-            'metodo_cobro_id': self.metodo_pago.id,
+            'metodo_cobro_id': self.metodo_cobro.id,
             'metodo_pago_id': self.metodo_pago.id
         })
         
         self.assertEqual(response.status_code, 200)
         data = response.json()
+        if not data['success']:
+            print(f"API Error: {data}")
         self.assertTrue(data['success'])
         self.assertEqual(data['data']['tasa_ajustada'], 7600)
 
