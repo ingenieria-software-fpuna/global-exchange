@@ -207,31 +207,31 @@ class Transaccion(models.Model):
     
     # Comisiones y descuentos
     porcentaje_comision = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
+        max_digits=8,
+        decimal_places=4,
         default=0.00,
         validators=[MinValueValidator(0)],
         verbose_name="Porcentaje de Comisión (%)",
         help_text="Porcentaje de comisión aplicado"
     )
     monto_comision = models.DecimalField(
-        max_digits=12,
+        max_digits=15,
         decimal_places=2,
         default=0.00,
         validators=[MinValueValidator(0)],
         verbose_name="Monto de Comisión",
-        help_text="Monto total de comisión en la moneda destino"
+        help_text="Monto total de comisión en la moneda origen"
     )
     porcentaje_descuento = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
+        max_digits=8,
+        decimal_places=4,
         default=0.00,
         validators=[MinValueValidator(0)],
         verbose_name="Porcentaje de Descuento (%)",
         help_text="Porcentaje de descuento aplicado por tipo de cliente"
     )
     monto_descuento = models.DecimalField(
-        max_digits=12,
+        max_digits=15,
         decimal_places=2,
         default=0.00,
         validators=[MinValueValidator(0)],
