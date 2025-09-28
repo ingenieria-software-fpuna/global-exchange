@@ -3,6 +3,7 @@ from django import forms
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.models import Group
 from datetime import date
+from grupos.models import Grupo
 
 class DateInput(forms.DateInput):
     """Widget personalizado para campos de fecha que asegura formato YYYY-MM-DD para HTML5"""
@@ -44,7 +45,7 @@ class UsuarioCreationForm(forms.ModelForm):
     password1 = forms.CharField(label="Contraseña", widget=forms.PasswordInput(attrs={'class': 'form-control'}))
     password2 = forms.CharField(label="Repetir Contraseña", widget=forms.PasswordInput(attrs={'class': 'form-control'}))
     groups = forms.ModelMultipleChoiceField(
-        queryset=Group.objects.all().order_by('name'),
+        queryset=Group.objects.none(),  # Se configurará en __init__
         widget=forms.CheckboxSelectMultiple,
         required=False,
         label="Grupos"
@@ -80,6 +81,14 @@ class UsuarioCreationForm(forms.ModelForm):
                 raise forms.ValidationError("El usuario debe ser mayor de 18 años.")
         return fecha_nacimiento
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Configurar queryset para grupos activos
+        grupos_activos = Grupo.objects.filter(es_activo=True).select_related('group')
+        self.fields['groups'].queryset = Group.objects.filter(
+            grupo_extension__in=grupos_activos
+        ).order_by('name')
+
     def save(self, commit=True):
         user = super().save(commit=False)
         user.set_password(self.cleaned_data["password1"])
@@ -96,7 +105,7 @@ class UsuarioCreationForm(forms.ModelForm):
 
 class UsuarioUpdateForm(forms.ModelForm):
     groups = forms.ModelMultipleChoiceField(
-        queryset=Group.objects.all().order_by('name'),
+        queryset=Group.objects.none(),  # Se configurará en __init__
         widget=forms.CheckboxSelectMultiple,
         required=False,
         label="Grupos"
@@ -129,12 +138,22 @@ class UsuarioUpdateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Configurar queryset para grupos activos
+        grupos_activos = Grupo.objects.filter(es_activo=True).select_related('group')
+        self.fields['groups'].queryset = Group.objects.filter(
+            grupo_extension__in=grupos_activos
+        ).order_by('name')
+        
         # Pre-cargar grupos asignados al usuario
         if self.instance and self.instance.pk:
             self.fields['groups'].initial = self.instance.groups.values_list('pk', flat=True)
             # Asegurar que la fecha de nacimiento se muestre correctamente en el campo
             if self.instance.fecha_nacimiento:
-                self.fields['fecha_nacimiento'].initial = self.instance.fecha_nacimiento.strftime('%Y-%m-%d')
+                if hasattr(self.instance.fecha_nacimiento, 'strftime'):
+                    self.fields['fecha_nacimiento'].initial = self.instance.fecha_nacimiento.strftime('%Y-%m-%d')
+                else:
+                    # Si ya es un string, usarlo directamente
+                    self.fields['fecha_nacimiento'].initial = self.instance.fecha_nacimiento
 
     def save(self, commit=True):
         user = super().save(commit=commit)

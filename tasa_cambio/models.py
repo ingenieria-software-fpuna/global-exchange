@@ -74,6 +74,16 @@ class TasaCambio(models.Model):
                     moneda=self.moneda,
                     es_activa=True
                 ).exclude(pk=self.pk).update(es_activa=False)
+
+                # Cancelar transacciones pendientes que usen esta moneda
+                # Importar aquí para evitar importación circular
+                from transacciones.models import Transaccion
+                canceladas = Transaccion.cancelar_pendientes_por_moneda(self.moneda)
+
+                # Log opcional para debugging (se puede quitar en producción)
+                if canceladas > 0:
+                    print(f"Canceladas {canceladas} transacciones pendientes por cambio de tasa para {self.moneda.codigo}")
+
             super().save(*args, **kwargs)
 
     @property

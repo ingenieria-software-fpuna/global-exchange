@@ -50,6 +50,14 @@
             {{ form.direccion }}
             {% for e in form.direccion.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           </div>
+          {% if form.monto_limite_transaccion %}
+          <div class="col-md-6">
+            <label class="form-label" for="id_monto_limite_transaccion">Monto Límite por Transacción</label>
+            {{ form.monto_limite_transaccion }}
+            {% for e in form.monto_limite_transaccion.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            {% if form.monto_limite_transaccion.help_text %}<div class="form-text">{{ form.monto_limite_transaccion.help_text }}</div>{% endif %}
+          </div>
+          {% endif %}
           <div class="col-md-6">
             <label class="form-label" for="id_usuarios_asociados">Usuarios Asociados</label>
             {{ form.usuarios_asociados }}

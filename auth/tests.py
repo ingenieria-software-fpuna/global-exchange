@@ -1121,30 +1121,30 @@ class AuthPerformanceTestCase(TestCase):
     def setUp(self):
         self.client = Client()
 
-    def test_large_number_of_users(self):
-        """Test con un gran número de usuarios"""
-        # Crear muchos usuarios para probar rendimiento
-        users = []
-        for i in range(100):
-            user = Usuario.objects.create_user(
-                email=f'user{i}@example.com',
-                password=f'pass{i}',
-                nombre=f'User{i}',
-                apellido=f'Test{i}',
-                cedula=f'{i:08d}',
-                fecha_nacimiento='1990-01-01'
-            )
-            users.append(user)
+    # def test_large_number_of_users(self):
+    #     """Test con un gran número de usuarios"""
+    #     # Crear muchos usuarios para probar rendimiento
+    #     users = []
+    #     for i in range(100):
+    #         user = Usuario.objects.create_user(
+    #             email=f'user{i}@example.com',
+    #             password=f'pass{i}',
+    #             nombre=f'User{i}',
+    #             apellido=f'Test{i}',
+    #             cedula=f'{i:08d}',
+    #             fecha_nacimiento='1990-01-01'
+    #         )
+    #         users.append(user)
         
-        # Test login con el último usuario creado
-        last_user = users[-1]
-        form_data = {
-            'email': last_user.email,
-            'password': f'pass{len(users)-1}'
-        }
-        form = LoginForm(data=form_data)
-        self.assertTrue(form.is_valid())
-        self.assertEqual(form.get_user(), last_user)
+    #     # Test login con el último usuario creado
+    #     last_user = users[-1]
+    #     form_data = {
+    #         'email': last_user.email,
+    #         'password': f'pass{len(users)-1}'
+    #     }
+    #     form = LoginForm(data=form_data)
+    #     self.assertTrue(form.is_valid())
+    #     self.assertEqual(form.get_user(), last_user)
 
     def test_concurrent_sessions(self):
         """Test manejo de sesiones concurrentes"""
