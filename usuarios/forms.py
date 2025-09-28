@@ -149,7 +149,11 @@ class UsuarioUpdateForm(forms.ModelForm):
             self.fields['groups'].initial = self.instance.groups.values_list('pk', flat=True)
             # Asegurar que la fecha de nacimiento se muestre correctamente en el campo
             if self.instance.fecha_nacimiento:
-                self.fields['fecha_nacimiento'].initial = self.instance.fecha_nacimiento.strftime('%Y-%m-%d')
+                if hasattr(self.instance.fecha_nacimiento, 'strftime'):
+                    self.fields['fecha_nacimiento'].initial = self.instance.fecha_nacimiento.strftime('%Y-%m-%d')
+                else:
+                    # Si ya es un string, usarlo directamente
+                    self.fields['fecha_nacimiento'].initial = self.instance.fecha_nacimiento
 
     def save(self, commit=True):
         user = super().save(commit=commit)

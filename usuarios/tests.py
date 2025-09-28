@@ -110,10 +110,12 @@ class UsuarioFormsTestCase(TestCase):
     def setUp(self):
         self.user_data = {
             'email': 'test@example.com',
-            'password': 'testpass123',
+            'password1': 'testpass123',
             'password2': 'testpass123',
             'nombre': 'Test',
-            'apellido': 'User'
+            'apellido': 'User',
+            'cedula': '12345678',
+            'fecha_nacimiento': '1995-01-01'
         }
 
     def test_usuario_creation_form_valid(self):
