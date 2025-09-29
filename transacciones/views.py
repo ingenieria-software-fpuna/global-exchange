@@ -603,7 +603,7 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
         
         # Obtener descuento del cliente
         descuento_pct = Decimal('0')
-        if cliente and cliente.tipo_cliente and cliente.tipo_cliente.descuento > 0:
+        if cliente and cliente.tipo_cliente and cliente.tipo_cliente.activo and cliente.tipo_cliente.descuento > 0:
             descuento_pct = Decimal(str(cliente.tipo_cliente.descuento))
         
         # LÓGICA :Cliente ingresa cuánto quiere PAGAR, sistema calcula cuánto RECIBE
@@ -791,7 +791,7 @@ def calcular_venta_completa(monto, moneda_origen, moneda_destino, cliente=None, 
         
         # Obtener descuento del cliente
         descuento_pct = Decimal('0')
-        if cliente and cliente.tipo_cliente and cliente.tipo_cliente.descuento > 0:
+        if cliente and cliente.tipo_cliente and cliente.tipo_cliente.activo and cliente.tipo_cliente.descuento > 0:
             descuento_pct = Decimal(str(cliente.tipo_cliente.descuento))
         
         # Obtener tasa de la divisa que va a vender

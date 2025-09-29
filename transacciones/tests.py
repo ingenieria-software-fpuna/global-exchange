@@ -9,6 +9,7 @@ from metodo_cobro.models import MetodoCobro
 from clientes.models import Cliente, TipoCliente
 from tasa_cambio.models import TasaCambio
 from usuarios.models import Usuario
+from transacciones.views import calcular_transaccion_completa, calcular_venta_completa
 
 User = get_user_model()
 
@@ -138,3 +139,87 @@ class TransaccionViewsTest(TestCase):
         self.assertTrue(data['success'])
         self.assertEqual(len(data['metodos_cobro']), 1)
         self.assertEqual(data['metodos_cobro'][0]['nombre'], 'Efectivo USD')
+
+    def test_descuento_tipo_cliente_inactivo(self):
+        """Test: Los tipos de cliente inactivos no aplican descuentos"""
+        # Crear tipo de cliente activo con descuento
+        tipo_inactivo = TipoCliente.objects.create(
+            nombre='Tipo Inactivo',
+            descuento=Decimal('15.00'),
+            activo=True
+        )
+        
+        # Crear cliente con tipo activo
+        cliente_inactivo = Cliente.objects.create(
+            nombre_comercial='Cliente Inactivo',
+            ruc='12345678',
+            tipo_cliente=tipo_inactivo
+        )
+        
+        # Desactivar el tipo de cliente después de crear el cliente
+        tipo_inactivo.activo = False
+        tipo_inactivo.save()
+        
+        # Crear tipo de cliente activo con descuento
+        tipo_activo = TipoCliente.objects.create(
+            nombre='Tipo Activo',
+            descuento=Decimal('10.00'),
+            activo=True
+        )
+        
+        # Crear cliente con tipo activo
+        cliente_activo = Cliente.objects.create(
+            nombre_comercial='Cliente Activo',
+            ruc='87654321',
+            tipo_cliente=tipo_activo
+        )
+        
+        # Test compra con cliente inactivo - no debe aplicar descuento
+        resultado_inactivo = calcular_transaccion_completa(
+            monto=Decimal('100000'),
+            moneda_origen=self.pyg,
+            moneda_destino=self.usd,
+            cliente=cliente_inactivo
+        )
+        
+        self.assertTrue(resultado_inactivo['success'])
+        self.assertEqual(resultado_inactivo['data']['descuento_pct'], 0)
+        self.assertEqual(resultado_inactivo['data']['descuento_aplicado'], 0)
+        
+        # Test compra con cliente activo - debe aplicar descuento
+        resultado_activo = calcular_transaccion_completa(
+            monto=Decimal('100000'),
+            moneda_origen=self.pyg,
+            moneda_destino=self.usd,
+            cliente=cliente_activo
+        )
+        
+        self.assertTrue(resultado_activo['success'])
+        self.assertEqual(resultado_activo['data']['descuento_pct'], 10.0)
+        # El descuento se aplica a la tasa, no a las comisiones
+        self.assertEqual(resultado_activo['data']['descuento_aplicado'], 0)
+        
+        # Test venta con cliente inactivo - no debe aplicar descuento
+        resultado_venta_inactivo = calcular_venta_completa(
+            monto=Decimal('100'),
+            moneda_origen=self.usd,
+            moneda_destino=self.pyg,
+            cliente=cliente_inactivo
+        )
+        
+        self.assertTrue(resultado_venta_inactivo['success'])
+        self.assertEqual(resultado_venta_inactivo['data']['descuento_pct'], 0)
+        self.assertEqual(resultado_venta_inactivo['data']['descuento_aplicado'], 0)
+        
+        # Test venta con cliente activo - debe aplicar descuento
+        resultado_venta_activo = calcular_venta_completa(
+            monto=Decimal('100'),
+            moneda_origen=self.usd,
+            moneda_destino=self.pyg,
+            cliente=cliente_activo
+        )
+        
+        self.assertTrue(resultado_venta_activo['success'])
+        self.assertEqual(resultado_venta_activo['data']['descuento_pct'], 10.0)
+        # El descuento se aplica a la tasa, no a las comisiones
+        self.assertEqual(resultado_venta_activo['data']['descuento_aplicado'], 0)

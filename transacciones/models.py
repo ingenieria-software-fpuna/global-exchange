@@ -411,7 +411,7 @@ class Transaccion(models.Model):
         # Descuento aplicado (sobre las comisiones)
         descuento_aplicado = Decimal('0')
         descuento_pct = Decimal('0')
-        if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.descuento > 0:
+        if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.activo and self.cliente.tipo_cliente.descuento > 0:
             descuento_pct = Decimal(str(self.cliente.tipo_cliente.descuento))
             descuento_aplicado = comision_total * (descuento_pct / Decimal('100'))
         
@@ -531,7 +531,7 @@ class Transaccion(models.Model):
 
                 # Calcular precio de venta con descuento (como se hace en calcular_compra)
                 comision_venta_ajustada = Decimal(str(tasa_actual.comision_venta))
-                if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.descuento > 0:
+                if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.activo and self.cliente.tipo_cliente.descuento > 0:
                     descuento_pct = Decimal(str(self.cliente.tipo_cliente.descuento))
                     comision_venta_ajustada = comision_venta_ajustada * (Decimal('1') - (descuento_pct / Decimal('100')))
 
@@ -549,7 +549,7 @@ class Transaccion(models.Model):
                 # Calcular precio de compra con descuento (como se hace en calcular_venta)
                 precio_base_compra = Decimal(str(tasa_actual.precio_base)) - Decimal(str(tasa_actual.comision_compra))
 
-                if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.descuento > 0:
+                if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.activo and self.cliente.tipo_cliente.descuento > 0:
                     descuento_pct = Decimal(str(self.cliente.tipo_cliente.descuento))
                     # Para ventas, el descuento aumenta la tasa (cliente recibe más PYG)
                     tasa_esperada = precio_base_compra * (Decimal('1') + (descuento_pct / Decimal('100')))
