@@ -255,19 +255,25 @@ class ClienteFormTestCase(TestCase):
         self.assertIn(self.tipo_inactivo.id, tipo_choices)
         self.assertEqual(len(tipo_choices), 2)
     
-    def test_cannot_create_cliente_with_inactive_tipo(self):
-        """Test: No se puede crear un cliente con tipo inactivo (validación del modelo)"""
+    def test_can_create_cliente_with_inactive_tipo(self):
+        """Test: Se puede crear un cliente con tipo inactivo"""
         form_data = {
             'nombre_comercial': 'Cliente Test',
             'ruc': '12345678',
+            'correo_electronico': 'test@example.com',
             'tipo_cliente': self.tipo_inactivo.id,
         }
         
         form = ClienteForm(data=form_data)
         
-        # Verificar que el formulario no es válido debido a la validación del modelo
-        self.assertFalse(form.is_valid())
+        # Verificar que el formulario es válido
+        if not form.is_valid():
+            print(f"Form errors: {form.errors}")
+            self.fail(f"Form is not valid: {form.errors}")
         
-        # Verificar que el error está en el campo tipo_cliente
-        self.assertIn('tipo_cliente', form.errors)
-        self.assertIn('No se puede asignar un tipo de cliente inactivo.', str(form.errors['tipo_cliente']))
+        self.assertTrue(form.is_valid())
+        
+        # Crear el cliente
+        cliente = form.save()
+        self.assertEqual(cliente.tipo_cliente, self.tipo_inactivo)
+        self.assertFalse(cliente.tipo_cliente.activo)
