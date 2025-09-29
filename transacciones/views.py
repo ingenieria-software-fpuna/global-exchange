@@ -800,17 +800,17 @@ def calcular_venta_completa(monto, moneda_origen, moneda_destino, cliente=None, 
         except TasaCambio.DoesNotExist:
             return {'success': False, 'error': f'Tasa de cambio no disponible para {moneda_origen.codigo}'}
         
-        # Para ventas: precio_base - comision_compra da la tasa base de compra
-        precio_base_compra = Decimal(str(tasa_origen.precio_base)) - Decimal(str(tasa_origen.comision_compra))
-        
-        # Aplicar descuento del cliente a la tasa base (cliente recibe más PYG)
+        # Para ventas: aplicar descuento a la comisión de compra
+        comision_compra_ajustada = Decimal(str(tasa_origen.comision_compra))
         if descuento_pct > 0:
-            # El descuento aumenta la tasa base para dar más PYG al cliente
-            precio_usado = precio_base_compra * (Decimal('1') + (descuento_pct / Decimal('100')))
+            # El descuento reduce la comisión de compra (cliente recibe más PYG)
+            comision_compra_ajustada = comision_compra_ajustada * (Decimal('1') - (descuento_pct / Decimal('100')))
             tipo_operacion = 'compra (con descuento)'
         else:
-            precio_usado = precio_base_compra
             tipo_operacion = 'compra'
+        
+        # Calcular precio de compra ajustado: precio_base - comision_compra_ajustada
+        precio_usado = Decimal(str(tasa_origen.precio_base)) - comision_compra_ajustada
         
         # LÓGICA DE CÁLCULO PARA VENTAS:
         # 1. El monto ingresado es cuánta divisa extranjera quiere VENDER
@@ -880,7 +880,7 @@ def calcular_venta_completa(monto, moneda_origen, moneda_destino, cliente=None, 
                 'tasa_destino': None,  # Para ventas, la tasa relevante es la de origen
                 
                 # Tasas para mostrar en el preview
-                'tasa_base': float(precio_base_compra),
+                'tasa_base': float(Decimal(str(tasa_origen.precio_base)) - Decimal(str(tasa_origen.comision_compra))),
                 'tasa_ajustada': float(precio_usado),
                 
                 # Cálculos
