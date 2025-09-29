@@ -44,7 +44,7 @@ def validar_limites_transaccion(monto_origen, moneda_origen, cliente=None, usuar
     if cliente and cliente.monto_limite_transaccion:
         if monto_origen > cliente.monto_limite_transaccion:
             errores.append(f'El monto excede el límite por transacción del cliente: {cliente.monto_limite_transaccion}')
-        limites_aplicados.append(f'Cliente: máx. {cliente.monto_limite_transaccion} {moneda_origen.codigo}')
+        limites_aplicados.append(f'Cliente: máx. {cliente.monto_limite_transaccion} PYG')
     
     # 2. Validar límite por transacción de la moneda
     if moneda_origen.monto_limite_transaccion:
