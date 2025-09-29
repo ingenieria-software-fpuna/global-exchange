@@ -128,7 +128,7 @@ class ClienteListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['tipos_cliente'] = TipoCliente.objects.filter(activo=True)
+        context['tipos_cliente'] = TipoCliente.objects.all()
         context['q'] = self.request.GET.get('q', '')
         context['tipo_cliente_filter'] = self.request.GET.get('tipo_cliente', '')
         context['estado_filter'] = self.request.GET.get('estado', '')
