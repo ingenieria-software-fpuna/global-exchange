@@ -309,33 +309,6 @@ class TasaCambioViewTest(TestCase):
         # Verificar que la cotización se creó
         self.assertTrue(TasaCambio.objects.filter(precio_base=7600).exists())
     
-    def test_toggle_status_with_permission(self):
-        """Prueba el toggle de estado con permisos"""
-        # Agregar permiso al usuario
-        content_type = ContentType.objects.get_for_model(TasaCambio)
-        permission = Permission.objects.get(
-            codename='change_tasacambio',
-            content_type=content_type,
-        )
-        self.user.user_permissions.add(permission)
-        
-        self.client.force_login(self.user)
-        
-        response = self.client.post(
-            reverse('tasa_cambio:toggle_status', kwargs={'pk': self.tasa_cambio.pk}),
-            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
-        )
-        self.assertEqual(response.status_code, 200)
-    
-    def test_toggle_status_without_permission(self):
-        """Prueba el toggle de estado sin permisos"""
-        self.client.force_login(self.user)
-        
-        response = self.client.post(
-            reverse('tasa_cambio:toggle_status', kwargs={'pk': self.tasa_cambio.pk}),
-            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
-        )
-        self.assertEqual(response.status_code, 403)  # Prohibido
 
 
 class TasaCambioURLTest(TestCase):
@@ -351,10 +324,6 @@ class TasaCambioURLTest(TestCase):
         url = reverse('tasa_cambio:tasacambio_create')
         self.assertEqual(url, '/tasa-cambio/crear/')
     
-    def test_toggle_status_url(self):
-        """Prueba la URL de toggle de estado"""
-        url = reverse('tasa_cambio:toggle_status', kwargs={'pk': 1})
-        self.assertEqual(url, '/tasa-cambio/toggle-status/1/')
     
     def test_tasacambio_dashboard_url(self):
         """Prueba la URL del dashboard"""

@@ -109,7 +109,7 @@
                             <th class="text-center">Precio Venta</th>
                             <th class="text-center">Spread</th>
                             <th class="text-center">Estado</th>
-                            <th class="text-center">Acciones</th>
+                            {% comment %} <th class="text-center">Acciones</th> {% endcomment %}
                         </tr>
                     </thead>
                     <tbody>
@@ -169,14 +169,7 @@
                                 {% endif %}
                             </td>
                             <td class="text-center">
-                                {% if perms.tasa_cambio.change_tasacambio and tasa.es_activa %}
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-warning toggle-status-btn"
-                                        title="Desactivar cotización"
-                                        data-tasacambio-id="{{ tasa.pk }}">
-                                    <i class="fas fa-pause"></i>
-                                </button>
-                                {% endif %}
+                                <!-- Botón de desactivar removido -->
                             </td>
                         </tr>
                         {% endfor %}
@@ -319,41 +312,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     {% endif %}
 
-    // Toggle status functionality
-    document.querySelectorAll('.toggle-status-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const id = btn.dataset.tasacambioId;
-            try {
-                const resp = await fetch(`{% url 'tasa_cambio:toggle_status' 0 %}`.replace('/0/', `/${id}/`), {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': getCookie('csrftoken') },
-                });
-                const data = await resp.json();
-                if (data.success) {
-                    window.location.reload();
-                } else {
-                    alert(data.message || 'Error al cambiar estado');
-                }
-            } catch (e) {
-                alert('Error de red');
-            }
-        });
-    });
-
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
 });
 </script>
 {% endblock %}
