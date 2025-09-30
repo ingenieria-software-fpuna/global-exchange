@@ -275,7 +275,8 @@ def simular_cambio_api(request):
             cliente = Cliente.objects.select_related('tipo_cliente').get(
                 pk=cliente_id, activo=True, usuarios_asociados=request.user
             )
-            descuento_pct = D(str(cliente.tipo_cliente.descuento or 0))
+            # Solo aplicar descuento si el tipo de cliente está activo
+            descuento_pct = D(str(cliente.tipo_cliente.descuento or 0)) if cliente.tipo_cliente.activo else D('0')
             cliente_info = {
                 'id': cliente.id,
                 'nombre': cliente.nombre_comercial,

@@ -121,9 +121,9 @@
               {% if resumen_detallado.cliente and resumen_detallado.cliente.descuento > 0 %}
               <div class="mb-2">
                 {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
-                <label class="text-muted small">Tasa con {{ resumen_detallado.cliente.descuento }}% descuento VIP:</label>
+                <label class="text-muted small">Tasa ajustada (con descuento):</label>
                 {% else %}
-                <label class="text-muted small">Tasa ajustada (con {{ resumen_detallado.cliente.descuento }}% descuento):</label>
+                <label class="text-muted small">Tasa ajustada (con descuento):</label>
                 {% endif %}
                 <div class="fw-bold text-success">₲ {{ resumen_detallado.tasa_ajustada|floatformat:4 }}</div>
               </div>

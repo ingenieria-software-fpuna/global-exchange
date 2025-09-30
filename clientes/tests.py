@@ -3,7 +3,8 @@ from django.urls import reverse
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from decimal import Decimal
-from .models import TipoCliente
+from .models import TipoCliente, Cliente
+from .forms import ClienteForm, ClienteUpdateForm
 
 
 class TipoClienteModelTestCase(TestCase):
@@ -214,3 +215,65 @@ class TipoClienteViewsTestCase(TestCase):
         
         self.assertTrue(issubclass(TipoClienteDeleteView, LoginRequiredMixin))
         self.assertTrue(issubclass(TipoClienteDeleteView, DeleteView))
+
+
+class ClienteFormTestCase(TestCase):
+    """Tests para los formularios de cliente"""
+    
+    def setUp(self):
+        # Crear tipos de cliente activos e inactivos
+        self.tipo_activo = TipoCliente.objects.create(
+            nombre='Tipo Activo',
+            descuento=Decimal('10.00'),
+            activo=True
+        )
+        self.tipo_inactivo = TipoCliente.objects.create(
+            nombre='Tipo Inactivo',
+            descuento=Decimal('15.00'),
+            activo=False
+        )
+    
+    def test_cliente_form_shows_all_tipos(self):
+        """Test: El formulario de cliente muestra todos los tipos, activos e inactivos"""
+        form = ClienteForm()
+        
+        # Verificar que el queryset incluye ambos tipos
+        tipo_choices = [choice[0] for choice in form.fields['tipo_cliente'].queryset.values_list('id')]
+        
+        self.assertIn(self.tipo_activo.id, tipo_choices)
+        self.assertIn(self.tipo_inactivo.id, tipo_choices)
+        self.assertEqual(len(tipo_choices), 2)
+    
+    def test_cliente_update_form_shows_all_tipos(self):
+        """Test: El formulario de actualización de cliente muestra todos los tipos"""
+        form = ClienteUpdateForm()
+        
+        # Verificar que el queryset incluye ambos tipos
+        tipo_choices = [choice[0] for choice in form.fields['tipo_cliente'].queryset.values_list('id')]
+        
+        self.assertIn(self.tipo_activo.id, tipo_choices)
+        self.assertIn(self.tipo_inactivo.id, tipo_choices)
+        self.assertEqual(len(tipo_choices), 2)
+    
+    def test_can_create_cliente_with_inactive_tipo(self):
+        """Test: Se puede crear un cliente con tipo inactivo"""
+        form_data = {
+            'nombre_comercial': 'Cliente Test',
+            'ruc': '12345678',
+            'correo_electronico': 'test@example.com',
+            'tipo_cliente': self.tipo_inactivo.id,
+        }
+        
+        form = ClienteForm(data=form_data)
+        
+        # Verificar que el formulario es válido
+        if not form.is_valid():
+            print(f"Form errors: {form.errors}")
+            self.fail(f"Form is not valid: {form.errors}")
+        
+        self.assertTrue(form.is_valid())
+        
+        # Crear el cliente
+        cliente = form.save()
+        self.assertEqual(cliente.tipo_cliente, self.tipo_inactivo)
+        self.assertFalse(cliente.tipo_cliente.activo)
