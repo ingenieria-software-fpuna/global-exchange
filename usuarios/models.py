@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin, Group
 from django.utils import timezone
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 class UsuarioManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -55,3 +57,22 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+
+@receiver(post_save, sender=Usuario)
+def asignar_grupo_visitante(sender, instance, created, **kwargs):
+    """
+    Asigna automáticamente el grupo 'Visitante' a nuevos usuarios
+    que no tienen ningún grupo asignado.
+    """
+    if created:
+        try:
+            # Buscar el grupo Visitante
+            grupo_visitante, created_group = Group.objects.get_or_create(name='Visitante')
+            
+            # Solo asignar si el usuario no tiene grupos
+            if not instance.groups.exists():
+                instance.groups.add(grupo_visitante)
+                print(f"Usuario {instance.email} asignado automáticamente al grupo 'Visitante'")
+        except Exception as e:
+            print(f"⚠️ Error asignando grupo Visitante a {instance.email}: {e}")
