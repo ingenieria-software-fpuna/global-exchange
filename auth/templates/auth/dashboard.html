@@ -55,22 +55,6 @@
                 </div>
             </div>
         </div>
-        <div class="col-lg-4 col-md-6 mb-3">
-            <div class="card border-0 shadow-sm h-100 hover-shadow">
-                <div class="card-body text-center p-3">
-                    <div class="bg-info bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                        <i class="fas fa-calculator fa-lg text-info"></i>
-                    </div>
-                    <h6 class="card-title fw-semibold mb-1">Simulador</h6>
-                    <p class="card-text text-muted" style="font-size: 0.8rem;">Calcula cambios entre monedas</p>
-                </div>
-                <div class="card-footer border-0 bg-transparent p-2">
-                    <a href="{% url 'tasa_cambio:dashboard' %}" class="btn btn-outline-info w-100 btn-sm fw-semibold">
-                        <i class="fas fa-calculator me-1"></i>Simulador
-                    </a>
-                </div>
-            </div>
-        </div>
     </div>
     {% else %}
     <!-- Mensaje para usuarios sin permisos de transacciones -->
@@ -90,6 +74,31 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- Simulador - Siempre visible para todos los usuarios -->
+    <div class="row mb-3">
+        <div class="col-12 mb-1">
+            <h2 class="h6 fw-semibold text-dark mb-0">
+                <i class="fas fa-calculator text-primary me-2"></i>Simulador de Cambio
+            </h2>
+        </div>
+        <div class="col-lg-4 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm h-100 hover-shadow">
+                <div class="card-body text-center p-3">
+                    <div class="bg-info bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                        <i class="fas fa-calculator fa-lg text-info"></i>
+                    </div>
+                    <h6 class="card-title fw-semibold mb-1">Simulador</h6>
+                    <p class="card-text text-muted" style="font-size: 0.8rem;">Calcula cambios entre monedas</p>
+                </div>
+                <div class="card-footer border-0 bg-transparent p-2">
+                    <a href="{% url 'tasa_cambio:dashboard' %}" class="btn btn-outline-info w-100 btn-sm fw-semibold">
+                        <i class="fas fa-calculator me-1"></i>Simulador
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Administration Sections Row 1: User & Client Management -->
     {% if can_view_usuarios or can_view_groups or can_view_tipocliente or can_view_cliente %}
