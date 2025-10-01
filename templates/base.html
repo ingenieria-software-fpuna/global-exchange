@@ -95,13 +95,11 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     {% if user.is_authenticated %}
-                        {% if can_view_dashboard %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'auth:dashboard' %}">
                                 <i class="fas fa-gauge-high me-1"></i>Dashboard
                             </a>
                         </li>
-                        {% endif %}
                         {% if can_view_usuarios or can_view_roles or can_view_tipocliente or is_admin_role %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -154,11 +152,13 @@
                                     <i class="fas fa-gauge-high me-2"></i>Dashboard
                                 </a>
                             </li>
+                            {% if can_view_transacciones %}
                             <li>
                                 <a class="dropdown-item" href="{% url 'transacciones:mis_transacciones' %}">
                                     <i class="fas fa-exchange-alt me-2"></i>Mis transacciones
                                 </a>
                             </li>
+                            {% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <a class="dropdown-item" href="{% url 'auth:logout' %}">
