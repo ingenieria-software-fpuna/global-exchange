@@ -59,6 +59,11 @@ def crear_grupos_ejemplo():
             'nombre': 'Operador',
             'descripcion': 'Acceso de solo lectura a clientes, métodos de pago/cobro, tasas de cambio y transacciones',
             'apps_solo_lectura': ['clientes', 'metodo_cobro', 'metodo_pago', 'tasa_cambio', 'transacciones']
+        },
+        {
+            'nombre': 'Visitante',
+            'descripcion': 'Sin permisos especiales, solo acceso básico al sistema',
+            'sin_permisos': True
         }
     ]
 
@@ -91,35 +96,42 @@ def crear_grupos_ejemplo():
         # Configurar permisos
         permisos_asignados = []
 
-        # Acceso completo a apps
-        if 'apps_completas' in config:
-            for app in config['apps_completas']:
-                if app in permisos_por_app:
-                    permisos_asignados.extend(permisos_por_app[app])
+        # Grupo sin permisos (Visitante)
+        if config.get('sin_permisos', False):
+            print(f"    📋 Sin permisos asignados (grupo básico)")
+        else:
+            # Acceso completo a apps
+            if 'apps_completas' in config:
+                for app in config['apps_completas']:
+                    if app in permisos_por_app:
+                        permisos_asignados.extend(permisos_por_app[app])
 
-        # Solo lectura (view permissions)
-        if 'apps_solo_lectura' in config:
-            for app in config['apps_solo_lectura']:
-                if app in permisos_por_app:
-                    permisos_lectura = [p for p in permisos_por_app[app] if p.codename.startswith('view_')]
-                    permisos_asignados.extend(permisos_lectura)
+            # Solo lectura (view permissions)
+            if 'apps_solo_lectura' in config:
+                for app in config['apps_solo_lectura']:
+                    if app in permisos_por_app:
+                        permisos_lectura = [p for p in permisos_por_app[app] if p.codename.startswith('view_')]
+                        permisos_asignados.extend(permisos_lectura)
 
-        # Asignar permisos al grupo
-        if permisos_asignados:
-            django_group.permissions.set(permisos_asignados)
-            print(f"    📋 {len(permisos_asignados)} permisos asignados")
+            # Asignar permisos al grupo
+            if permisos_asignados:
+                django_group.permissions.set(permisos_asignados)
+                print(f"    📋 {len(permisos_asignados)} permisos asignados")
 
         # Mostrar resumen de permisos
-        apps_con_permisos = {}
-        for permiso in permisos_asignados:
-            app = permiso.content_type.app_label
-            if app not in apps_con_permisos:
-                apps_con_permisos[app] = []
-            apps_con_permisos[app].append(permiso.codename)
+        if permisos_asignados:
+            apps_con_permisos = {}
+            for permiso in permisos_asignados:
+                app = permiso.content_type.app_label
+                if app not in apps_con_permisos:
+                    apps_con_permisos[app] = []
+                apps_con_permisos[app].append(permiso.codename)
 
-        for app, perms in apps_con_permisos.items():
-            tipo_acceso = "completo" if len(perms) > 1 else "lectura"
-            print(f"      • {app}: {tipo_acceso} ({len(perms)} permisos)")
+            for app, perms in apps_con_permisos.items():
+                tipo_acceso = "completo" if len(perms) > 1 else "lectura"
+                print(f"      • {app}: {tipo_acceso} ({len(perms)} permisos)")
+        else:
+            print(f"      • Sin permisos especiales (acceso básico)")
 
     return grupos_creados
 
@@ -159,6 +171,14 @@ def crear_usuarios_ejemplo():
             'cedula': '4444444',
             'password': '123456',
             'grupo': 'Operador'
+        },
+        {
+            'email': 'visitante1@globalexchange.test',
+            'nombre': 'Visitante',
+            'apellido': 'Uno',
+            'cedula': '5555555',
+            'password': '123456',
+            'grupo': 'Visitante'
         }
     ]
 
@@ -246,9 +266,11 @@ def main():
             print("   • analista2@globalexchange.test / analista123")
             print("   • operador1@globalexchange.test / operador123")
             print("   • operador2@globalexchange.test / operador123")
+            print("   • visitante1@globalexchange.test / 123456")
             print("\n🔐 Permisos configurados:")
             print("   • Analista: Acceso completo a todas las funcionalidades")
             print("   • Operador: Solo lectura en clientes, métodos de pago/cobro, tasas y transacciones")
+            print("   • Visitante: Sin permisos especiales, solo acceso básico")
         else:
             print("\n❌ Error al crear los grupos y usuarios.")
             sys.exit(1)

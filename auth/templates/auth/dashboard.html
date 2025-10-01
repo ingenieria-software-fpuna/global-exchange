@@ -16,6 +16,7 @@
         </div>
 
     <!-- Quick Actions Section -->
+    {% if can_view_transacciones or can_view_usuarios or can_view_groups or can_view_tipocliente or can_view_cliente or can_view_monedas or can_view_tasacambio or can_view_metodopago or can_view_metodocobro or can_view_configuracion %}
     <div class="row mb-3">
         <div class="col-12 mb-1">
             <h2 class="h6 fw-semibold text-dark mb-0">
@@ -53,6 +54,33 @@
                     </a>
                 </div>
             </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- Mensaje para usuarios sin permisos de transacciones -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="alert alert-info shadow-sm" role="alert">
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <i class="fas fa-info-circle fa-2x text-info"></i>
+                    </div>
+                    <div>
+                        <h6 class="alert-heading mb-1">Estamos trabajando en tu acceso</h6>
+                        <p class="mb-0">Tu cuenta está siendo configurada. Pronto tendrás acceso a todas las funcionalidades del sistema. Si necesitas acceso inmediato, contacta con el administrador.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Simulador - Siempre visible para todos los usuarios -->
+    <div class="row mb-3">
+        <div class="col-12 mb-1">
+            <h2 class="h6 fw-semibold text-dark mb-0">
+                <i class="fas fa-calculator text-primary me-2"></i>Simulador de Cambio
+            </h2>
         </div>
         <div class="col-lg-4 col-md-6 mb-3">
             <div class="card border-0 shadow-sm h-100 hover-shadow">
