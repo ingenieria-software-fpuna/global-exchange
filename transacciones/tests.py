@@ -9,6 +9,7 @@ from metodo_cobro.models import MetodoCobro
 from clientes.models import Cliente, TipoCliente
 from tasa_cambio.models import TasaCambio
 from usuarios.models import Usuario
+from transacciones.views import calcular_transaccion_completa, calcular_venta_completa
 
 User = get_user_model()
 
@@ -138,3 +139,142 @@ class TransaccionViewsTest(TestCase):
         self.assertTrue(data['success'])
         self.assertEqual(len(data['metodos_cobro']), 1)
         self.assertEqual(data['metodos_cobro'][0]['nombre'], 'Efectivo USD')
+
+    def test_descuento_tipo_cliente_inactivo(self):
+        """Test: Los tipos de cliente inactivos no aplican descuentos"""
+        # Crear tipo de cliente activo con descuento
+        tipo_inactivo = TipoCliente.objects.create(
+            nombre='Tipo Inactivo',
+            descuento=Decimal('15.00'),
+            activo=True
+        )
+        
+        # Crear cliente con tipo activo
+        cliente_inactivo = Cliente.objects.create(
+            nombre_comercial='Cliente Inactivo',
+            ruc='12345678',
+            tipo_cliente=tipo_inactivo
+        )
+        
+        # Desactivar el tipo de cliente después de crear el cliente
+        tipo_inactivo.activo = False
+        tipo_inactivo.save()
+        
+        # Crear tipo de cliente activo con descuento
+        tipo_activo = TipoCliente.objects.create(
+            nombre='Tipo Activo',
+            descuento=Decimal('10.00'),
+            activo=True
+        )
+        
+        # Crear cliente con tipo activo
+        cliente_activo = Cliente.objects.create(
+            nombre_comercial='Cliente Activo',
+            ruc='87654321',
+            tipo_cliente=tipo_activo
+        )
+        
+        # Test compra con cliente inactivo - no debe aplicar descuento
+        resultado_inactivo = calcular_transaccion_completa(
+            monto=Decimal('100000'),
+            moneda_origen=self.pyg,
+            moneda_destino=self.usd,
+            cliente=cliente_inactivo
+        )
+        
+        self.assertTrue(resultado_inactivo['success'])
+        self.assertEqual(resultado_inactivo['data']['descuento_pct'], 0)
+        self.assertEqual(resultado_inactivo['data']['descuento_aplicado'], 0)
+        
+        # Test compra con cliente activo - debe aplicar descuento
+        resultado_activo = calcular_transaccion_completa(
+            monto=Decimal('100000'),
+            moneda_origen=self.pyg,
+            moneda_destino=self.usd,
+            cliente=cliente_activo
+        )
+        
+        self.assertTrue(resultado_activo['success'])
+        self.assertEqual(resultado_activo['data']['descuento_pct'], 10.0)
+        # El descuento se aplica a la tasa, no a las comisiones
+        self.assertEqual(resultado_activo['data']['descuento_aplicado'], 0)
+        
+        # Test venta con cliente inactivo - no debe aplicar descuento
+        resultado_venta_inactivo = calcular_venta_completa(
+            monto=Decimal('100'),
+            moneda_origen=self.usd,
+            moneda_destino=self.pyg,
+            cliente=cliente_inactivo
+        )
+        
+        self.assertTrue(resultado_venta_inactivo['success'])
+        self.assertEqual(resultado_venta_inactivo['data']['descuento_pct'], 0)
+        self.assertEqual(resultado_venta_inactivo['data']['descuento_aplicado'], 0)
+        
+        # Test venta con cliente activo - debe aplicar descuento
+        resultado_venta_activo = calcular_venta_completa(
+            monto=Decimal('100'),
+            moneda_origen=self.usd,
+            moneda_destino=self.pyg,
+            cliente=cliente_activo
+        )
+        
+        self.assertTrue(resultado_venta_activo['success'])
+        self.assertEqual(resultado_venta_activo['data']['descuento_pct'], 10.0)
+        # El descuento se aplica a la tasa, no a las comisiones
+        self.assertEqual(resultado_venta_activo['data']['descuento_aplicado'], 0)
+
+    def test_venta_descuento_aplicado_a_comision_compra(self):
+        """Test: En ventas, el descuento se aplica a la comisión de compra, no al precio final"""
+        # Crear tipo de cliente con descuento
+        tipo_cliente = TipoCliente.objects.create(
+            nombre='Tipo con Descuento',
+            descuento=Decimal('20.00'),
+            activo=True
+        )
+        
+        # Crear cliente
+        cliente = Cliente.objects.create(
+            nombre_comercial='Cliente Test',
+            ruc='12345678',
+            tipo_cliente=tipo_cliente
+        )
+        
+        # Calcular venta sin descuento (simulando cliente sin tipo)
+        resultado_sin_descuento = calcular_venta_completa(
+            monto=Decimal('100'),
+            moneda_origen=self.usd,
+            moneda_destino=self.pyg,
+            cliente=None
+        )
+        
+        # Verificar que el cálculo sin descuento fue exitoso
+        if not resultado_sin_descuento['success']:
+            print(f"Error en cálculo sin descuento: {resultado_sin_descuento.get('error', 'Error desconocido')}")
+            self.fail("El cálculo sin descuento falló")
+        
+        # Calcular venta con descuento
+        resultado_con_descuento = calcular_venta_completa(
+            monto=Decimal('100'),
+            moneda_origen=self.usd,
+            moneda_destino=self.pyg,
+            cliente=cliente
+        )
+        
+        self.assertTrue(resultado_sin_descuento['success'])
+        self.assertTrue(resultado_con_descuento['success'])
+        
+        # El cliente con descuento debe recibir más PYG
+        self.assertGreater(
+            resultado_con_descuento['data']['resultado'],
+            resultado_sin_descuento['data']['resultado']
+        )
+        
+        # Verificar que el descuento se aplicó correctamente
+        self.assertEqual(resultado_con_descuento['data']['descuento_pct'], 20.0)
+        
+        # La tasa usada con descuento debe ser mayor (mejor para el cliente)
+        self.assertGreater(
+            resultado_con_descuento['data']['precio_usado'],
+            resultado_sin_descuento['data']['precio_usado']
+        )
