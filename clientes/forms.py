@@ -58,10 +58,8 @@ class ClienteForm(forms.ModelForm):
             activo=True, es_activo=True
         ).order_by('nombre', 'apellido')
         
-        # Configurar queryset para tipos de cliente activos
-        self.fields['tipo_cliente'].queryset = TipoCliente.objects.filter(
-            activo=True
-        ).order_by('nombre')
+        # Configurar queryset para todos los tipos de cliente
+        self.fields['tipo_cliente'].queryset = TipoCliente.objects.all().order_by('nombre')
         
         # Configurar labels y help texts
         self.fields['nombre_comercial'].label = "Nombre Comercial"
@@ -151,10 +149,8 @@ class ClienteUpdateForm(forms.ModelForm):
             activo=True, es_activo=True
         ).order_by('nombre', 'apellido')
         
-        # Configurar queryset para tipos de cliente activos
-        self.fields['tipo_cliente'].queryset = TipoCliente.objects.filter(
-            activo=True
-        ).order_by('nombre')
+        # Configurar queryset para todos los tipos de cliente
+        self.fields['tipo_cliente'].queryset = TipoCliente.objects.all().order_by('nombre')
         
         # Configurar labels y help texts
         self.fields['nombre_comercial'].label = "Nombre Comercial"

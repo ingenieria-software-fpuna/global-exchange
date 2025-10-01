@@ -116,11 +116,8 @@ class Cliente(models.Model):
         """Validación personalizada del modelo"""
         super().clean()
         
-        # Validar que el tipo de cliente esté activo
-        if self.tipo_cliente and not self.tipo_cliente.activo:
-            raise ValidationError({
-                'tipo_cliente': 'No se puede asignar un tipo de cliente inactivo.'
-            })
+        # Validaciones personalizadas del modelo Cliente
+        # (Se removió la validación de tipo de cliente activo)
 
     def save(self, *args, **kwargs):
         self.clean()
