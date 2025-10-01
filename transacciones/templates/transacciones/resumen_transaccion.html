@@ -40,6 +40,16 @@
       </div>
       {% endif %}
 
+      <!-- Observaciones (si las hay) -->
+      <div class="alert alert-warning mb-4" style="border-left: 4px solid #ffc107;">
+        <h5 class="alert-heading mb-2">
+          <i class="fas fa-exclamation-triangle"></i> Observaciones
+        </h5>
+        <p class="mb-0" style="font-size: 1.1rem;">
+          {{ transaccion.observaciones }}
+        </p>
+      </div>
+      
       <!-- Detalles de la operación -->
       <div class="card shadow-sm mb-4">
         <div class="card-header">
