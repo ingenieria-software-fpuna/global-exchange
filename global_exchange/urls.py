@@ -84,6 +84,7 @@ urlpatterns = [
     path('metodos-cobro/', include('metodo_cobro.urls', namespace='metodo_cobro')),
     path('configuracion/', include('configuracion.urls', namespace='configuracion')),
     path('transacciones/', include('transacciones.urls', namespace='transacciones')),
+    path('tauser/', include('tauser.urls', namespace='tauser')),
     path('docs/', docs_view, name='docs_index'),
     path('docs/<path:path>', docs_view, name='docs'),
 ]
