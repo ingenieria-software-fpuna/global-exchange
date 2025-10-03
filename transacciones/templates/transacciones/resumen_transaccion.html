@@ -49,6 +49,13 @@
           <div class="row">
             <div class="col-md-6">
               <p><strong>Tipo:</strong> {{ transaccion.tipo_operacion.nombre }}</p>
+              <p><strong>Moneda:</strong> 
+                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
+                  {{ transaccion.moneda_origen.nombre }} ({{ transaccion.moneda_origen.codigo }})
+                {% else %}
+                  {{ transaccion.moneda_destino.nombre }} ({{ transaccion.moneda_destino.codigo }})
+                {% endif %}
+              </p>
               <p><strong>Fecha:</strong> {{ transaccion.fecha_creacion|date:"d/m/Y H:i" }}</p>
               {% if transaccion.cliente %}
                 <p><strong>Cliente:</strong> {{ transaccion.cliente.nombre_comercial }}</p>
