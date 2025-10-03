@@ -307,7 +307,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+        <button type="button" class="btn btn-secondary" id="btn-cancelar-transaccion-modal">
           <i class="fas fa-times me-2"></i>Cancelar Transacción
         </button>
         <button type="button" class="btn btn-success" id="btn-continuar-nueva-cotizacion">
@@ -414,6 +414,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const formProcesarPago = document.getElementById('form-procesar-pago');
     const modalCambioCotizacion = new bootstrap.Modal(document.getElementById('modalCambioCotizacion'));
     const btnContinuarNuevaCotizacion = document.getElementById('btn-continuar-nueva-cotizacion');
+    const btnCancelarTransaccionModal = document.getElementById('btn-cancelar-transaccion-modal');
     
     if (btnProcesarPago) {
         btnProcesarPago.addEventListener('click', function() {
@@ -426,6 +427,13 @@ document.addEventListener('DOMContentLoaded', function() {
         btnContinuarNuevaCotizacion.addEventListener('click', function() {
             // Crear nueva transacción con la nueva cotización
             crearNuevaTransaccion();
+        });
+    }
+    
+    if (btnCancelarTransaccionModal) {
+        btnCancelarTransaccionModal.addEventListener('click', function() {
+            // Cancelar la transacción actual
+            cancelarTransaccionDesdeModal();
         });
     }
     
@@ -537,6 +545,49 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Error de conexión al crear la nueva transacción: ' + error.message);
             btnContinuarNuevaCotizacion.innerHTML = '<i class="fas fa-check me-2"></i>Continuar con Nueva Cotización';
             btnContinuarNuevaCotizacion.disabled = false;
+        });
+    }
+    
+    function cancelarTransaccionDesdeModal() {
+        // Confirmar que el usuario realmente quiere cancelar
+        if (!confirm('¿Está seguro que desea cancelar esta transacción definitivamente?')) {
+            return;
+        }
+        
+        // Mostrar loading en el botón
+        btnCancelarTransaccionModal.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Cancelando...';
+        btnCancelarTransaccionModal.disabled = true;
+        
+        // Hacer petición POST para cancelar la transacción por cambio de cotización
+        fetch('{% url "transacciones:cancelar_por_cambio_cotizacion" transaccion.id_transaccion %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Cancelación exitosa, cerrar modal y recargar página
+                modalCambioCotizacion.hide();
+                alert('Transacción cancelada por cambio de cotización');
+                location.reload();
+            } else {
+                throw new Error(data.error || 'Error desconocido');
+            }
+        })
+        .catch(error => {
+            console.error('Error al cancelar:', error);
+            alert('Error al cancelar la transacción: ' + error.message);
+            // Restaurar botón
+            btnCancelarTransaccionModal.innerHTML = '<i class="fas fa-times me-2"></i>Cancelar Transacción';
+            btnCancelarTransaccionModal.disabled = false;
         });
     }
     

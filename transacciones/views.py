@@ -585,6 +585,39 @@ def crear_con_nueva_cotizacion(request, transaccion_id):
         return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'})
 
 
+@login_required
+@require_http_methods(["POST"])
+def cancelar_por_cambio_cotizacion(request, transaccion_id):
+    """
+    Cancela una transacción específicamente debido a cambio de cotización desde el modal.
+    """
+    try:
+        transaccion = get_object_or_404(Transaccion, id_transaccion=transaccion_id)
+        
+        # Verificar permisos
+        if transaccion.usuario != request.user:
+            if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+                return JsonResponse({'success': False, 'error': 'Sin permisos'})
+        
+        # Verificar que se puede cancelar
+        if transaccion.estado.codigo not in ['PENDIENTE', 'CANCELADA']:
+            return JsonResponse({'success': False, 'error': 'Esta transacción ya no se puede cancelar'})
+        
+        with transaction.atomic():
+            estado_cancelada = EstadoTransaccion.objects.get(codigo='CANCELADA')
+            transaccion.estado = estado_cancelada
+            transaccion.observaciones += f"\nCancelada por cambio de cotización el {timezone.now()} por {request.user.email}"
+            transaccion.save()
+            
+        return JsonResponse({
+            'success': True,
+            'message': 'Transacción cancelada por cambio de cotización'
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'})
+
+
 def calcular_transaccion(monto, moneda_origen, moneda_destino, cliente=None, metodo_pago=None):
     """
     Calcula los detalles de una transacción usando la misma lógica del simulador.
