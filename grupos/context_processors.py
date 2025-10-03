@@ -122,6 +122,13 @@ def permissions_context(request):
         context['can_edit_tauser'] = request.user.has_perm('tauser.change_tauser')
         context['can_delete_tauser'] = request.user.has_perm('tauser.delete_tauser')
         
+        # Permisos específicos para stock
+        context['can_view_stock'] = request.user.has_perm('tauser.view_stock')
+        context['can_create_stock'] = request.user.has_perm('tauser.add_stock')
+        context['can_edit_stock'] = request.user.has_perm('tauser.change_stock')
+        context['can_delete_stock'] = request.user.has_perm('tauser.delete_stock')
+        context['can_manage_stock'] = request.user.has_perm('tauser.manage_stock')
+        
         # Dashboard
         context['can_view_dashboard'] = (
             context['is_admin'] or 
@@ -188,4 +195,9 @@ def permissions_context(request):
         context['can_create_tauser'] = False
         context['can_edit_tauser'] = False
         context['can_delete_tauser'] = False
+        context['can_view_stock'] = False
+        context['can_create_stock'] = False
+        context['can_edit_stock'] = False
+        context['can_delete_stock'] = False
+        context['can_manage_stock'] = False
     return context

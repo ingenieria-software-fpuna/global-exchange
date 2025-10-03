@@ -160,9 +160,11 @@
                                 <h6 class="card-title fw-semibold mb-1">Tausers</h6>
                                 <p class="card-text text-muted mb-0" style="font-size: 0.7rem;">Gestiona los tausers del sistema</p>
                             </div>
-                            <a href="{% url 'tauser:tauser_list' %}" class="btn btn-outline-primary btn-sm">
-                                <i class="fas fa-arrow-right"></i>
-                            </a>
+                            <div class="btn-group" role="group">
+                                <a href="{% url 'tauser:tauser_list' %}" class="btn btn-outline-primary btn-sm" title="Ver Tausers">
+                                    <i class="fas fa-list"></i>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
