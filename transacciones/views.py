@@ -550,6 +550,46 @@ def crear_con_nueva_cotizacion(request, transaccion_id):
         import json
         datos = json.loads(request.body)
         
+        # Recalcular los datos completos para obtener información adicional
+        if transaccion_original.moneda_origen.codigo == 'PYG':
+            # COMPRA: PYG → otra moneda
+            nueva_cotizacion = calcular_transaccion_completa(
+                monto=transaccion_original.monto_origen,
+                moneda_origen=transaccion_original.moneda_origen,
+                moneda_destino=transaccion_original.moneda_destino,
+                cliente=transaccion_original.cliente,
+                metodo_cobro=transaccion_original.metodo_cobro,
+                metodo_pago=transaccion_original.metodo_pago
+            )
+        else:
+            # VENTA: otra moneda → PYG
+            nueva_cotizacion = calcular_venta_completa(
+                monto=transaccion_original.monto_origen,
+                moneda_origen=transaccion_original.moneda_origen,
+                moneda_destino=transaccion_original.moneda_destino,
+                cliente=transaccion_original.cliente,
+                metodo_cobro=transaccion_original.metodo_cobro,
+                metodo_pago=transaccion_original.metodo_pago
+            )
+        
+        if not nueva_cotizacion['success']:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error al calcular nueva cotización: {nueva_cotizacion["error"]}'
+            })
+        
+        # Extraer datos completos
+        datos_completos = nueva_cotizacion['data']
+        
+        # Calcular porcentajes de comisión y descuento
+        monto_origen = Decimal(str(datos_completos['total']))
+        monto_comision = Decimal(str(datos_completos['comision_total']))
+        monto_descuento = Decimal(str(datos_completos['descuento_aplicado']))
+        
+        # Calcular porcentajes
+        porcentaje_comision = (monto_comision / monto_origen * 100) if monto_origen > 0 else Decimal('0')
+        porcentaje_descuento = Decimal(str(datos_completos.get('descuento_pct', 0)))
+        
         # Cancelar la transacción original
         with transaction.atomic():
             # Cancelar transacción original
@@ -564,13 +604,18 @@ def crear_con_nueva_cotizacion(request, transaccion_id):
                 tipo_operacion=transaccion_original.tipo_operacion,
                 moneda_origen=transaccion_original.moneda_origen,
                 moneda_destino=transaccion_original.moneda_destino,
-                monto_origen=Decimal(datos['monto_origen']),
-                monto_destino=Decimal(datos['monto_destino']),
-                tasa_cambio=Decimal(datos['tasa_cambio']),
+                monto_origen=monto_origen,
+                monto_destino=Decimal(str(datos_completos['resultado'])),
+                tasa_cambio=Decimal(str(datos_completos['precio_usado'])),
+                # Agregar campos de comisiones y descuentos
+                porcentaje_comision=porcentaje_comision,
+                monto_comision=monto_comision,
+                porcentaje_descuento=porcentaje_descuento,
+                monto_descuento=monto_descuento,
                 metodo_cobro=transaccion_original.metodo_cobro,
                 metodo_pago=transaccion_original.metodo_pago,
                 estado=estado_pendiente,
-                observaciones=f"Transacción creada con nueva cotización (reemplaza a {transaccion_original.id_transaccion}). {datos.get('detalle_calculo', '')}"
+                observaciones=f"Transacción creada con nueva cotización (reemplaza a {transaccion_original.id_transaccion}). {datos_completos.get('detalle', '')}"
             )
             
             print(f"DEBUG: Nueva transacción creada con ID: {nueva_transaccion.id_transaccion}")
