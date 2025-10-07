@@ -25,6 +25,10 @@ class MetodoPago(models.Model):
         default=True,
         help_text="Indica si el método está activo"
     )
+    requiere_retiro_fisico = models.BooleanField(
+        default=True,
+        help_text="Indica si este método requiere retiro físico en Tauser (ej: efectivo = True, transferencia = False)"
+    )
     monedas_permitidas = models.ManyToManyField(
         Moneda,
         help_text="Monedas en las que se puede usar este método de pago"

@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+
+{% block title %}Simulador de Cajero Automático{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-8">
+      
+      <!-- Header -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-body text-center">
+          <h1 class="h3 mb-2">
+            <i class="fas fa-cash-register me-2"></i>
+            Simulador de Cajero Automático
+          </h1>
+          <p class="text-muted mb-0">Ingrese el ID de transacción para retirar su efectivo</p>
+          <div class="alert alert-info mt-3 mb-0">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Tipos de transacciones:</strong>
+            <ul class="mb-0 mt-2">
+              <li><strong>Compra de divisas:</strong> Retire las divisas compradas en efectivo</li>
+              <li><strong>Venta con cobro en efectivo:</strong> Entregue su moneda extranjera y retire guaraníes</li>
+              <li><strong>Venta con transferencia:</strong> No requiere retiro físico</li>
+            </ul>
+          </div>
+          {% if tauser_seleccionado %}
+          <div class="alert alert-info mt-3 mb-0">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Punto de retiro preseleccionado:</strong> {{ tauser_seleccionado.nombre }} - {{ tauser_seleccionado.direccion }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Formulario de entrada -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">
+          <h5 class="mb-0"><i class="fas fa-keyboard me-2"></i>Ingreso de Datos</h5>
+        </div>
+        <div class="card-body">
+          <form id="form-validar-transaccion">
+            {% csrf_token %}
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="id_transaccion" class="form-label">
+                    <i class="fas fa-receipt me-1"></i>
+                    ID de Transacción
+                  </label>
+                  <input type="text" 
+                         class="form-control form-control-lg" 
+                         id="id_transaccion" 
+                         name="id_transaccion" 
+                         placeholder="Ej: TXN-20241201123456-ABC123"
+                         required>
+                  <div class="form-text">Ingrese el ID de transacción que recibió por email o SMS</div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="tauser_id" class="form-label">
+                    <i class="fas fa-map-marker-alt me-1"></i>
+                    Punto de Retiro
+                  </label>
+                  <select class="form-select form-select-lg" 
+                          id="tauser_id" 
+                          name="tauser_id" 
+                          required>
+                    <option value="">Seleccione un punto de retiro</option>
+                    {% for tauser in tausers %}
+                      <option value="{{ tauser.id }}" 
+                              {% if tauser_preseleccionado and tauser.id|stringformat:"s" == tauser_preseleccionado %}selected{% endif %}>
+                        {{ tauser.nombre }} - {{ tauser.direccion }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                  <div class="form-text">Seleccione el punto donde desea retirar su efectivo</div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="d-grid">
+              <button type="submit" class="btn btn-primary btn-lg" id="btn-validar">
+                <i class="fas fa-search me-2"></i>
+                Validar Transacción
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Resultado de validación -->
+      <div id="resultado-validacion" class="card shadow-sm mb-4" style="display: none;">
+        <div class="card-header">
+          <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Información de la Transacción</h5>
+        </div>
+        <div class="card-body">
+          <div id="contenido-validacion"></div>
+        </div>
+      </div>
+
+      <!-- Botón de retiro -->
+      <div id="boton-retiro" class="card shadow-sm mb-4" style="display: none;">
+        <div class="card-body text-center">
+          <button type="button" class="btn btn-success btn-lg" id="btn-procesar-retiro">
+            <i class="fas fa-money-bill-wave me-2"></i>
+            Procesar Retiro
+          </button>
+        </div>
+      </div>
+
+      <!-- Resultado del retiro -->
+      <div id="resultado-retiro" class="card shadow-sm mb-4" style="display: none;">
+        <div class="card-header">
+          <h5 class="mb-0"><i class="fas fa-receipt me-2"></i>Comprobante de Retiro</h5>
+        </div>
+        <div class="card-body">
+          <div id="contenido-retiro"></div>
+        </div>
+      </div>
+
+      <!-- Botón para nueva transacción -->
+      <div id="nueva-transaccion" class="text-center" style="display: none;">
+        <button type="button" class="btn btn-outline-primary" id="btn-nueva-transaccion">
+          <i class="fas fa-plus me-2"></i>
+          Procesar Otra Transacción
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal de confirmación -->
+<div class="modal fade" id="modal-confirmacion" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          Confirmar Retiro
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>¿Está seguro que desea procesar el retiro de esta transacción?</p>
+        <div class="alert alert-info">
+          <strong>Importante:</strong> Una vez procesado el retiro, no se puede deshacer.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success" id="btn-confirmar-retiro">
+          <i class="fas fa-check me-2"></i>
+          Confirmar Retiro
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const formValidar = document.getElementById('form-validar-transaccion');
+    const btnValidar = document.getElementById('btn-validar');
+    const btnProcesar = document.getElementById('btn-procesar-retiro');
+    const btnConfirmar = document.getElementById('btn-confirmar-retiro');
+    const btnNueva = document.getElementById('btn-nueva-transaccion');
+    
+    const resultadoValidacion = document.getElementById('resultado-validacion');
+    const contenidoValidacion = document.getElementById('contenido-validacion');
+    const botonRetiro = document.getElementById('boton-retiro');
+    const resultadoRetiro = document.getElementById('resultado-retiro');
+    const contenidoRetiro = document.getElementById('contenido-retiro');
+    const nuevaTransaccion = document.getElementById('nueva-transaccion');
+    
+    let datosTransaccion = null;
+
+    // Validar transacción
+    formValidar.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const idTransaccion = document.getElementById('id_transaccion').value.trim();
+        const tauserId = document.getElementById('tauser_id').value;
+        
+        if (!idTransaccion || !tauserId) {
+            mostrarError('Por favor complete todos los campos');
+            return;
+        }
+        
+        btnValidar.disabled = true;
+        btnValidar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Validando...';
+        
+        // Realizar petición AJAX
+        fetch('{% url "tauser:validar_transaccion_retiro" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `id_transaccion=${encodeURIComponent(idTransaccion)}&tauser_id=${encodeURIComponent(tauserId)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                datosTransaccion = data;
+                mostrarResultadoValidacion(data);
+                botonRetiro.style.display = 'block';
+            } else {
+                mostrarError(data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            mostrarError('Error de conexión. Intente nuevamente.');
+        })
+        .finally(() => {
+            btnValidar.disabled = false;
+            btnValidar.innerHTML = '<i class="fas fa-search me-2"></i>Validar Transacción';
+        });
+    });
+    
+    // Procesar retiro
+    btnProcesar.addEventListener('click', function() {
+        const modal = new bootstrap.Modal(document.getElementById('modal-confirmacion'));
+        modal.show();
+    });
+    
+    // Confirmar retiro
+    btnConfirmar.addEventListener('click', function() {
+        if (!datosTransaccion) return;
+        
+        btnConfirmar.disabled = true;
+        btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Procesando...';
+        
+        // Realizar petición AJAX
+        fetch('{% url "tauser:procesar_retiro" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `id_transaccion=${encodeURIComponent(datosTransaccion.transaccion.id)}&tauser_id=${encodeURIComponent(datosTransaccion.tauser.id)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                mostrarResultadoRetiro(data);
+                botonRetiro.style.display = 'none';
+                resultadoValidacion.style.display = 'none';
+                nuevaTransaccion.style.display = 'block';
+            } else {
+                mostrarError(data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            mostrarError('Error de conexión. Intente nuevamente.');
+        })
+        .finally(() => {
+            btnConfirmar.disabled = false;
+            btnConfirmar.innerHTML = '<i class="fas fa-check me-2"></i>Confirmar Retiro';
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modal-confirmacion'));
+            modal.hide();
+        });
+    });
+    
+    // Nueva transacción
+    btnNueva.addEventListener('click', function() {
+        // Limpiar formulario
+        formValidar.reset();
+        resultadoValidacion.style.display = 'none';
+        botonRetiro.style.display = 'none';
+        resultadoRetiro.style.display = 'none';
+        nuevaTransaccion.style.display = 'none';
+        datosTransaccion = null;
+        
+        // Enfocar en el primer campo
+        document.getElementById('id_transaccion').focus();
+    });
+    
+    function mostrarResultadoValidacion(data) {
+        const transaccion = data.transaccion;
+        const tauser = data.tauser;
+        const stock = data.stock_disponible;
+        
+        // Determinar el tipo de operación y mostrar información específica
+        let tipoOperacion = '';
+        let instrucciones = '';
+        
+        if (transaccion.tipo.includes('Compra')) {
+            tipoOperacion = 'Compra de Divisas';
+            instrucciones = 'Retire las divisas que compró en efectivo';
+        } else if (transaccion.tipo.includes('Venta')) {
+            tipoOperacion = 'Venta de Divisas';
+            instrucciones = 'Entregue su moneda extranjera y retire guaraníes';
+        }
+        
+        contenidoValidacion.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-muted">Información de la Transacción</h6>
+                    <p><strong>ID:</strong> ${transaccion.id}</p>
+                    <p><strong>Tipo:</strong> ${tipoOperacion}</p>
+                    <p><strong>Cliente:</strong> ${transaccion.cliente}</p>
+                    <p><strong>Fecha de Creación:</strong> ${transaccion.fecha_creacion}</p>
+                    <p><strong>Fecha de Pago:</strong> ${transaccion.fecha_pago || 'No disponible'}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted">Detalles del Retiro</h6>
+                    <p><strong>Moneda:</strong> ${transaccion.moneda_destino.nombre} (${transaccion.moneda_destino.simbolo})</p>
+                    <p><strong>Monto a Retirar:</strong> <span class="fw-bold text-success">${transaccion.monto_a_retirar_formateado}</span></p>
+                    <p><strong>Punto de Retiro:</strong> ${tauser.nombre}</p>
+                    <p><strong>Dirección:</strong> ${tauser.direccion}</p>
+                </div>
+            </div>
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Instrucciones:</strong> ${instrucciones}
+            </div>
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Stock Disponible:</strong> ${stock.cantidad_formateada}
+                ${stock.esta_bajo_stock ? '<span class="text-warning"> (Stock bajo)</span>' : ''}
+            </div>
+        `;
+        
+        resultadoValidacion.style.display = 'block';
+    }
+    
+    function mostrarResultadoRetiro(data) {
+        const transaccion = data.transaccion;
+        const stock = data.stock_actualizado;
+        
+        contenidoRetiro.innerHTML = `
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>¡Retiro procesado exitosamente!</strong>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-muted">Comprobante de Retiro</h6>
+                    <p><strong>ID de Transacción:</strong> ${transaccion.id}</p>
+                    <p><strong>Tipo:</strong> ${transaccion.tipo}</p>
+                    <p><strong>Cliente:</strong> ${transaccion.cliente}</p>
+                    <p><strong>Fecha de Retiro:</strong> ${transaccion.fecha_retiro}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted">Detalles del Retiro</h6>
+                    <p><strong>Moneda:</strong> ${transaccion.moneda}</p>
+                    <p><strong>Monto Retirado:</strong> <span class="fw-bold text-success">${transaccion.monto_retirado_formateado}</span></p>
+                    <p><strong>Punto de Retiro:</strong> ${transaccion.tauser}</p>
+                </div>
+            </div>
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Stock Restante:</strong> ${stock.cantidad_restante_formateada}
+                ${stock.esta_bajo_stock ? '<span class="text-warning"> (Stock bajo)</span>' : ''}
+            </div>
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Importante:</strong> Guarde este comprobante como respaldo de su retiro.
+            </div>
+        `;
+        
+        resultadoRetiro.style.display = 'block';
+    }
+    
+    function mostrarError(mensaje) {
+        // Crear alerta temporal
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-danger alert-dismissible fade show position-fixed';
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        alertDiv.innerHTML = `
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            ${mensaje}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        // Remover después de 5 segundos
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.parentNode.removeChild(alertDiv);
+            }
+        }, 5000);
+    }
+});
+</script>
+
+{% endblock %}

@@ -98,6 +98,11 @@
                                     <a href="{% url 'tauser:tauser_detail' t.pk %}" class="btn btn-sm btn-outline-secondary" title="Ver Detalles">
                                         <i class="fas fa-eye"></i>
                                     </a>
+                                    {% if t.es_activo %}
+                                    <a href="{% url 'tauser:simulador_cajero' %}?tauser_id={{ t.pk }}" class="btn btn-sm btn-outline-success" title="Simulador de Cajero">
+                                        <i class="fas fa-cash-register"></i>
+                                    </a>
+                                    {% endif %}
                                     {% if perms.tauser.change_tauser %}
                                     <a href="{% url 'tauser:tauser_update' t.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
                                         <i class="fas fa-edit"></i>

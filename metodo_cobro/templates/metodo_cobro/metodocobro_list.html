@@ -71,6 +71,7 @@
                             <th>Descripción</th>
                             <th>Comisión</th>
                             <th>Monedas Permitidas</th>
+                            <th>Retiro Físico</th>
                             <th>Estado</th>
                             <th>Creado</th>
                             <th>Actualizado</th>
@@ -91,6 +92,17 @@
                                     <span class="text-muted">-</span>
                                     {% endfor %}
                                 </div>
+                            </td>
+                            <td>
+                                {% if m.requiere_retiro_fisico %}
+                                <span class="badge bg-warning text-dark">
+                                    <i class="fas fa-store me-1"></i>Sí
+                                </span>
+                                {% else %}
+                                <span class="badge bg-info text-dark">
+                                    <i class="fas fa-laptop me-1"></i>No
+                                </span>
+                                {% endif %}
                             </td>
                             <td>
                                 {% if m.es_activo %}

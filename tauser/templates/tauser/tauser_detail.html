@@ -344,7 +344,7 @@
                             <label for="moneda_select" class="form-label">Moneda <span class="text-danger">*</span></label>
                             <select class="form-select" id="moneda_select" name="moneda" required>
                                 <option value="">Seleccionar moneda...</option>
-                                {% for item in monedas_con_stock %}
+                                {% for item in todas_las_monedas %}
                                 <option value="{{ item.moneda.pk }}" 
                                         data-symbol="{{ item.moneda.simbolo }}"
                                         data-decimales="{{ item.moneda.decimales }}"

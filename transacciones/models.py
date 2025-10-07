@@ -13,6 +13,7 @@ from monedas.models import Moneda
 from metodo_pago.models import MetodoPago
 from metodo_cobro.models import MetodoCobro
 from clientes.models import Cliente
+from tauser.models import Tauser
 
 User = get_user_model()
 
@@ -133,6 +134,15 @@ class Transaccion(models.Model):
         null=True,
         blank=True,
         help_text="Cliente que realiza la transacción (opcional para clientes casuales)"
+    )
+    tauser = models.ForeignKey(
+        Tauser,
+        on_delete=models.PROTECT,
+        related_name='transacciones',
+        verbose_name="Tauser",
+        null=True,
+        blank=True,
+        help_text="Punto de atención donde se realiza la transacción (opcional)"
     )
     usuario = models.ForeignKey(
         User,
@@ -295,6 +305,7 @@ class Transaccion(models.Model):
         indexes = [
             models.Index(fields=['id_transaccion']),
             models.Index(fields=['cliente', '-fecha_creacion']),
+            models.Index(fields=['tauser', '-fecha_creacion']),
             models.Index(fields=['usuario', '-fecha_creacion']),
             models.Index(fields=['estado', '-fecha_creacion']),
             models.Index(fields=['fecha_expiracion']),
@@ -333,6 +344,12 @@ class Transaccion(models.Model):
         if self.cliente and not self.cliente.activo:
             raise ValidationError({
                 'cliente': 'No se puede crear una transacción para un cliente inactivo.'
+            })
+        
+        # Validar que el tauser esté activo si se especifica
+        if self.tauser and not self.tauser.es_activo:
+            raise ValidationError({
+                'tauser': 'No se puede crear una transacción para un tauser inactivo.'
             })
         
         # Validar que el tipo de operación esté activo

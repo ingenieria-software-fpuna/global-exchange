@@ -7,6 +7,8 @@ from django.urls import reverse_lazy
 from django.db.models import Q
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
+from django.utils import timezone
+from django.db import transaction
 
 from .models import Tauser, Stock
 from .forms import TauserForm, StockForm
@@ -205,9 +207,16 @@ def cargar_stock(request, pk):
                     stock_existente.es_activo = True
                 stock_existente.save()
                 
-                messages.success(request, 
-                    f'Se agregaron {moneda.simbolo}{cantidad_agregar:.{moneda.decimales}f} al stock de {moneda.nombre}. '
-                    f'Nueva cantidad: {stock_existente.mostrar_cantidad()}')
+                if resultado:
+                    messages.success(request, 
+                        f'Se agregaron {moneda.simbolo}{cantidad_agregar:.{moneda.decimales}f} al stock de {moneda.nombre}. '
+                        f'Cantidad anterior: {moneda.simbolo}{cantidad_anterior:.{moneda.decimales}f} → '
+                        f'Nueva cantidad: {stock_existente.mostrar_cantidad()}')
+                else:
+                    messages.error(request, 'Error al agregar cantidad al stock existente.')
+                
+                # Refrescar el objeto tauser para obtener los datos actualizados
+                tauser.refresh_from_db()
             else:
                 # Crear nuevo stock
                 nuevo_stock = Stock.objects.create(
@@ -221,6 +230,8 @@ def cargar_stock(request, pk):
                 messages.success(request, 
                     f'Stock creado para {moneda.nombre} con {moneda.simbolo}{cantidad_agregar:.{moneda.decimales}f}')
             
+            # Refrescar el objeto tauser para obtener los datos actualizados
+            tauser.refresh_from_db()
             return redirect('tauser:tauser_detail', pk=tauser.pk)
             
         except (ValueError, TypeError) as e:
@@ -231,3 +242,277 @@ def cargar_stock(request, pk):
             return redirect('tauser:tauser_detail', pk=tauser.pk)
     
     return redirect('tauser:tauser_detail', pk=tauser.pk)
+
+
+@login_required
+def simulador_cajero(request):
+    """
+    Vista para el simulador de cajero automático.
+    Permite a los clientes retirar efectivo usando el ID de transacción.
+    """
+    # Obtener todos los tausers activos para mostrar en el selector
+    tausers_activos = Tauser.objects.filter(es_activo=True).order_by('nombre')
+    
+    # Obtener tauser preseleccionado si viene en la URL
+    tauser_preseleccionado = request.GET.get('tauser_id')
+    tauser_seleccionado = None
+    if tauser_preseleccionado:
+        try:
+            tauser_seleccionado = Tauser.objects.get(id=tauser_preseleccionado, es_activo=True)
+        except Tauser.DoesNotExist:
+            tauser_seleccionado = None
+    
+    context = {
+        'titulo': 'Simulador de Cajero Automático',
+        'tausers': tausers_activos,
+        'tauser_preseleccionado': tauser_preseleccionado,
+        'tauser_seleccionado': tauser_seleccionado,
+    }
+    
+    return render(request, 'tauser/simulador_cajero.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def validar_transaccion_retiro(request):
+    """
+    API endpoint para validar una transacción antes del retiro.
+    Verifica que la transacción existe, está pagada y puede ser retirada.
+    Maneja tanto compras como ventas con cobro en efectivo.
+    """
+    try:
+        id_transaccion = request.POST.get('id_transaccion')
+        tauser_id = request.POST.get('tauser_id')
+        
+        if not id_transaccion or not tauser_id:
+            return JsonResponse({
+                'success': False,
+                'error': 'ID de transacción y Tauser son requeridos'
+            })
+        
+        # Obtener la transacción
+        try:
+            from transacciones.models import Transaccion, EstadoTransaccion
+            transaccion = Transaccion.objects.select_related(
+                'cliente', 'tipo_operacion', 'estado', 'moneda_destino', 'metodo_cobro'
+            ).get(id_transaccion=id_transaccion)
+        except Transaccion.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Transacción no encontrada'
+            })
+        
+        # Verificar que esté pagada
+        if transaccion.estado.codigo != EstadoTransaccion.PAGADA:
+            return JsonResponse({
+                'success': False,
+                'error': f'La transacción no está pagada. Estado actual: {transaccion.estado.nombre}'
+            })
+        
+        # Verificar si la transacción requiere retiro físico en Tauser
+        requiere_retiro_fisico = False
+        if transaccion.tipo_operacion.codigo == 'VENTA':
+            # Para ventas, verificar si el método de cobro requiere retiro físico
+            if transaccion.metodo_cobro and transaccion.metodo_cobro.requiere_retiro_fisico:
+                requiere_retiro_fisico = True
+        elif transaccion.tipo_operacion.codigo == 'COMPRA':
+            # Para compras, siempre requiere retiro físico (cliente retira divisas)
+            requiere_retiro_fisico = True
+        
+        if not requiere_retiro_fisico:
+            return JsonResponse({
+                'success': False,
+                'error': 'Esta transacción no requiere retiro físico en Tauser. El pago se procesó por transferencia.'
+            })
+        
+        # Obtener el tauser
+        try:
+            tauser = Tauser.objects.get(id=tauser_id, es_activo=True)
+        except Tauser.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Tauser no válido o inactivo'
+            })
+        
+        # Verificar que el tauser tenga stock de la moneda destino
+        try:
+            stock = Stock.objects.get(
+                tauser=tauser,
+                moneda=transaccion.moneda_destino,
+                es_activo=True
+            )
+        except Stock.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': f'No hay stock de {transaccion.moneda_destino.nombre} en {tauser.nombre}'
+            })
+        
+        # Verificar que hay suficiente stock
+        if stock.cantidad < transaccion.monto_destino:
+            return JsonResponse({
+                'success': False,
+                'error': f'Stock insuficiente. Disponible: {stock.mostrar_cantidad()}, Requerido: {transaccion.moneda_destino.mostrar_monto(transaccion.monto_destino)}'
+            })
+        
+        # Preparar datos de la transacción para mostrar
+        resumen_detallado = transaccion.get_resumen_detallado()
+        
+        return JsonResponse({
+            'success': True,
+            'transaccion': {
+                'id': transaccion.id_transaccion,
+                'tipo': transaccion.tipo_operacion.nombre,
+                'cliente': transaccion.cliente.nombre_comercial if transaccion.cliente else 'Casual',
+                'moneda_destino': {
+                    'codigo': transaccion.moneda_destino.codigo,
+                    'nombre': transaccion.moneda_destino.nombre,
+                    'simbolo': transaccion.moneda_destino.simbolo
+                },
+                'monto_a_retirar': float(transaccion.monto_destino),
+                'monto_a_retirar_formateado': resumen_detallado['monto_recibe_formateado'],
+                'fecha_creacion': transaccion.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+                'fecha_pago': transaccion.fecha_pago.strftime('%d/%m/%Y %H:%M') if transaccion.fecha_pago else None,
+            },
+            'tauser': {
+                'id': tauser.id,
+                'nombre': tauser.nombre,
+                'direccion': tauser.direccion,
+            },
+            'stock_disponible': {
+                'cantidad': float(stock.cantidad),
+                'cantidad_formateada': stock.mostrar_cantidad(),
+                'cantidad_minima': float(stock.cantidad_minima),
+                'esta_bajo_stock': stock.esta_bajo_stock()
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error interno: {str(e)}'
+        })
+
+
+@login_required
+@require_http_methods(["POST"])
+def procesar_retiro(request):
+    """
+    Procesa el retiro de efectivo de una transacción.
+    Actualiza el stock del tauser y marca la transacción como retirada.
+    """
+    try:
+        id_transaccion = request.POST.get('id_transaccion')
+        tauser_id = request.POST.get('tauser_id')
+        
+        if not id_transaccion or not tauser_id:
+            return JsonResponse({
+                'success': False,
+                'error': 'ID de transacción y Tauser son requeridos'
+            })
+        
+        # Obtener la transacción
+        try:
+            from transacciones.models import Transaccion, EstadoTransaccion
+            transaccion = Transaccion.objects.select_related(
+                'cliente', 'tipo_operacion', 'estado', 'moneda_destino', 'metodo_cobro'
+            ).get(id_transaccion=id_transaccion)
+        except Transaccion.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Transacción no encontrada'
+            })
+        
+        # Verificar que esté pagada
+        if transaccion.estado.codigo != EstadoTransaccion.PAGADA:
+            return JsonResponse({
+                'success': False,
+                'error': f'La transacción no está pagada. Estado actual: {transaccion.estado.nombre}'
+            })
+        
+        # Verificar si la transacción requiere retiro físico en Tauser
+        requiere_retiro_fisico = False
+        if transaccion.tipo_operacion.codigo == 'VENTA':
+            # Para ventas, verificar si el método de cobro requiere retiro físico
+            if transaccion.metodo_cobro and transaccion.metodo_cobro.requiere_retiro_fisico:
+                requiere_retiro_fisico = True
+        elif transaccion.tipo_operacion.codigo == 'COMPRA':
+            # Para compras, siempre requiere retiro físico (cliente retira divisas)
+            requiere_retiro_fisico = True
+        
+        if not requiere_retiro_fisico:
+            return JsonResponse({
+                'success': False,
+                'error': 'Esta transacción no requiere retiro físico en Tauser. El pago se procesó por transferencia.'
+            })
+        
+        # Obtener el tauser
+        try:
+            tauser = Tauser.objects.get(id=tauser_id, es_activo=True)
+        except Tauser.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Tauser no válido o inactivo'
+            })
+        
+        # Procesar el retiro con transacción atómica
+        with transaction.atomic():
+            # Verificar stock nuevamente (por si cambió entre validación y procesamiento)
+            try:
+                stock = Stock.objects.select_for_update().get(
+                    tauser=tauser,
+                    moneda=transaccion.moneda_destino,
+                    es_activo=True
+                )
+            except Stock.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'No hay stock de {transaccion.moneda_destino.nombre} en {tauser.nombre}'
+                })
+            
+            # Verificar stock suficiente
+            if stock.cantidad < transaccion.monto_destino:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Stock insuficiente. Disponible: {stock.mostrar_cantidad()}, Requerido: {transaccion.moneda_destino.mostrar_monto(transaccion.monto_destino)}'
+                })
+            
+            # Reducir el stock
+            if not stock.reducir_cantidad(transaccion.monto_destino):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No se pudo reducir el stock'
+                })
+            
+            # Actualizar la transacción con el tauser y agregar observación
+            transaccion.tauser = tauser
+            transaccion.observaciones += f"\nRetirado en {tauser.nombre} el {timezone.now()} por {request.user.email}"
+            transaccion.save()
+        
+        # Preparar respuesta exitosa
+        resumen_detallado = transaccion.get_resumen_detallado()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Retiro procesado exitosamente',
+            'transaccion': {
+                'id': transaccion.id_transaccion,
+                'tipo': transaccion.tipo_operacion.nombre,
+                'cliente': transaccion.cliente.nombre_comercial if transaccion.cliente else 'Casual',
+                'monto_retirado': float(transaccion.monto_destino),
+                'monto_retirado_formateado': resumen_detallado['monto_recibe_formateado'],
+                'moneda': transaccion.moneda_destino.nombre,
+                'tauser': tauser.nombre,
+                'fecha_retiro': timezone.now().strftime('%d/%m/%Y %H:%M'),
+            },
+            'stock_actualizado': {
+                'cantidad_restante': float(stock.cantidad),
+                'cantidad_restante_formateada': stock.mostrar_cantidad(),
+                'esta_bajo_stock': stock.esta_bajo_stock()
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error interno: {str(e)}'
+        })

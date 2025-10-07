@@ -13,4 +13,9 @@ urlpatterns = [
     
     # URLs para Cargar Stock (solo desde tauser)
     path('<int:pk>/cargar-stock/', views.cargar_stock, name='cargar_stock'),
+    
+    # URLs para Simulador de Cajero Automático
+    path('simulador/', views.simulador_cajero, name='simulador_cajero'),
+    path('validar-transaccion/', views.validar_transaccion_retiro, name='validar_transaccion_retiro'),
+    path('procesar-retiro/', views.procesar_retiro, name='procesar_retiro'),
 ]

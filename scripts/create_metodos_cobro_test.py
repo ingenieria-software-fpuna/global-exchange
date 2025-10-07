@@ -47,43 +47,50 @@ def crear_metodos_cobro():
             'nombre': 'Transferencia bancaria',
             'descripcion': 'Transferencia bancaria local',
             'comision': Decimal('1.00'),
-            'monedas': [pyg]
+            'monedas': [pyg],
+            'requiere_retiro_fisico': False  # Transferencia = No requiere retiro físico
         },
         {
             'nombre': 'Tarjeta de débito',
             'descripcion': 'Pago con tarjeta de débito',
             'comision': Decimal('1.50'),
-            'monedas': [pyg]
+            'monedas': [pyg],
+            'requiere_retiro_fisico': False  # Tarjeta = No requiere retiro físico
         },
         {
             'nombre': 'Billetera electrónica',
             'descripcion': 'Pago mediante billetera electrónica',
             'comision': Decimal('2.00'),
-            'monedas': [pyg]
+            'monedas': [pyg],
+            'requiere_retiro_fisico': False  # Digital = No requiere retiro físico
         },
         {
             'nombre': 'Tarjeta de crédito',
             'descripcion': 'Pago con tarjeta de crédito',
             'comision': Decimal('3.00'),
-            'monedas': [pyg, usd]
+            'monedas': [pyg, usd],
+            'requiere_retiro_fisico': False  # Tarjeta = No requiere retiro físico
         },
         {
             'nombre': 'Cheque',
             'descripcion': 'Pago con cheque bancario',
             'comision': Decimal('0.50'),
-            'monedas': [pyg, usd, eur]
+            'monedas': [pyg, usd, eur],
+            'requiere_retiro_fisico': True  # Cheque = Requiere retiro físico
         },
         {
             'nombre': 'Cheque adelantado',
             'descripcion': 'Pago con cheque adelantado',
             'comision': Decimal('0.75'),
-            'monedas': [pyg, usd, eur]
+            'monedas': [pyg, usd, eur],
+            'requiere_retiro_fisico': True  # Cheque = Requiere retiro físico
         },
         {
             'nombre': 'Efectivo',
             'descripcion': 'Pago en efectivo',
             'comision': Decimal('0.00'),
-            'monedas': list(todas_monedas_excepto_pyg)
+            'monedas': list(todas_monedas_excepto_pyg),
+            'requiere_retiro_fisico': True  # Efectivo = Requiere retiro físico
         }
     ]
     
@@ -94,17 +101,25 @@ def crear_metodos_cobro():
             defaults={
                 'descripcion': metodo_data['descripcion'],
                 'comision': metodo_data['comision'],
-                'es_activo': True
+                'es_activo': True,
+                'requiere_retiro_fisico': metodo_data['requiere_retiro_fisico']
             }
         )
+        
+        # Actualizar el campo si ya existía
+        if not created and metodo.requiere_retiro_fisico != metodo_data['requiere_retiro_fisico']:
+            metodo.requiere_retiro_fisico = metodo_data['requiere_retiro_fisico']
+            metodo.save()
         
         # Agregar las monedas permitidas
         metodo.monedas_permitidas.set(metodo_data['monedas'])
         
         if created:
-            print(f"✓ Creado: {metodo.nombre}")
+            retiro_text = "Requiere retiro físico" if metodo.requiere_retiro_fisico else "No requiere retiro físico"
+            print(f"✓ Creado: {metodo.nombre} - {retiro_text}")
         else:
-            print(f"✓ Ya existe: {metodo.nombre} (actualizado)")
+            retiro_text = "Requiere retiro físico" if metodo.requiere_retiro_fisico else "No requiere retiro físico"
+            print(f"✓ Ya existe: {metodo.nombre} - {retiro_text}")
     
     print(f"\n¡Métodos de cobro creados exitosamente!")
     print(f"Total de métodos: {MetodoCobro.objects.count()}")
