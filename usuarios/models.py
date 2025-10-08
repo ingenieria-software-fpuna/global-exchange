@@ -32,10 +32,10 @@ class UsuarioManager(BaseUserManager):
         return usuario
 
 class Usuario(AbstractBaseUser, PermissionsMixin):
-    email = models.EmailField(unique=True)
+    email = models.EmailField(unique=True, max_length=50)
     cedula = models.CharField(max_length=20, unique=True, verbose_name="Cédula de Identidad", null=True, blank=True)
-    nombre = models.CharField(max_length=100)
-    apellido = models.CharField(max_length=100, blank=True)
+    nombre = models.CharField(max_length=30)
+    apellido = models.CharField(max_length=30, blank=True)
     fecha_nacimiento = models.DateField(verbose_name="Fecha de Nacimiento", null=True, blank=True)
     
     # Para verificar correo
