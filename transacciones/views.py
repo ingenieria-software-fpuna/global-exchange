@@ -14,6 +14,7 @@ import json
 from datetime import datetime, date
 
 from .models import Transaccion, TipoOperacion, EstadoTransaccion
+from .forms import BilleteraElectronicaForm, TarjetaDebitoForm, TransferenciaBancariaForm
 from monedas.models import Moneda
 from metodo_pago.models import MetodoPago
 from metodo_cobro.models import MetodoCobro
@@ -304,7 +305,7 @@ def resumen_transaccion(request, transaccion_id):
 @require_http_methods(["POST"])
 def procesar_pago(request, transaccion_id):
     """
-    Procesa el 'pago' de una transacción (simulado por ahora).
+    Redirige a la pantalla de pago específica según el método de cobro seleccionado.
     """
     transaccion = get_object_or_404(Transaccion, id_transaccion=transaccion_id)
     
@@ -324,25 +325,31 @@ def procesar_pago(request, transaccion_id):
         messages.error(request, 'La transacción ha expirado y fue cancelada automáticamente.')
         return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
 
-    # Nota: La verificación de cambio de cotización ahora se maneja en el frontend
-    # mediante verificar_cambio_cotizacion() antes de llegar aquí. Si llegamos aquí,
-    # es porque el usuario ya confirmó proceder con la cotización actual o no hay cambios.
+    # Redirigir según el método de cobro
+    metodo_cobro = transaccion.metodo_cobro.nombre.lower()
     
-    # Procesar el 'pago' (por ahora solo cambiar estado)
-    try:
-        with transaction.atomic():
-            estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
-            transaccion.estado = estado_pagada
-            transaccion.fecha_pago = timezone.now()
-            transaccion.observaciones += f"\nPago procesado el {timezone.now()} por {request.user.email}"
-            transaccion.save()
+    if 'billetera electrónica' in metodo_cobro or 'billetera electronica' in metodo_cobro:
+        return redirect('transacciones:pago_billetera_electronica', transaccion_id=transaccion_id)
+    elif 'tarjeta de débito' in metodo_cobro or 'tarjeta de debito' in metodo_cobro:
+        return redirect('transacciones:pago_tarjeta_debito', transaccion_id=transaccion_id)
+    elif 'transferencia bancaria' in metodo_cobro:
+        return redirect('transacciones:pago_transferencia_bancaria', transaccion_id=transaccion_id)
+    else:
+        # Para otros métodos de cobro no implementados, procesar directamente
+        try:
+            with transaction.atomic():
+                estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
+                transaccion.estado = estado_pagada
+                transaccion.fecha_pago = timezone.now()
+                transaccion.observaciones += f"\nPago procesado el {timezone.now()} por {request.user.email}"
+                transaccion.save()
+                
+            messages.success(request, '¡Pago procesado exitosamente! La transacción ha sido completada.')
+            return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
             
-        messages.success(request, '¡Pago procesado exitosamente! La transacción ha sido completada.')
-        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
-        
-    except Exception as e:
-        messages.error(request, f'Error al procesar el pago: {str(e)}')
-        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+        except Exception as e:
+            messages.error(request, f'Error al procesar el pago: {str(e)}')
+            return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
 
 
 @login_required
@@ -443,15 +450,7 @@ def verificar_cambio_cotizacion(request, transaccion_id):
         # Verificar si hay cambio de cotización
         hay_cambio = not transaccion.tiene_tasa_actualizada()
         
-        # DEBUG: Mostrar información para debugging
-        print(f"DEBUG: Transacción {transaccion.id_transaccion}")
-        print(f"  - Moneda origen: {transaccion.moneda_origen.codigo}")
-        print(f"  - Moneda destino: {transaccion.moneda_destino.codigo}")
-        print(f"  - Tasa guardada: {transaccion.tasa_cambio}")
-        print(f"  - ¿Hay cambio?: {hay_cambio}")
-        
-        if not hay_cambio:
-            print("DEBUG: No hay cambio de cotización")
+        if not hay_cambio:          
             return JsonResponse({
                 'success': True,
                 'hay_cambio': False,
@@ -1775,3 +1774,212 @@ class MisTransaccionesListView(LoginRequiredMixin, ListView):
         })
 
         return context
+
+
+# ============================================================================
+# VISTAS PARA PROCESAMIENTO DE PAGOS POR MÉTODO DE COBRO
+# ============================================================================
+
+@login_required
+def pago_billetera_electronica(request, transaccion_id):
+    """
+    Vista para procesar pago con billetera electrónica.
+    """
+    transaccion = get_object_or_404(
+        Transaccion.objects.select_related(
+            'cliente', 'usuario', 'metodo_cobro', 'moneda_origen', 'moneda_destino'
+        ),
+        id_transaccion=transaccion_id
+    )
+    
+    # Verificar permisos
+    if transaccion.usuario != request.user:
+        if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+            raise Http404("Transacción no encontrada")
+    
+    # Verificar que la transacción esté pendiente
+    if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
+        messages.error(request, 'Esta transacción ya no se puede procesar.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+    
+    if transaccion.esta_expirada():
+        transaccion.cancelar_por_expiracion()
+        messages.error(request, 'La transacción ha expirado y fue cancelada automáticamente.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+    if request.method == 'POST':
+        form = BilleteraElectronicaForm(request.POST)
+        if form.is_valid():
+            # Procesar el pago
+            try:
+                with transaction.atomic():
+                    estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
+                    transaccion.estado = estado_pagada
+                    transaccion.fecha_pago = timezone.now()
+                    
+                    # Guardar datos del pago
+                    datos_pago = {
+                        'metodo': 'Billetera Electrónica',
+                        'telefono': form.cleaned_data['numero_telefono'],
+                        'procesado_por': request.user.email,
+                        'fecha_procesamiento': timezone.now().isoformat()
+                    }
+                    
+                    transaccion.observaciones += f"\nPago procesado con Billetera Electrónica el {timezone.now()} por {request.user.email}"
+                    transaccion.observaciones += f"\nTeléfono: {form.cleaned_data['numero_telefono']}"
+                    transaccion.save()
+                    
+                messages.success(request, '¡Pago procesado exitosamente con billetera electrónica!')
+                return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+                
+            except Exception as e:
+                messages.error(request, f'Error al procesar el pago: {str(e)}')
+    else:
+        form = BilleteraElectronicaForm()
+    
+    context = {
+        'transaccion': transaccion,
+        'form': form,
+        'tiempo_restante': (transaccion.fecha_expiracion - timezone.now()).total_seconds() if not transaccion.esta_expirada() else 0,
+    }
+    
+    return render(request, 'transacciones/pago_billetera_electronica.html', context)
+
+
+@login_required
+def pago_tarjeta_debito(request, transaccion_id):
+    """
+    Vista para procesar pago con tarjeta de débito.
+    """
+    transaccion = get_object_or_404(
+        Transaccion.objects.select_related(
+            'cliente', 'usuario', 'metodo_cobro', 'moneda_origen', 'moneda_destino'
+        ),
+        id_transaccion=transaccion_id
+    )
+    
+    # Verificar permisos
+    if transaccion.usuario != request.user:
+        if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+            raise Http404("Transacción no encontrada")
+    
+    # Verificar que la transacción esté pendiente
+    if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
+        messages.error(request, 'Esta transacción ya no se puede procesar.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+    
+    if transaccion.esta_expirada():
+        transaccion.cancelar_por_expiracion()
+        messages.error(request, 'La transacción ha expirado y fue cancelada automáticamente.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+    if request.method == 'POST':
+        form = TarjetaDebitoForm(request.POST)
+        if form.is_valid():
+            # Procesar el pago
+            try:
+                with transaction.atomic():
+                    estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
+                    transaccion.estado = estado_pagada
+                    transaccion.fecha_pago = timezone.now()
+                    
+                    # Guardar datos del pago (enmascarar datos sensibles)
+                    numero_tarjeta = form.cleaned_data['numero_tarjeta']
+                    numero_enmascarado = '**** **** **** ' + numero_tarjeta[-4:] if len(numero_tarjeta) >= 4 else '****'
+                    
+                    transaccion.observaciones += f"\nPago procesado con Tarjeta de Débito el {timezone.now()} por {request.user.email}"
+                    transaccion.observaciones += f"\nTarjeta: {numero_enmascarado}"
+                    transaccion.observaciones += f"\nTitular: {form.cleaned_data['nombre_titular']}"
+                    transaccion.save()
+                    
+                messages.success(request, '¡Pago procesado exitosamente con tarjeta de débito!')
+                return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+                
+            except Exception as e:
+                messages.error(request, f'Error al procesar el pago: {str(e)}')
+    else:
+        form = TarjetaDebitoForm()
+    
+    context = {
+        'transaccion': transaccion,
+        'form': form,
+        'tiempo_restante': (transaccion.fecha_expiracion - timezone.now()).total_seconds() if not transaccion.esta_expirada() else 0,
+    }
+    
+    return render(request, 'transacciones/pago_tarjeta_debito.html', context)
+
+
+@login_required
+def pago_transferencia_bancaria(request, transaccion_id):
+    """
+    Vista para procesar pago con transferencia bancaria.
+    Muestra los datos de la cuenta destino y permite ingresar el comprobante.
+    """
+    transaccion = get_object_or_404(
+        Transaccion.objects.select_related(
+            'cliente', 'usuario', 'metodo_cobro', 'moneda_origen', 'moneda_destino'
+        ),
+        id_transaccion=transaccion_id
+    )
+    
+    # Verificar permisos
+    if transaccion.usuario != request.user:
+        if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+            raise Http404("Transacción no encontrada")
+    
+    # Verificar que la transacción esté pendiente
+    if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
+        messages.error(request, 'Esta transacción ya no se puede procesar.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+    
+    if transaccion.esta_expirada():
+        transaccion.cancelar_por_expiracion()
+        messages.error(request, 'La transacción ha expirado y fue cancelada automáticamente.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+    
+    # Datos de cuenta bancaria de la empresa (esto podría venir de configuración)
+    datos_cuenta = {
+        'banco': 'Banco Global Exchange',
+        'titular': 'Global Exchange S.A.',
+        'numero_cuenta': '1234567890',
+        'tipo_cuenta': 'Cuenta Corriente',
+        'ruc': '80123456-7',
+        'codigo_swift': 'GEXCPYPA',
+        'moneda': transaccion.moneda_destino.codigo if transaccion.tipo_operacion.codigo == 'COMPRA' else transaccion.moneda_origen.codigo
+    }
+
+    if request.method == 'POST':
+        form = TransferenciaBancariaForm(request.POST)
+        if form.is_valid():
+            # Procesar el pago
+            try:
+                with transaction.atomic():
+                    estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
+                    transaccion.estado = estado_pagada
+                    transaccion.fecha_pago = timezone.now()
+                    
+                    # Guardar datos del pago
+                    transaccion.observaciones += f"\nPago procesado con Transferencia Bancaria el {timezone.now()} por {request.user.email}"
+                    transaccion.observaciones += f"\nComprobante: {form.cleaned_data['numero_comprobante']}"
+                    transaccion.observaciones += f"\nBanco origen: {form.cleaned_data['banco_origen']}"
+                    transaccion.observaciones += f"\nFecha transferencia: {form.cleaned_data['fecha_transferencia']}"
+                    if form.cleaned_data['observaciones']:
+                        transaccion.observaciones += f"\nObservaciones: {form.cleaned_data['observaciones']}"
+                    transaccion.save()
+                    
+                messages.success(request, '¡Pago procesado exitosamente con transferencia bancaria!')
+                return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+                
+            except Exception as e:
+                messages.error(request, f'Error al procesar el pago: {str(e)}')
+    else:
+        form = TransferenciaBancariaForm()
+    
+    context = {
+        'transaccion': transaccion,
+        'form': form,
+        'datos_cuenta': datos_cuenta,
+        'tiempo_restante': (transaccion.fecha_expiracion - timezone.now()).total_seconds() if not transaccion.esta_expirada() else 0,
+    }
+    
+    return render(request, 'transacciones/pago_transferencia_bancaria.html', context)
