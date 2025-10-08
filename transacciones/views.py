@@ -581,14 +581,24 @@ def crear_con_nueva_cotizacion(request, transaccion_id):
         # Extraer datos completos
         datos_completos = nueva_cotizacion['data']
         
-        # Calcular porcentajes de comisión y descuento
-        monto_origen = Decimal(str(datos_completos['total']))
+        # Extraer datos de comisión y descuento
         monto_comision = Decimal(str(datos_completos['comision_total']))
-        monto_descuento = Decimal(str(datos_completos['descuento_aplicado']))
-        
-        # Calcular porcentajes
-        porcentaje_comision = (monto_comision / monto_origen * 100) if monto_origen > 0 else Decimal('0')
         porcentaje_descuento = Decimal(str(datos_completos.get('descuento_pct', 0)))
+        
+        # El monto de descuento ahora viene correctamente calculado desde las funciones
+        monto_descuento = Decimal(str(datos_completos.get('descuento_aplicado', 0)))
+        
+        # Calcular porcentaje de comisión correctamente según el tipo de operación
+        if transaccion_original.moneda_origen.codigo == 'PYG':
+            # COMPRA: PYG → otra moneda
+            # El porcentaje se calcula sobre el monto en PYG que el cliente paga
+            monto_base_comision = transaccion_original.monto_origen
+        else:
+            # VENTA: otra moneda → PYG  
+            # El porcentaje se calcula sobre el monto en PYG que el cliente recibe (subtotal)
+            monto_base_comision = Decimal(str(datos_completos['subtotal']))
+        
+        porcentaje_comision = (monto_comision / monto_base_comision * 100) if monto_base_comision > 0 else Decimal('0')
         
         # Cancelar la transacción original
         with transaction.atomic():
@@ -604,7 +614,7 @@ def crear_con_nueva_cotizacion(request, transaccion_id):
                 tipo_operacion=transaccion_original.tipo_operacion,
                 moneda_origen=transaccion_original.moneda_origen,
                 moneda_destino=transaccion_original.moneda_destino,
-                monto_origen=monto_origen,
+                monto_origen=transaccion_original.monto_origen,
                 monto_destino=Decimal(str(datos_completos['resultado'])),
                 tasa_cambio=Decimal(str(datos_completos['precio_usado'])),
                 # Agregar campos de comisiones y descuentos
@@ -886,17 +896,27 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
         
         comision_total = comision_cobro + comision_pago
         
-        # 3. NO aplicar descuento a las comisiones - el descuento ya está en la tasa ajustada
-        descuento_aplicado = Decimal('0')  # El descuento se aplica solo en la tasa, no en comisiones
+        # 3. Calcular el monto neto disponible para la conversión (después de comisiones)
+        monto_neto_conversion = monto_a_pagar - comision_total
         
-        # 4. Calcular el monto neto disponible para la conversión (después de comisiones)
-        monto_neto_conversion = monto_a_pagar - comision_total  # Sin sumar descuento adicional
-        
-        # 5. Convertir el monto neto a la divisa destino usando la tasa ajustada
+        # 4. Convertir el monto neto a la divisa destino usando la tasa ajustada
         resultado_final = (monto_neto_conversion / precio_usado).quantize(
             Decimal('1.' + '0' * max(moneda_destino.decimales, 0)), 
             rounding=ROUND_HALF_UP
         )
+        
+        # 5. Calcular el monto real del descuento aplicado
+        # El descuento es el ahorro en PYG que obtiene el cliente sobre la comisión de cambio
+        descuento_aplicado = Decimal('0')
+        if descuento_pct > 0:
+            # El descuento se aplica sobre la comisión de venta
+            comision_original = Decimal(str(tasa_destino.comision_venta))
+            comision_con_descuento = comision_venta_ajustada
+            descuento_en_comision = comision_original - comision_con_descuento
+            
+            # El descuento en PYG es: (descuento en comisión) × (cantidad de divisa que obtiene)
+            cantidad_divisa_obtenida = resultado_final
+            descuento_aplicado = descuento_en_comision * cantidad_divisa_obtenida
         
         # 6. Valores para mostrar
         subtotal = monto_a_pagar  # Lo que ingresó el cliente
@@ -1076,14 +1096,23 @@ def calcular_venta_completa(monto, moneda_origen, moneda_destino, cliente=None, 
         
         comision_total = comision_cobro + comision_pago
         
-        # 4. El descuento ya está aplicado en la tasa ajustada
-        descuento_aplicado = Decimal('0')
-        
-        # 5. Resultado final: PYG bruto menos comisiones de métodos
+        # 4. Resultado final: PYG bruto menos comisiones de métodos
         resultado_final = (monto_pyg_bruto - comision_total).quantize(
             Decimal('1.00'), 
             rounding=ROUND_HALF_UP
         )
+        
+        # 5. Calcular el monto real del descuento aplicado
+        # El descuento es el PYG adicional que recibe el cliente sobre la comisión de cambio
+        descuento_aplicado = Decimal('0')
+        if descuento_pct > 0:
+            # El descuento se aplica sobre la comisión de compra
+            comision_original = Decimal(str(tasa_origen.comision_compra))
+            comision_con_descuento = comision_compra_ajustada
+            descuento_en_comision = comision_original - comision_con_descuento
+            
+            # El descuento en PYG es: (descuento en comisión) × (cantidad de divisa que vende)
+            descuento_aplicado = descuento_en_comision * monto_a_vender
         
         # 6. Valores para mostrar
         subtotal = monto_pyg_bruto  # PYG bruto de la conversión
