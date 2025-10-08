@@ -117,6 +117,8 @@ class RegistroForm(UserCreationForm):
             raise forms.ValidationError("La cédula debe contener solo números.")
         if len(cedula) < 5:
             raise forms.ValidationError("La cédula debe tener al menos 5 dígitos.")
+        if int(cedula) <= 0:
+            raise forms.ValidationError("La cédula debe ser un número mayor a cero.")
         return cedula
     
     def clean_fecha_nacimiento(self):
