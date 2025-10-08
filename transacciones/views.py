@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, Http404
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 from django.views.generic import ListView
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -323,16 +324,9 @@ def procesar_pago(request, transaccion_id):
         messages.error(request, 'La transacción ha expirado y fue cancelada automáticamente.')
         return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
 
-    # Verificar que la tasa de cambio sigue siendo actual
-    if not transaccion.tiene_tasa_actualizada():
-        # Cancelar la transacción por cambio de tasa
-        transaccion.cancelar_por_cambio_tasa()
-        messages.error(
-            request,
-            'La tasa de cambio ha sido modificada. Esta transacción fue cancelada automáticamente. '
-            'Por favor, crea una nueva transacción con la tasa actual.'
-        )
-        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+    # Nota: La verificación de cambio de cotización ahora se maneja en el frontend
+    # mediante verificar_cambio_cotizacion() antes de llegar aquí. Si llegamos aquí,
+    # es porque el usuario ya confirmó proceder con la cotización actual o no hay cambios.
     
     # Procesar el 'pago' (por ahora solo cambiar estado)
     try:
@@ -414,6 +408,267 @@ def cancelar_por_expiracion(request, transaccion_id):
         else:
             return JsonResponse({'success': False, 'error': 'No se pudo cancelar la transacción'})
             
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'})
+
+
+@login_required
+@require_http_methods(["POST"])
+def verificar_cambio_cotizacion(request, transaccion_id):
+    """
+    API endpoint para verificar si hay cambio de cotización en una transacción.
+    """
+    try:
+        transaccion = get_object_or_404(Transaccion, id_transaccion=transaccion_id)
+        
+        # Debug: Log información de la transacción (se puede quitar en producción)
+        # print(f"DEBUG: Transacción {transaccion_id} - Estado: {transaccion.estado.codigo} - Usuario: {transaccion.usuario.email}")
+        
+        # Verificar permisos
+        if transaccion.usuario != request.user:
+            if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+                return JsonResponse({'success': False, 'error': 'Sin permisos'})
+        
+        # Verificar que esté pendiente o cancelada por cambio de tasa
+        if transaccion.estado.codigo not in ['PENDIENTE', 'CANCELADA']:
+            return JsonResponse({
+                'success': False, 
+                'error': f'Transacción ya no se puede procesar. Estado actual: {transaccion.estado.codigo}'
+            })
+            
+        # Verificar expiración
+        if transaccion.esta_expirada():
+            return JsonResponse({'success': False, 'error': 'Transacción expirada'})
+        
+        # Verificar si hay cambio de cotización
+        hay_cambio = not transaccion.tiene_tasa_actualizada()
+        
+        # DEBUG: Mostrar información para debugging
+        print(f"DEBUG: Transacción {transaccion.id_transaccion}")
+        print(f"  - Moneda origen: {transaccion.moneda_origen.codigo}")
+        print(f"  - Moneda destino: {transaccion.moneda_destino.codigo}")
+        print(f"  - Tasa guardada: {transaccion.tasa_cambio}")
+        print(f"  - ¿Hay cambio?: {hay_cambio}")
+        
+        if not hay_cambio:
+            print("DEBUG: No hay cambio de cotización")
+            return JsonResponse({
+                'success': True,
+                'hay_cambio': False,
+                'message': 'No hay cambio de cotización'
+            })
+        
+        # Hay cambio, calcular nueva cotización
+        try:
+            # Determinar si es compra o venta y usar la función correcta
+            if transaccion.moneda_origen.codigo == 'PYG':
+                # COMPRA: PYG → otra moneda
+                nueva_cotizacion = calcular_transaccion_completa(
+                    monto=transaccion.monto_origen,
+                    moneda_origen=transaccion.moneda_origen,
+                    moneda_destino=transaccion.moneda_destino,
+                    cliente=transaccion.cliente,
+                    metodo_cobro=transaccion.metodo_cobro,
+                    metodo_pago=transaccion.metodo_pago
+                )
+            else:
+                # VENTA: otra moneda → PYG
+                nueva_cotizacion = calcular_venta_completa(
+                    monto=transaccion.monto_origen,
+                    moneda_origen=transaccion.moneda_origen,
+                    moneda_destino=transaccion.moneda_destino,
+                    cliente=transaccion.cliente,
+                    metodo_cobro=transaccion.metodo_cobro,
+                    metodo_pago=transaccion.metodo_pago
+                )
+            
+            if not nueva_cotizacion['success']:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Error al calcular nueva cotización: {nueva_cotizacion["error"]}'
+                })
+            
+            # Extraer datos del resultado
+            datos = nueva_cotizacion['data']
+            
+            # Preparar datos para el modal
+            response_data = {
+                'success': True,
+                'hay_cambio': True,
+                'moneda_nombre': transaccion.moneda_destino.nombre,
+                'moneda_simbolo': transaccion.moneda_destino.simbolo,
+                # Datos originales
+                'tasa_original': f"{transaccion.tasa_cambio:,.2f}",
+                'monto_origen_original': f"{transaccion.monto_origen:,.0f}",
+                'monto_destino_original': f"{transaccion.monto_destino:,.2f}",
+                # Datos nuevos
+                'tasa_nueva': f"{datos['precio_usado']:,.2f}",
+                'monto_origen_nuevo': f"{datos['total']:,.0f}",
+                'monto_destino_nuevo': f"{datos['resultado']:,.2f}",
+                # Datos para crear nueva transacción
+                'nueva_transaccion_datos': {
+                    'monto_origen': str(datos['total']),
+                    'monto_destino': str(datos['resultado']),
+                    'tasa_cambio': str(datos['precio_usado']),
+                    'total_comisiones': str(datos['comision_total']),
+                    'descuento_aplicado': str(datos['descuento_aplicado']),
+                    'detalle_calculo': datos.get('detalle', ''),
+                }
+            }
+            
+            return JsonResponse(response_data)
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error al calcular nueva cotización: {str(e)}'
+            })
+            
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'})
+
+
+@login_required
+@require_http_methods(["POST"])
+def crear_con_nueva_cotizacion(request, transaccion_id):
+    """
+    API endpoint para crear una nueva transacción con la cotización actualizada.
+    """
+    try:
+        transaccion_original = get_object_or_404(Transaccion, id_transaccion=transaccion_id)
+        
+        # Verificar permisos
+        if transaccion_original.usuario != request.user:
+            if transaccion_original.cliente and not transaccion_original.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+                return JsonResponse({'success': False, 'error': 'Sin permisos'})
+        
+        # Verificar que esté pendiente
+        if transaccion_original.estado.codigo != 'PENDIENTE':
+            return JsonResponse({'success': False, 'error': 'Transacción original ya no está pendiente'})
+        
+        # Obtener datos del cuerpo de la petición
+        import json
+        datos = json.loads(request.body)
+        
+        # Recalcular los datos completos para obtener información adicional
+        if transaccion_original.moneda_origen.codigo == 'PYG':
+            # COMPRA: PYG → otra moneda
+            nueva_cotizacion = calcular_transaccion_completa(
+                monto=transaccion_original.monto_origen,
+                moneda_origen=transaccion_original.moneda_origen,
+                moneda_destino=transaccion_original.moneda_destino,
+                cliente=transaccion_original.cliente,
+                metodo_cobro=transaccion_original.metodo_cobro,
+                metodo_pago=transaccion_original.metodo_pago
+            )
+        else:
+            # VENTA: otra moneda → PYG
+            nueva_cotizacion = calcular_venta_completa(
+                monto=transaccion_original.monto_origen,
+                moneda_origen=transaccion_original.moneda_origen,
+                moneda_destino=transaccion_original.moneda_destino,
+                cliente=transaccion_original.cliente,
+                metodo_cobro=transaccion_original.metodo_cobro,
+                metodo_pago=transaccion_original.metodo_pago
+            )
+        
+        if not nueva_cotizacion['success']:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error al calcular nueva cotización: {nueva_cotizacion["error"]}'
+            })
+        
+        # Extraer datos completos
+        datos_completos = nueva_cotizacion['data']
+        
+        # Extraer datos de comisión y descuento
+        monto_comision = Decimal(str(datos_completos['comision_total']))
+        porcentaje_descuento = Decimal(str(datos_completos.get('descuento_pct', 0)))
+        
+        # El monto de descuento ahora viene correctamente calculado desde las funciones
+        monto_descuento = Decimal(str(datos_completos.get('descuento_aplicado', 0)))
+        
+        # Calcular porcentaje de comisión correctamente según el tipo de operación
+        if transaccion_original.moneda_origen.codigo == 'PYG':
+            # COMPRA: PYG → otra moneda
+            # El porcentaje se calcula sobre el monto en PYG que el cliente paga
+            monto_base_comision = transaccion_original.monto_origen
+        else:
+            # VENTA: otra moneda → PYG  
+            # El porcentaje se calcula sobre el monto en PYG que el cliente recibe (subtotal)
+            monto_base_comision = Decimal(str(datos_completos['subtotal']))
+        
+        porcentaje_comision = (monto_comision / monto_base_comision * 100) if monto_base_comision > 0 else Decimal('0')
+        
+        # Cancelar la transacción original
+        with transaction.atomic():
+            # Cancelar transacción original
+            transaccion_original.cancelar_por_cambio_tasa()
+            
+            # Crear nueva transacción
+            estado_pendiente = EstadoTransaccion.objects.get(codigo='PENDIENTE')
+            
+            nueva_transaccion = Transaccion.objects.create(
+                usuario=transaccion_original.usuario,
+                cliente=transaccion_original.cliente,
+                tipo_operacion=transaccion_original.tipo_operacion,
+                moneda_origen=transaccion_original.moneda_origen,
+                moneda_destino=transaccion_original.moneda_destino,
+                monto_origen=transaccion_original.monto_origen,
+                monto_destino=Decimal(str(datos_completos['resultado'])),
+                tasa_cambio=Decimal(str(datos_completos['precio_usado'])),
+                # Agregar campos de comisiones y descuentos
+                porcentaje_comision=porcentaje_comision,
+                monto_comision=monto_comision,
+                porcentaje_descuento=porcentaje_descuento,
+                monto_descuento=monto_descuento,
+                metodo_cobro=transaccion_original.metodo_cobro,
+                metodo_pago=transaccion_original.metodo_pago,
+                estado=estado_pendiente,
+                observaciones=f"Transacción creada con nueva cotización (reemplaza a {transaccion_original.id_transaccion}). {datos_completos.get('detalle', '')}"
+            )
+            
+            print(f"DEBUG: Nueva transacción creada con ID: {nueva_transaccion.id_transaccion}")
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Nueva transacción creada exitosamente',
+                'redirect_url': reverse('transacciones:resumen_transaccion', kwargs={'transaccion_id': nueva_transaccion.id_transaccion})
+            })
+            
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'})
+
+
+@login_required
+@require_http_methods(["POST"])
+def cancelar_por_cambio_cotizacion(request, transaccion_id):
+    """
+    Cancela una transacción específicamente debido a cambio de cotización desde el modal.
+    """
+    try:
+        transaccion = get_object_or_404(Transaccion, id_transaccion=transaccion_id)
+        
+        # Verificar permisos
+        if transaccion.usuario != request.user:
+            if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+                return JsonResponse({'success': False, 'error': 'Sin permisos'})
+        
+        # Verificar que se puede cancelar
+        if transaccion.estado.codigo not in ['PENDIENTE', 'CANCELADA']:
+            return JsonResponse({'success': False, 'error': 'Esta transacción ya no se puede cancelar'})
+        
+        with transaction.atomic():
+            estado_cancelada = EstadoTransaccion.objects.get(codigo='CANCELADA')
+            transaccion.estado = estado_cancelada
+            transaccion.observaciones += f"\nCancelada por cambio de cotización el {timezone.now()} por {request.user.email}"
+            transaccion.save()
+            
+        return JsonResponse({
+            'success': True,
+            'message': 'Transacción cancelada por cambio de cotización'
+        })
+        
     except Exception as e:
         return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'})
 
@@ -641,17 +896,27 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
         
         comision_total = comision_cobro + comision_pago
         
-        # 3. NO aplicar descuento a las comisiones - el descuento ya está en la tasa ajustada
-        descuento_aplicado = Decimal('0')  # El descuento se aplica solo en la tasa, no en comisiones
+        # 3. Calcular el monto neto disponible para la conversión (después de comisiones)
+        monto_neto_conversion = monto_a_pagar - comision_total
         
-        # 4. Calcular el monto neto disponible para la conversión (después de comisiones)
-        monto_neto_conversion = monto_a_pagar - comision_total  # Sin sumar descuento adicional
-        
-        # 5. Convertir el monto neto a la divisa destino usando la tasa ajustada
+        # 4. Convertir el monto neto a la divisa destino usando la tasa ajustada
         resultado_final = (monto_neto_conversion / precio_usado).quantize(
             Decimal('1.' + '0' * max(moneda_destino.decimales, 0)), 
             rounding=ROUND_HALF_UP
         )
+        
+        # 5. Calcular el monto real del descuento aplicado
+        # El descuento es el ahorro en PYG que obtiene el cliente sobre la comisión de cambio
+        descuento_aplicado = Decimal('0')
+        if descuento_pct > 0:
+            # El descuento se aplica sobre la comisión de venta
+            comision_original = Decimal(str(tasa_destino.comision_venta))
+            comision_con_descuento = comision_venta_ajustada
+            descuento_en_comision = comision_original - comision_con_descuento
+            
+            # El descuento en PYG es: (descuento en comisión) × (cantidad de divisa que obtiene)
+            cantidad_divisa_obtenida = resultado_final
+            descuento_aplicado = descuento_en_comision * cantidad_divisa_obtenida
         
         # 6. Valores para mostrar
         subtotal = monto_a_pagar  # Lo que ingresó el cliente
@@ -831,14 +1096,23 @@ def calcular_venta_completa(monto, moneda_origen, moneda_destino, cliente=None, 
         
         comision_total = comision_cobro + comision_pago
         
-        # 4. El descuento ya está aplicado en la tasa ajustada
-        descuento_aplicado = Decimal('0')
-        
-        # 5. Resultado final: PYG bruto menos comisiones de métodos
+        # 4. Resultado final: PYG bruto menos comisiones de métodos
         resultado_final = (monto_pyg_bruto - comision_total).quantize(
             Decimal('1.00'), 
             rounding=ROUND_HALF_UP
         )
+        
+        # 5. Calcular el monto real del descuento aplicado
+        # El descuento es el PYG adicional que recibe el cliente sobre la comisión de cambio
+        descuento_aplicado = Decimal('0')
+        if descuento_pct > 0:
+            # El descuento se aplica sobre la comisión de compra
+            comision_original = Decimal(str(tasa_origen.comision_compra))
+            comision_con_descuento = comision_compra_ajustada
+            descuento_en_comision = comision_original - comision_con_descuento
+            
+            # El descuento en PYG es: (descuento en comisión) × (cantidad de divisa que vende)
+            descuento_aplicado = descuento_en_comision * monto_a_vender
         
         # 6. Valores para mostrar
         subtotal = monto_pyg_bruto  # PYG bruto de la conversión

@@ -35,8 +35,8 @@
               {% for cliente in clientes %}
                 <option value="{{ cliente.id }}" data-descuento="{{ cliente.tipo_cliente.descuento }}" 
                         {% if cliente_preseleccionado and cliente.id|stringformat:"s" == cliente_preseleccionado %}selected{% endif %}>
-                  {{ cliente.nombre_comercial }} — {{ cliente.tipo_cliente.nombre }} 
-                  ({{ cliente.tipo_cliente.descuento }}% descuento)
+                  {{ cliente.nombre_comercial }}{% if cliente.tipo_cliente.activo %} — {{ cliente.tipo_cliente.nombre }} 
+                  ({{ cliente.tipo_cliente.descuento }}% descuento){% endif %}
                 </option>
               {% empty %}
                 <option value="" disabled>No hay clientes asociados</option>

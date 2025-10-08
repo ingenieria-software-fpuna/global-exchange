@@ -263,16 +263,6 @@
                                        class="btn btn-sm btn-outline-primary" title="Ver resumen">
                                         <i class="fas fa-eye"></i>
                                     </a>
-                                    {% if transaccion.estado.codigo == 'PENDIENTE' %}
-                                    <a href="{% url 'transacciones:procesar_pago' transaccion.id_transaccion %}"
-                                       class="btn btn-sm btn-outline-success" title="Procesar pago">
-                                        <i class="fas fa-credit-card"></i>
-                                    </a>
-                                    <a href="{% url 'transacciones:cancelar_transaccion' transaccion.id_transaccion %}"
-                                       class="btn btn-sm btn-outline-danger" title="Cancelar">
-                                        <i class="fas fa-times"></i>
-                                    </a>
-                                    {% endif %}
                                 </div>
                             </td>
                         </tr>
