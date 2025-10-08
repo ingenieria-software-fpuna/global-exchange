@@ -613,3 +613,19 @@ class Transaccion(models.Model):
                     canceladas += 1
 
         return canceladas
+
+    def requiere_retiro_fisico(self):
+        """
+        Determina si la transacción requiere retiro físico en un Tauser.
+        
+        Para COMPRA: Siempre requiere retiro físico (cliente retira divisas)
+        Para VENTA: Solo si el método de cobro requiere retiro físico
+        """
+        if self.tipo_operacion.codigo == 'COMPRA':
+            # Para compras, siempre requiere retiro físico (cliente retira divisas)
+            return True
+        elif self.tipo_operacion.codigo == 'VENTA':
+            # Para ventas, verificar si el método de cobro requiere retiro físico
+            if self.metodo_cobro and self.metodo_cobro.requiere_retiro_fisico:
+                return True
+        return False

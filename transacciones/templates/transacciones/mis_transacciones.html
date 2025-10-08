@@ -202,6 +202,7 @@
                             <th>Monto Origen</th>
                             <th>Moneda Destino</th>
                             <th>Monto Destino</th>
+                            <th class="text-center">Retiro</th>
                             <th class="text-center">Acciones</th>
                         </tr>
                     </thead>
@@ -255,6 +256,25 @@
                                     ₲ {{ transaccion.monto_destino|floatformat:0|floatformat:"g" }}
                                 {% else %}
                                     {{ transaccion.moneda_destino.simbolo }} {{ transaccion.monto_destino|floatformat:2 }}
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if transaccion.requiere_retiro_fisico %}
+                                    {% if transaccion.tauser %}
+                                        <span class="badge bg-success" title="Retirado en {{ transaccion.tauser.nombre }}">
+                                            <i class="fas fa-check me-1"></i>Retirado
+                                        </span>
+                                        <br>
+                                        <small class="text-muted">{{ transaccion.tauser.nombre }}</small>
+                                    {% else %}
+                                        <span class="badge bg-warning" title="Pendiente de retiro">
+                                            <i class="fas fa-clock me-1"></i>Pendiente
+                                        </span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-secondary" title="No requiere retiro físico">
+                                        <i class="fas fa-times me-1"></i>No aplica
+                                    </span>
                                 {% endif %}
                             </td>
                             <td class="text-center">
