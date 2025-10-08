@@ -55,6 +55,22 @@
                 </div>
             </div>
         </div>
+        <div class="col-lg-4 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm h-100 hover-shadow">
+                <div class="card-body text-center p-3">
+                    <div class="bg-warning bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                        <i class="fas fa-cash-register fa-lg text-warning"></i>
+                    </div>
+                    <h6 class="card-title fw-semibold mb-1">Simulador Tauser</h6>
+                    <p class="card-text text-muted" style="font-size: 0.8rem;">Simulación de retiros en Tauser</p>
+                </div>
+                <div class="card-footer border-0 bg-transparent p-2">
+                    <a href="{% url 'tauser:simulador_cajero' %}" class="btn btn-warning w-100 btn-sm fw-semibold">
+                        <i class="fas fa-cash-register me-1"></i>Simular
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
     {% else %}
     <!-- Mensaje para usuarios sin permisos de transacciones -->
