@@ -9,8 +9,10 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.db import transaction
+from django.core.paginator import Paginator
 
-from .models import Tauser, Stock
+
+from .models import Tauser, Stock, HistorialStock
 from .forms import TauserForm, StockForm
 
 
@@ -200,7 +202,11 @@ def cargar_stock(request, pk):
             
             if stock_existente:
                 # Agregar cantidad al stock existente
-                stock_existente.agregar_cantidad(cantidad_agregar)
+                stock_existente.agregar_cantidad(
+                    cantidad_agregar, 
+                    usuario=request.user,
+                    observaciones=f'Carga manual de stock'
+                )
                 if cantidad_minima > 0:
                     stock_existente.cantidad_minima = cantidad_minima
                 if es_activo:
@@ -477,7 +483,12 @@ def procesar_retiro(request):
                 })
             
             # Reducir el stock
-            if not stock.reducir_cantidad(transaccion.monto_destino):
+            if not stock.reducir_cantidad(
+                transaccion.monto_destino,
+                usuario=request.user,
+                transaccion=transaccion,
+                observaciones=f'Retiro por transacción {transaccion.id_transaccion}'
+            ):
                 return JsonResponse({
                     'success': False,
                     'error': 'No se pudo reducir el stock'
@@ -516,3 +527,53 @@ def procesar_retiro(request):
             'success': False,
             'error': f'Error interno: {str(e)}'
         })
+
+
+@login_required
+@permission_required('tauser.view_historial_stock', raise_exception=True)
+def historial_stock(request, pk):
+    """Vista para mostrar el historial de movimientos de stock de un tauser"""
+    tauser = get_object_or_404(Tauser, pk=pk)
+    
+    # Obtener todos los movimientos de stock del tauser
+    historial = HistorialStock.objects.filter(
+        stock__tauser=tauser
+    ).select_related(
+        'stock__moneda', 'usuario', 'transaccion'
+    ).order_by('-fecha_movimiento')
+    
+    # Filtros opcionales
+    tipo_movimiento = request.GET.get('tipo_movimiento')
+    origen_movimiento = request.GET.get('origen_movimiento')
+    fecha_desde = request.GET.get('fecha_desde')
+    fecha_hasta = request.GET.get('fecha_hasta')
+    
+    if tipo_movimiento:
+        historial = historial.filter(tipo_movimiento=tipo_movimiento)
+    if origen_movimiento:
+        historial = historial.filter(origen_movimiento=origen_movimiento)
+    if fecha_desde:
+        historial = historial.filter(fecha_movimiento__date__gte=fecha_desde)
+    if fecha_hasta:
+        historial = historial.filter(fecha_movimiento__date__lte=fecha_hasta)
+    
+    # Paginación
+    paginator = Paginator(historial, 50)  # 50 registros por página
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'titulo': f'Historial de Stock - {tauser.nombre}',
+        'tauser': tauser,
+        'page_obj': page_obj,
+        'tipo_movimiento_choices': HistorialStock.TIPO_MOVIMIENTO_CHOICES,
+        'origen_movimiento_choices': HistorialStock.ORIGEN_MOVIMIENTO_CHOICES,
+        'filtros': {
+            'tipo_movimiento': tipo_movimiento,
+            'origen_movimiento': origen_movimiento,
+            'fecha_desde': fecha_desde,
+            'fecha_hasta': fecha_hasta,
+        }
+    }
+    
+    return render(request, 'tauser/historial_stock.html', context)

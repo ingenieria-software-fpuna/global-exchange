@@ -13,6 +13,7 @@ urlpatterns = [
     
     # URLs para Cargar Stock (solo desde tauser)
     path('<int:pk>/cargar-stock/', views.cargar_stock, name='cargar_stock'),
+    path('<int:pk>/historial-stock/', views.historial_stock, name='historial_stock'),
     
     # URLs para Simulador de Cajero Automático
     path('simulador/', views.simulador_cajero, name='simulador_cajero'),

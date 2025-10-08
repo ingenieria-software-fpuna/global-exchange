@@ -136,6 +136,11 @@
                             <i class="fas fa-plus me-1"></i>Cargar Stock
                         </button>
                         {% endif %}
+                        {% if perms.tauser.view_historial_stock %}
+                        <a href="{% url 'tauser:historial_stock' tauser.pk %}" class="btn btn-sm btn-outline-info">
+                            <i class="fas fa-history me-1"></i>Historial
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="card-body">
