@@ -2,6 +2,8 @@ from django.db import models
 from django.utils import timezone
 from django.core.validators import MinValueValidator
 from monedas.models import Moneda
+from decimal import Decimal
+
 
 
 class Tauser(models.Model):
@@ -117,7 +119,9 @@ class Stock(models.Model):
     def agregar_cantidad(self, cantidad):
         """Agrega cantidad al stock"""
         if cantidad > 0:
-            self.cantidad += cantidad
+            # Convertir a Decimal para mantener precisión
+            cantidad_decimal = Decimal(str(cantidad))
+            self.cantidad = self.cantidad + cantidad_decimal
             self.save()
             return True
         return False
