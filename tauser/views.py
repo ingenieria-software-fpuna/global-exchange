@@ -182,7 +182,6 @@ def cargar_stock(request, pk):
             moneda_id = request.POST.get('moneda')
             cantidad_agregar = request.POST.get('cantidad_agregar')
             cantidad_minima = request.POST.get('cantidad_minima', 0)
-            es_activo = request.POST.get('es_activo') == 'on'
             
             if not moneda_id or not cantidad_agregar:
                 messages.error(request, 'Moneda y cantidad son requeridos.')
@@ -202,21 +201,18 @@ def cargar_stock(request, pk):
             
             if stock_existente:
                 # Agregar cantidad al stock existente
-                stock_existente.agregar_cantidad(
+                resultado = stock_existente.agregar_cantidad(
                     cantidad_agregar, 
                     usuario=request.user,
                     observaciones=f'Carga manual de stock'
                 )
                 if cantidad_minima > 0:
                     stock_existente.cantidad_minima = cantidad_minima
-                if es_activo:
-                    stock_existente.es_activo = True
                 stock_existente.save()
                 
                 if resultado:
                     messages.success(request, 
                         f'Se agregaron {moneda.simbolo}{cantidad_agregar:.{moneda.decimales}f} al stock de {moneda.nombre}. '
-                        f'Cantidad anterior: {moneda.simbolo}{cantidad_anterior:.{moneda.decimales}f} → '
                         f'Nueva cantidad: {stock_existente.mostrar_cantidad()}')
                 else:
                     messages.error(request, 'Error al agregar cantidad al stock existente.')
@@ -224,13 +220,13 @@ def cargar_stock(request, pk):
                 # Refrescar el objeto tauser para obtener los datos actualizados
                 tauser.refresh_from_db()
             else:
-                # Crear nuevo stock
+                # Crear nuevo stock (siempre activo por defecto)
                 nuevo_stock = Stock.objects.create(
                     tauser=tauser,
                     moneda=moneda,
                     cantidad=cantidad_agregar,
                     cantidad_minima=cantidad_minima,
-                    es_activo=es_activo
+                    es_activo=True
                 )
                 
                 messages.success(request, 
