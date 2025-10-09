@@ -18,19 +18,57 @@ Este proyecto simula una pasarela de pago completa para pruebas de integración.
 
 ##  Levantar el simulador:
 
-### Con Docker (Único método)
+**Windows**
+
+```
+powershell -ExecutionPolicy Bypass -File .\run.ps1
+```
+
+**Bash:**
 ```bash
+chmod +x run.sh
+./run.sh
+```
+
+### Docker Compose directo
+```
 docker-compose up -d
 ```
+
 ###  Parar el simulador:
-```bash
+
+**Windows**
+```
+powershell -ExecutionPolicy Bypass -File .\stop.ps1
+```
+
+**Bash:**
+```
+./stop.sh
+```
+
+### Docker Compose directo
+```
 docker-compose down
 ```
 
 ### Parar y limpiar datos:
-```bash
+
+**Windows**
+```
+powershell -ExecutionPolicy Bypass -File .\clean.ps1
+```
+
+**Bash:**
+```
+./clean.sh
+```
+
+### Docker Compose directo
+```
 docker-compose down -v
 ```
+
 Esto levanta:
 - **PostgreSQL** en puerto 5433
 - **Simulador FastAPI** en puerto 3001
