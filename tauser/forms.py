@@ -37,6 +37,14 @@ class TauserForm(forms.ModelForm):
             'fecha_instalacion': 'Fecha de Instalación',
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Formatear la fecha para el input datetime-local
+        if self.instance and self.instance.pk and self.instance.fecha_instalacion:
+            # Convertir a formato YYYY-MM-DDTHH:MM para datetime-local
+            fecha_formateada = self.instance.fecha_instalacion.strftime('%Y-%m-%dT%H:%M')
+            self.initial['fecha_instalacion'] = fecha_formateada
+
     def clean_nombre(self):
         nombre = self.cleaned_data.get('nombre')
         if nombre:
