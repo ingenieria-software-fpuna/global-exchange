@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Administración - Simulador Pasarela de Pago</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <h1>Panel de Administración</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>ID Pago</th>
+                <th>Monto</th>
+                <th>Método</th>
+                <th>Moneda</th>
+                <th>Estado</th>
+                <th>Webhook</th>
+                <th>Fecha</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for pago in pagos %}
+            <tr>
+                <td>{{ pago.id_pago }}</td>
+                <td>{{ pago.monto }}</td>
+                <td>{{ pago.metodo }}</td>
+                <td>{{ pago.moneda }}</td>
+                <td>{{ pago.estado }}</td>
+                <td>{{ pago.webhook_url or '' }}</td>
+                <td>{{ pago.fecha }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

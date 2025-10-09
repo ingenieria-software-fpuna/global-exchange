@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+
+  simulador-db:
+    image: postgres:13.6  
+    restart: always
+    environment:
+      POSTGRES_DB: simulador_pagos
+      POSTGRES_USER: simulador
+      POSTGRES_PASSWORD: simulador123
+    volumes:
+      - simulador_db_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # Puerto 5433 para evitar conflicto con BD en 5432
+    shm_size: 128mb
+
+  # Simulador de pasarela
+  simulador-pasarela:
+    build: .
+    ports:
+      - "3001:3001"  
+    environment:
+      - PYTHONPATH=/app
+      - DB_HOST=simulador-db
+      - DB_PORT=5432
+      - DB_NAME=simulador_pagos
+      - DB_USER=simulador
+      - DB_PASSWORD=simulador123
+      - PORT=3001
+      - WEBHOOK_TIMEOUT=5
+    depends_on:
+      - simulador-db
+    restart: unless-stopped
+
+volumes:
+  simulador_db_data:
