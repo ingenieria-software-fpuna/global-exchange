@@ -676,4 +676,100 @@ class ClienteSensitiveColumnsTestCase(TestCase):
         )
 
 
+class ClienteActionsColumnTestCase(TestCase):
+    """Tests para verificar que la columna de acciones solo se muestra si hay acciones disponibles"""
+    
+    def setUp(self):
+        """Configurar datos de prueba"""
+        from django.contrib.auth.models import Group, Permission
+        from django.contrib.contenttypes.models import ContentType
+        from usuarios.models import Usuario
+        
+        # Crear tipo de cliente
+        self.tipo_cliente = TipoCliente.objects.create(
+            nombre='Tipo Test',
+            descuento=Decimal('5.00'),
+            activo=True
+        )
+        
+        # Crear usuario con permisos de edición
+        self.usuario_con_permisos = Usuario.objects.create_user(
+            email='editor@test.com',
+            nombre='Editor',
+            apellido='Test',
+            password='test123'
+        )
+        
+        # Crear usuario sin permisos de edición (solo lectura)
+        self.usuario_solo_lectura = Usuario.objects.create_user(
+            email='lector@test.com',
+            nombre='Lector',
+            apellido='Test',
+            password='test123'
+        )
+        
+        # Crear grupos
+        grupo_editor = Group.objects.create(name='Editor Test')
+        grupo_lector = Group.objects.create(name='Lector Test')
+        
+        # Obtener permisos
+        content_type = ContentType.objects.get_for_model(Cliente)
+        perm_view = Permission.objects.get(codename='view_cliente', content_type=content_type)
+        perm_change = Permission.objects.get(codename='change_cliente', content_type=content_type)
+        
+        # Asignar permisos
+        grupo_editor.permissions.add(perm_view, perm_change)
+        grupo_lector.permissions.add(perm_view)
+        
+        self.usuario_con_permisos.groups.add(grupo_editor)
+        self.usuario_solo_lectura.groups.add(grupo_lector)
+        
+        # Crear cliente
+        self.cliente = Cliente.objects.create(
+            nombre_comercial='Cliente Test',
+            ruc='12345678',
+            tipo_cliente=self.tipo_cliente,
+            activo=True
+        )
+    
+    def test_user_with_edit_permission_sees_actions_in_context(self):
+        """Test: Usuario con permiso de edición tiene can_edit_cliente en el contexto"""
+        from .views import ClienteListView
+        from django.test import RequestFactory
+        
+        factory = RequestFactory()
+        request = factory.get('/clientes/')
+        request.user = self.usuario_con_permisos
+        
+        view = ClienteListView()
+        view.request = request
+        view.kwargs = {}
+        view.object_list = view.get_queryset()
+        
+        context = view.get_context_data()
+        
+        self.assertIn('can_edit_cliente', context)
+        self.assertTrue(context['can_edit_cliente'])
+    
+    def test_user_without_edit_permission_cannot_edit_in_context(self):
+        """Test: Usuario sin permiso de edición no tiene can_edit_cliente en el contexto"""
+        from .views import ClienteListView
+        from django.test import RequestFactory
+        
+        factory = RequestFactory()
+        request = factory.get('/clientes/')
+        request.user = self.usuario_solo_lectura
+        
+        view = ClienteListView()
+        view.request = request
+        view.kwargs = {}
+        view.object_list = view.get_queryset()
+        
+        context = view.get_context_data()
+        
+        self.assertIn('can_edit_cliente', context)
+        self.assertFalse(context['can_edit_cliente'])
+
+
+
 
