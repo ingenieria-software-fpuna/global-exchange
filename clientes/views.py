@@ -104,6 +104,11 @@ class ClienteListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     def get_queryset(self):
         queryset = Cliente.objects.select_related('tipo_cliente').prefetch_related('usuarios_asociados')
         
+        # Verificar si el usuario tiene permiso para ver todos los clientes
+        if not self.request.user.has_perm('clientes.can_view_all_clients'):
+            # Si no tiene el permiso, mostrar solo los clientes asociados al usuario
+            queryset = queryset.filter(usuarios_asociados=self.request.user)
+        
         # Filtro de búsqueda
         q = self.request.GET.get('q')
         if q:

@@ -108,6 +108,9 @@ class Cliente(models.Model):
             models.Index(fields=['tipo_cliente']),
             models.Index(fields=['activo']),
         ]
+        permissions = [
+            ("can_view_all_clients", "Puede ver todos los clientes"),
+        ]
 
     def __str__(self):
         return f"{self.nombre_comercial} ({self.ruc})"

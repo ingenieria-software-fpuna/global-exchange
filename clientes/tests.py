@@ -277,3 +277,257 @@ class ClienteFormTestCase(TestCase):
         cliente = form.save()
         self.assertEqual(cliente.tipo_cliente, self.tipo_inactivo)
         self.assertFalse(cliente.tipo_cliente.activo)
+
+
+class ClientePermissionsTestCase(TestCase):
+    """Tests para verificar los permisos de visualización de clientes"""
+    
+    def setUp(self):
+        """Configurar datos de prueba"""
+        from django.contrib.auth.models import Group, Permission
+        from django.contrib.contenttypes.models import ContentType
+        from usuarios.models import Usuario
+        
+        # Crear tipo de cliente
+        self.tipo_cliente = TipoCliente.objects.create(
+            nombre='Tipo Test',
+            descuento=Decimal('5.00'),
+            activo=True
+        )
+        
+        # Crear usuarios
+        self.usuario_analista = Usuario.objects.create_user(
+            email='analista@test.com',
+            nombre='Analista',
+            apellido='Test',
+            password='test123'
+        )
+        
+        self.usuario_operador = Usuario.objects.create_user(
+            email='operador@test.com',
+            nombre='Operador',
+            apellido='Test',
+            password='test123'
+        )
+        
+        # Crear grupos
+        self.grupo_analista = Group.objects.create(name='Analista Test')
+        self.grupo_operador = Group.objects.create(name='Operador Test')
+        
+        # Obtener el ContentType de Cliente
+        content_type = ContentType.objects.get_for_model(Cliente)
+        
+        # Obtener permisos
+        self.perm_view_cliente = Permission.objects.get(
+            codename='view_cliente',
+            content_type=content_type
+        )
+        self.perm_view_all_clients = Permission.objects.get(
+            codename='can_view_all_clients',
+            content_type=content_type
+        )
+        
+        # Asignar permisos a grupos
+        # Analista: puede ver todos los clientes
+        self.grupo_analista.permissions.add(self.perm_view_cliente)
+        self.grupo_analista.permissions.add(self.perm_view_all_clients)
+        
+        # Operador: solo puede ver clientes asociados
+        self.grupo_operador.permissions.add(self.perm_view_cliente)
+        
+        # Asignar usuarios a grupos
+        self.usuario_analista.groups.add(self.grupo_analista)
+        self.usuario_operador.groups.add(self.grupo_operador)
+        
+        # Crear clientes
+        self.cliente1 = Cliente.objects.create(
+            nombre_comercial='Cliente 1',
+            ruc='11111111',
+            tipo_cliente=self.tipo_cliente,
+            activo=True
+        )
+        
+        self.cliente2 = Cliente.objects.create(
+            nombre_comercial='Cliente 2',
+            ruc='22222222',
+            tipo_cliente=self.tipo_cliente,
+            activo=True
+        )
+        
+        self.cliente3 = Cliente.objects.create(
+            nombre_comercial='Cliente 3',
+            ruc='33333333',
+            tipo_cliente=self.tipo_cliente,
+            activo=True
+        )
+        
+        # Asociar cliente1 y cliente2 al operador
+        self.cliente1.usuarios_asociados.add(self.usuario_operador)
+        self.cliente2.usuarios_asociados.add(self.usuario_operador)
+        
+    def test_analista_can_view_all_clients(self):
+        """Test: El usuario Analista puede ver todos los clientes"""
+        self.assertTrue(
+            self.usuario_analista.has_perm('clientes.can_view_all_clients'),
+            "El Analista debería tener el permiso can_view_all_clients"
+        )
+        
+    def test_operador_cannot_view_all_clients(self):
+        """Test: El usuario Operador NO puede ver todos los clientes"""
+        self.assertFalse(
+            self.usuario_operador.has_perm('clientes.can_view_all_clients'),
+            "El Operador NO debería tener el permiso can_view_all_clients"
+        )
+    
+    def test_analista_sees_all_clients_in_list_view(self):
+        """Test: El Analista ve todos los clientes en la vista de lista"""
+        from .views import ClienteListView
+        from django.test import RequestFactory
+        
+        factory = RequestFactory()
+        request = factory.get('/clientes/')
+        request.user = self.usuario_analista
+        
+        view = ClienteListView()
+        view.request = request
+        
+        queryset = view.get_queryset()
+        
+        self.assertEqual(queryset.count(), 3, "El Analista debería ver los 3 clientes")
+        self.assertIn(self.cliente1, queryset)
+        self.assertIn(self.cliente2, queryset)
+        self.assertIn(self.cliente3, queryset)
+    
+    def test_operador_sees_only_associated_clients(self):
+        """Test: El Operador ve solo los clientes asociados"""
+        from .views import ClienteListView
+        from django.test import RequestFactory
+        
+        factory = RequestFactory()
+        request = factory.get('/clientes/')
+        request.user = self.usuario_operador
+        
+        view = ClienteListView()
+        view.request = request
+        
+        queryset = view.get_queryset()
+        
+        self.assertEqual(queryset.count(), 2, "El Operador debería ver solo 2 clientes asociados")
+        self.assertIn(self.cliente1, queryset)
+        self.assertIn(self.cliente2, queryset)
+        self.assertNotIn(self.cliente3, queryset, "El Operador NO debería ver el cliente3")
+    
+    def test_operador_without_associations_sees_no_clients(self):
+        """Test: Un Operador sin clientes asociados no ve ningún cliente"""
+        from .views import ClienteListView
+        from django.test import RequestFactory
+        from usuarios.models import Usuario
+        
+        # Crear un operador sin clientes asociados
+        usuario_sin_clientes = Usuario.objects.create_user(
+            email='operador_sin_clientes@test.com',
+            nombre='Operador',
+            apellido='Sin Clientes',
+            password='test123'
+        )
+        usuario_sin_clientes.groups.add(self.grupo_operador)
+        
+        factory = RequestFactory()
+        request = factory.get('/clientes/')
+        request.user = usuario_sin_clientes
+        
+        view = ClienteListView()
+        view.request = request
+        
+        queryset = view.get_queryset()
+        
+        self.assertEqual(queryset.count(), 0, "Un Operador sin clientes asociados no debería ver ningún cliente")
+    
+    def test_permission_works_with_filters(self):
+        """Test: El permiso funciona correctamente con filtros de búsqueda"""
+        from .views import ClienteListView
+        from django.test import RequestFactory
+        
+        factory = RequestFactory()
+        
+        # Test con Analista (ve todos)
+        request = factory.get('/clientes/?q=Cliente')
+        request.user = self.usuario_analista
+        
+        view = ClienteListView()
+        view.request = request
+        
+        queryset = view.get_queryset()
+        self.assertEqual(queryset.count(), 3, "El Analista debería ver los 3 clientes con el filtro")
+        
+        # Test con Operador (ve solo asociados)
+        request = factory.get('/clientes/?q=Cliente')
+        request.user = self.usuario_operador
+        
+        view = ClienteListView()
+        view.request = request
+        
+        queryset = view.get_queryset()
+        self.assertEqual(queryset.count(), 2, "El Operador debería ver solo 2 clientes con el filtro")
+    
+    def test_admin_can_view_all_clients(self):
+        """Test: El usuario Admin tiene el permiso can_view_all_clients"""
+        from django.contrib.auth.models import Group, Permission
+        from django.contrib.contenttypes.models import ContentType
+        from usuarios.models import Usuario
+        
+        # Crear usuario Admin
+        usuario_admin = Usuario.objects.create_user(
+            email='admin@test.com',
+            nombre='Admin',
+            apellido='Test',
+            password='test123'
+        )
+        
+        # Crear grupo Admin y asignar todos los permisos
+        grupo_admin = Group.objects.create(name='Admin Test Group')
+        all_permissions = Permission.objects.all()
+        grupo_admin.permissions.set(all_permissions)
+        usuario_admin.groups.add(grupo_admin)
+        
+        self.assertTrue(
+            usuario_admin.has_perm('clientes.can_view_all_clients'),
+            "El Admin debería tener el permiso can_view_all_clients"
+        )
+    
+    def test_admin_sees_all_clients_in_list_view(self):
+        """Test: El Admin ve todos los clientes en la vista de lista"""
+        from .views import ClienteListView
+        from django.test import RequestFactory
+        from django.contrib.auth.models import Group, Permission
+        from usuarios.models import Usuario
+        
+        # Crear usuario Admin
+        usuario_admin = Usuario.objects.create_user(
+            email='admin2@test.com',
+            nombre='Admin',
+            apellido='Test2',
+            password='test123'
+        )
+        
+        # Crear grupo Admin y asignar todos los permisos
+        grupo_admin = Group.objects.create(name='Admin Test Group 2')
+        all_permissions = Permission.objects.all()
+        grupo_admin.permissions.set(all_permissions)
+        usuario_admin.groups.add(grupo_admin)
+        
+        factory = RequestFactory()
+        request = factory.get('/clientes/')
+        request.user = usuario_admin
+        
+        view = ClienteListView()
+        view.request = request
+        
+        queryset = view.get_queryset()
+        
+        self.assertEqual(queryset.count(), 3, "El Admin debería ver los 3 clientes")
+        self.assertIn(self.cliente1, queryset)
+        self.assertIn(self.cliente2, queryset)
+        self.assertIn(self.cliente3, queryset)
+
+

@@ -59,7 +59,7 @@ def crear_grupos_ejemplo():
             'nombre': 'Operador',
             'descripcion': 'Acceso de solo lectura a clientes, métodos de pago/cobro, tasas de cambio y transacciones',
             'apps_solo_lectura': ['clientes', 'metodo_cobro', 'metodo_pago', 'tasa_cambio', 'transacciones'],
-            'permisos_excluidos': ['view_tipocliente']
+            'permisos_excluidos': ['view_tipocliente', 'can_view_all_clients']
         },
         {
             'nombre': 'Visitante',
