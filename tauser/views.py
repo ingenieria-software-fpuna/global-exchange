@@ -229,6 +229,18 @@ def cargar_stock(request, pk):
                     es_activo=True
                 )
                 
+                # Registrar en historial la creación del stock
+                HistorialStock.objects.create(
+                    stock=nuevo_stock,
+                    tipo_movimiento='ENTRADA',
+                    origen_movimiento='MANUAL',
+                    cantidad_movida=cantidad_agregar,
+                    cantidad_anterior=0,
+                    cantidad_posterior=cantidad_agregar,
+                    usuario=request.user,
+                    observaciones='Creación inicial de stock'
+                )
+                
                 messages.success(request, 
                     f'Stock creado para {moneda.nombre} con {moneda.simbolo}{cantidad_agregar:.{moneda.decimales}f}')
             
