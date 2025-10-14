@@ -26,7 +26,8 @@ def obtener_permisos_por_app():
     # Aplicaciones relevantes para los permisos
     apps_relevantes = [
         'monedas', 'tasa_cambio', 'transacciones',
-        'metodo_cobro', 'metodo_pago', 'clientes'
+        'metodo_cobro', 'metodo_pago', 'clientes',
+        'configuracion', 'grupos', 'usuarios'
     ]
 
     for app in apps_relevantes:
@@ -52,8 +53,8 @@ def crear_grupos_ejemplo():
     grupos_config = [
         {
             'nombre': 'Analista',
-            'descripcion': 'Acceso completo a monedas, tasas, transacciones, métodos de pago/cobro, clientes y configuraciones',
-            'apps_completas': ['monedas', 'tasa_cambio', 'transacciones', 'metodo_cobro', 'metodo_pago', 'clientes']
+            'descripcion': 'Acceso completo a monedas, tasas, transacciones, métodos de pago/cobro, clientes y configuraciones del sistema',
+            'apps_completas': ['monedas', 'tasa_cambio', 'transacciones', 'metodo_cobro', 'metodo_pago', 'clientes', 'configuracion']
         },
         {
             'nombre': 'Operador',
