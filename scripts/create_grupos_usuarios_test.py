@@ -58,7 +58,8 @@ def crear_grupos_ejemplo():
         {
             'nombre': 'Operador',
             'descripcion': 'Acceso de solo lectura a clientes, métodos de pago/cobro, tasas de cambio y transacciones',
-            'apps_solo_lectura': ['clientes', 'metodo_cobro', 'metodo_pago', 'tasa_cambio', 'transacciones']
+            'apps_solo_lectura': ['clientes', 'metodo_cobro', 'metodo_pago', 'tasa_cambio', 'transacciones'],
+            'permisos_excluidos': ['view_tipocliente']
         },
         {
             'nombre': 'Visitante',
@@ -108,9 +109,13 @@ def crear_grupos_ejemplo():
 
             # Solo lectura (view permissions)
             if 'apps_solo_lectura' in config:
+                permisos_excluidos = config.get('permisos_excluidos', [])
                 for app in config['apps_solo_lectura']:
                     if app in permisos_por_app:
-                        permisos_lectura = [p for p in permisos_por_app[app] if p.codename.startswith('view_')]
+                        permisos_lectura = [
+                            p for p in permisos_por_app[app]
+                            if p.codename.startswith('view_') and p.codename not in permisos_excluidos
+                        ]
                         permisos_asignados.extend(permisos_lectura)
 
             # Asignar permisos al grupo
