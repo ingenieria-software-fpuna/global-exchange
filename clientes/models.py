@@ -110,6 +110,7 @@ class Cliente(models.Model):
         ]
         permissions = [
             ("can_view_all_clients", "Puede ver todos los clientes"),
+            ("can_view_sensitive_columns", "Puede ver columnas sensibles (usuarios asociados, estado, fecha creación)"),
         ]
 
     def __str__(self):

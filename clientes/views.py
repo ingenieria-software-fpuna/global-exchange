@@ -139,6 +139,7 @@ class ClienteListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         context['estado_filter'] = self.request.GET.get('estado', '')
         context['can_create_cliente'] = self.request.user.has_perm('clientes.add_cliente')
         context['can_edit_cliente'] = self.request.user.has_perm('clientes.change_cliente')
+        context['can_view_sensitive_columns'] = self.request.user.has_perm('clientes.can_view_sensitive_columns')
         return context
 
 class ClienteCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):

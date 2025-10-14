@@ -82,9 +82,11 @@
                                     <th>RUC</th>
                                     <th>Tipo</th>
                                     <th>Contacto</th>
+                                    {% if can_view_sensitive_columns %}
                                     <th>Usuarios Asociados</th>
                                     <th>Estado</th>
                                     <th>Fecha Creación</th>
+                                    {% endif %}
                                     <th class="text-center">Acciones</th>
                                 </tr>
                             </thead>
@@ -112,6 +114,7 @@
                                         <small class="text-muted">{{ cliente.numero_telefono }}</small>
                                         {% endif %}
                                     </td>
+                                    {% if can_view_sensitive_columns %}
                                     <td>
                                         <span class="badge bg-secondary">{{ cliente.usuarios_asociados.count }}</span>
                                         {% if cliente.usuarios_asociados.count == 0 %}
@@ -128,6 +131,7 @@
                                     <td>
                                         <small class="text-muted">{{ cliente.fecha_creacion|date:"d/m/Y H:i" }}</small>
                                     </td>
+                                    {% endif %}
                                     <td class="text-center">
                                         <div class="btn-group" role="group">
                                             {% if can_edit_cliente %}
