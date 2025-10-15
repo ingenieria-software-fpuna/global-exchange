@@ -82,10 +82,14 @@
                                     <th>RUC</th>
                                     <th>Tipo</th>
                                     <th>Contacto</th>
+                                    {% if can_view_sensitive_columns %}
                                     <th>Usuarios Asociados</th>
                                     <th>Estado</th>
                                     <th>Fecha Creación</th>
+                                    {% endif %}
+                                    {% if can_edit_cliente %}
                                     <th class="text-center">Acciones</th>
+                                    {% endif %}
                                 </tr>
                             </thead>
                             <tbody>
@@ -112,6 +116,7 @@
                                         <small class="text-muted">{{ cliente.numero_telefono }}</small>
                                         {% endif %}
                                     </td>
+                                    {% if can_view_sensitive_columns %}
                                     <td>
                                         <span class="badge bg-secondary">{{ cliente.usuarios_asociados.count }}</span>
                                         {% if cliente.usuarios_asociados.count == 0 %}
@@ -128,9 +133,10 @@
                                     <td>
                                         <small class="text-muted">{{ cliente.fecha_creacion|date:"d/m/Y H:i" }}</small>
                                     </td>
+                                    {% endif %}
+                                    {% if can_edit_cliente %}
                                     <td class="text-center">
                                         <div class="btn-group" role="group">
-                                            {% if can_edit_cliente %}
                                             <a href="{% url 'clientes:cliente_update' cliente.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
                                                 <i class="fas fa-edit"></i>
                                             </a>
@@ -140,9 +146,9 @@
                                                     title="{% if cliente.activo %}Desactivar{% else %}Activar{% endif %}">
                                                 {% if cliente.activo %}<i class="fas fa-eye-slash"></i>{% else %}<i class="fas fa-eye"></i>{% endif %}
                                             </button>
-                                            {% endif %}
                                         </div>
                                     </td>
+                                    {% endif %}
                                 </tr>
                                 {% endfor %}
                             </tbody>

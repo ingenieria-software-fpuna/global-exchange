@@ -47,6 +47,9 @@ class TasaCambio(models.Model):
         verbose_name_plural = "Cotizaciones"
         ordering = ['-fecha_creacion', 'moneda__nombre']
         db_table = 'tasa_cambio_tasacambio'
+        permissions = [
+            ("can_view_sensitive_columns", "Puede ver columnas sensibles (precio base, comisiones, spread, fecha, estado)"),
+        ]
 
     def __str__(self):
         return f"{self.moneda.nombre}: Base {self.precio_base} - Com. C/V {self.comision_compra}/{self.comision_venta}"

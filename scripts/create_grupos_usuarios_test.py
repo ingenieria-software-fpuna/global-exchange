@@ -26,7 +26,8 @@ def obtener_permisos_por_app():
     # Aplicaciones relevantes para los permisos
     apps_relevantes = [
         'monedas', 'tasa_cambio', 'transacciones',
-        'metodo_cobro', 'metodo_pago', 'clientes'
+        'metodo_cobro', 'metodo_pago', 'clientes',
+        'configuracion', 'grupos', 'usuarios'
     ]
 
     for app in apps_relevantes:
@@ -52,13 +53,14 @@ def crear_grupos_ejemplo():
     grupos_config = [
         {
             'nombre': 'Analista',
-            'descripcion': 'Acceso completo a monedas, tasas, transacciones, métodos de pago/cobro, clientes y configuraciones',
-            'apps_completas': ['monedas', 'tasa_cambio', 'transacciones', 'metodo_cobro', 'metodo_pago', 'clientes']
+            'descripcion': 'Acceso completo a monedas, tasas, transacciones, métodos de pago/cobro, clientes y configuraciones del sistema',
+            'apps_completas': ['tasa_cambio', 'configuracion']
         },
         {
             'nombre': 'Operador',
             'descripcion': 'Acceso de solo lectura a clientes, métodos de pago/cobro, tasas de cambio y transacciones',
-            'apps_solo_lectura': ['clientes', 'metodo_cobro', 'metodo_pago', 'tasa_cambio', 'transacciones']
+            'apps_solo_lectura': ['clientes', 'tasa_cambio', 'transacciones'],
+            'permisos_excluidos': ['view_tipocliente', 'can_view_all_clients', 'can_view_sensitive_columns']
         },
         {
             'nombre': 'Visitante',
@@ -108,9 +110,13 @@ def crear_grupos_ejemplo():
 
             # Solo lectura (view permissions)
             if 'apps_solo_lectura' in config:
+                permisos_excluidos = config.get('permisos_excluidos', [])
                 for app in config['apps_solo_lectura']:
                     if app in permisos_por_app:
-                        permisos_lectura = [p for p in permisos_por_app[app] if p.codename.startswith('view_')]
+                        permisos_lectura = [
+                            p for p in permisos_por_app[app]
+                            if p.codename.startswith('view_') and p.codename not in permisos_excluidos
+                        ]
                         permisos_asignados.extend(permisos_lectura)
 
             # Asignar permisos al grupo

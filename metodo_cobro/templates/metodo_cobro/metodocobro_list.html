@@ -74,7 +74,9 @@
                             <th>Estado</th>
                             <th>Creado</th>
                             <th>Actualizado</th>
+                            {% if perms.metodo_cobro.change_metodocobro %}
                             <th class="text-center">Acciones</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -101,9 +103,9 @@
                             </td>
                             <td><small class="text-muted">{{ m.fecha_creacion|date:"d/m/Y H:i" }}</small></td>
                             <td><small class="text-muted">{{ m.fecha_actualizacion|date:"d/m/Y H:i" }}</small></td>
+                            {% if perms.metodo_cobro.change_metodocobro %}
                             <td class="text-center">
                                 <div class="btn-group" role="group">
-                                    {% if perms.metodo_cobro.change_metodocobro %}
                                     <a href="{% url 'metodo_cobro:metodocobro_update' m.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
                                         <i class="fas fa-edit"></i>
                                     </a>
@@ -113,9 +115,9 @@
                                             title="{% if m.es_activo %}Desactivar{% else %}Activar{% endif %}">
                                         {% if m.es_activo %}<i class="fas fa-eye-slash"></i>{% else %}<i class="fas fa-eye"></i>{% endif %}
                                     </button>
-                                    {% endif %}
                                 </div>
                             </td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>
