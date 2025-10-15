@@ -100,11 +100,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h6 class="card-title">Total Entradas</h6>
-                            <h4 class="mb-0">
-                                {% for movimiento in page_obj %}
-                                    {% if movimiento.tipo_movimiento == 'ENTRADA' %}{{ forloop.counter0|add:1 }}{% endif %}
-                                {% empty %}0{% endfor %}
-                            </h4>
+                            <h4 class="mb-0">{{ total_entradas }}</h4>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-arrow-up fa-2x"></i>
@@ -119,11 +115,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h6 class="card-title">Total Salidas</h6>
-                            <h4 class="mb-0">
-                                {% for movimiento in page_obj %}
-                                    {% if movimiento.tipo_movimiento == 'SALIDA' %}{{ forloop.counter0|add:1 }}{% endif %}
-                                {% empty %}0{% endfor %}
-                            </h4>
+                            <h4 class="mb-0">{{ total_salidas }}</h4>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-arrow-down fa-2x"></i>
@@ -138,11 +130,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h6 class="card-title">Movimientos Manuales</h6>
-                            <h4 class="mb-0">
-                                {% for movimiento in page_obj %}
-                                    {% if movimiento.origen_movimiento == 'MANUAL' %}{{ forloop.counter0|add:1 }}{% endif %}
-                                {% empty %}0{% endfor %}
-                            </h4>
+                            <h4 class="mb-0">{{ total_manuales }}</h4>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-hand-paper fa-2x"></i>
@@ -157,11 +145,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h6 class="card-title">Por Transacciones</h6>
-                            <h4 class="mb-0">
-                                {% for movimiento in page_obj %}
-                                    {% if movimiento.origen_movimiento == 'TRANSACCION' %}{{ forloop.counter0|add:1 }}{% endif %}
-                                {% empty %}0{% endfor %}
-                            </h4>
+                            <h4 class="mb-0">{{ total_transacciones }}</h4>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-exchange-alt fa-2x"></i>

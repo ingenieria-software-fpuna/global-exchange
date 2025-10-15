@@ -130,15 +130,12 @@ def crear_tausers_ejemplo(datos, cantidad=5):
                 else:
                     cantidad_inicial = Decimal(str(random.randint(1000, 10000)))  # 1000 - 10000 USD/EUR/etc
 
-                # Cantidad mínima (10% de la cantidad inicial)
-                cantidad_minima = (cantidad_inicial * Decimal('0.1')).quantize(Decimal('0.01'))
 
                 # Crear stock
                 stock = Stock.objects.create(
                     tauser=tauser,
                     moneda=moneda,
                     cantidad=cantidad_inicial,
-                    cantidad_minima=cantidad_minima,
                     es_activo=True
                 )
 

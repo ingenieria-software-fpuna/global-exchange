@@ -86,3 +86,63 @@ def formatear_guaranies(valor):
         return f"₲ {valor_int:,}".replace(',', '.')
     except (ValueError, TypeError):
         return "N/A"
+
+@register.filter
+def formatear_denominacion(valor):
+    """
+    Formatea un valor de denominación para input type='number'
+    Convierte comas a puntos para compatibilidad con HTML5
+    """
+    if valor is None:
+        return ""
+    
+    try:
+        # Convertir a string y reemplazar coma por punto
+        valor_str = str(valor)
+        if ',' in valor_str:
+            valor_str = valor_str.replace(',', '.')
+        return valor_str
+    except (ValueError, TypeError):
+        return ""
+
+@register.filter
+def formatear_denominacion_sin_decimales(valor, tipo):
+    """
+    Formatea un valor de denominación sin decimales para billetes
+    """
+    if valor is None:
+        return ""
+    
+    try:
+        # Para billetes, mostrar sin decimales
+        if tipo == 'BILLETE':
+            valor_int = int(float(valor))
+            return str(valor_int)
+        else:
+            # Para monedas, mantener decimales
+            valor_str = str(valor)
+            if ',' in valor_str:
+                valor_str = valor_str.replace(',', '.')
+            return valor_str
+    except (ValueError, TypeError):
+        return ""
+
+@register.filter
+def formatear_denominacion_con_tipo(denominacion):
+    """
+    Formatea una denominación completa con valor y tipo
+    """
+    if denominacion is None:
+        return ""
+    
+    try:
+        # Formatear el valor
+        valor_str = str(denominacion.valor)
+        if ',' in valor_str:
+            valor_str = valor_str.replace(',', '.')
+        
+        # Agregar información del tipo
+        tipo_info = " (Billete)" if denominacion.tipo == 'BILLETE' else " (Moneda)"
+        return f"{valor_str}{tipo_info}"
+    except (ValueError, TypeError, AttributeError):
+        return ""

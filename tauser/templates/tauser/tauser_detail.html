@@ -181,12 +181,6 @@
                                                         {{ item.moneda.simbolo }}{{ item.cantidad|floatformat:item.moneda.decimales }}
                                                     </strong>
                                                 </div>
-                                                <div class="col-6">
-                                                    <small class="text-muted d-block">Cantidad Mínima:</small>
-                                                    <span class="text-muted">
-                                                        {{ item.moneda.simbolo }}{{ item.cantidad_minima|floatformat:item.moneda.decimales }}
-                                                    </span>
-                                                </div>
                                             </div>
                                             
                                             <div class="mt-2">
@@ -219,7 +213,6 @@
                                 <tr>
                                     <th>Moneda</th>
                                     <th>Cantidad en Stock</th>
-                                    <th>Cantidad Mínima</th>
                                     <th>Estado</th>
                                     <th>Alerta</th>
                                     <th>Última Actualización</th>
@@ -243,7 +236,6 @@
                                         <span class="fw-bold">{{ item.moneda.simbolo }}{{ item.cantidad|floatformat:item.moneda.decimales }}</span>
                                     </td>
                                     <td>
-                                        <span class="text-muted">{{ item.moneda.simbolo }}{{ item.cantidad_minima|floatformat:item.moneda.decimales }}</span>
                                     </td>
                                     <td>
                                         {% if item.es_activo %}
@@ -333,11 +325,11 @@
 <!-- Modal para Cargar Stock -->
 {% if can_create_stock %}
 <div class="modal fade" id="cargarStockModal" tabindex="-1" aria-labelledby="cargarStockModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="cargarStockModalLabel">
-                    <i class="fas fa-plus me-2"></i>Cargar Stock - {{ tauser.nombre }}
+                    <i class="fas fa-plus me-2"></i>Cargar Stock por Denominaciones - {{ tauser.nombre }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -365,31 +357,22 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="cantidad_agregar" class="form-label">Cantidad a Agregar <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" id="cantidad_agregar" name="cantidad_agregar" 
-                                       step="0.01" min="0" placeholder="0.00" required>
-                                <span class="input-group-text" id="simbolo_moneda">-</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="cantidad_minima" class="form-label">Cantidad Mínima (Opcional)</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" id="cantidad_minima" name="cantidad_minima" 
-                                       step="0.01" min="0" placeholder="0.00">
-                                <span class="input-group-text" id="simbolo_moneda_min">-</span>
-                            </div>
-                        </div>
                     </div>
                     
                     <!-- Información de la moneda seleccionada -->
                     <div id="info_moneda" class="alert alert-info" style="display: none;">
                         <h6 class="alert-heading">Información de la Moneda</h6>
                         <div id="detalles_moneda"></div>
+                    </div>
+                    
+                    <!-- Denominaciones de la moneda seleccionada -->
+                    <div id="denominaciones_container" style="display: none;">
+                        <h6 class="mb-3">
+                            <i class="fas fa-coins me-2"></i>Denominaciones Disponibles
+                        </h6>
+                        <div class="row" id="denominaciones_list">
+                            <!-- Las denominaciones se cargarán dinámicamente aquí -->
+                        </div>
                     </div>
                     
                     <!-- Resumen de la operación -->
@@ -400,7 +383,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-success">
+                    <button type="submit" class="btn btn-success" id="submit_btn" disabled>
                         <i class="fas fa-save me-2"></i>Cargar Stock
                     </button>
                 </div>
@@ -437,16 +420,19 @@ document.addEventListener('DOMContentLoaded', function() {
     listViewBtn.addEventListener('click', showListView);
     tableViewBtn.addEventListener('click', showTableView);
     
-    // Funcionalidad del modal de cargar stock
+    // Funcionalidad del modal de cargar stock por denominaciones
     const monedaSelect = document.getElementById('moneda_select');
-    const cantidadAgregar = document.getElementById('cantidad_agregar');
-    const cantidadMinima = document.getElementById('cantidad_minima');
-    const simboloMoneda = document.getElementById('simbolo_moneda');
     const simboloMonedaMin = document.getElementById('simbolo_moneda_min');
     const infoMoneda = document.getElementById('info_moneda');
-    const resumenOperacion = document.getElementById('resumen_operacion');
     const detallesMoneda = document.getElementById('detalles_moneda');
+    const denominacionesContainer = document.getElementById('denominaciones_container');
+    const denominacionesList = document.getElementById('denominaciones_list');
+    const resumenOperacion = document.getElementById('resumen_operacion');
     const detallesOperacion = document.getElementById('detalles_operacion');
+    const submitBtn = document.getElementById('submit_btn');
+    
+    // Cache de denominaciones por moneda
+    const denominacionesCache = {};
     
     if (monedaSelect) {
         monedaSelect.addEventListener('change', function() {
@@ -454,59 +440,165 @@ document.addEventListener('DOMContentLoaded', function() {
             const symbol = selectedOption.getAttribute('data-symbol') || '-';
             const decimales = selectedOption.getAttribute('data-decimales') || '2';
             const tieneStock = selectedOption.getAttribute('data-tiene-stock') === 'true';
-            const cantidadActual = parseFloat(selectedOption.getAttribute('data-cantidad-actual')) || 0;
+            const cantidadActualStr = selectedOption.getAttribute('data-cantidad-actual') || '0';
+            const cantidadActual = parseFloat(cantidadActualStr);
             
-            // Actualizar símbolos
-            simboloMoneda.textContent = symbol;
-            simboloMonedaMin.textContent = symbol;
-            
-            // Configurar step según decimales
-            cantidadAgregar.step = `0.${'0'.repeat(parseInt(decimales) - 1)}1`;
-            cantidadMinima.step = `0.${'0'.repeat(parseInt(decimales) - 1)}1`;
-            
-            // Mostrar información de la moneda
             if (this.value) {
-                let info = `<strong>${selectedOption.textContent.split(' - ')[1]}</strong><br>`;
-                info += `Símbolo: ${symbol}<br>`;
-                info += `Decimales: ${decimales}<br>`;
-                if (tieneStock) {
-                    info += `Stock actual: ${symbol}${cantidadActual.toFixed(parseInt(decimales))}`;
-                } else {
-                    info += `Estado: Sin stock registrado`;
+                // Actualizar símbolo
+                if (simboloMonedaMin) simboloMonedaMin.textContent = symbol;
+                
+                // Mostrar información de la moneda
+                if (infoMoneda && detallesMoneda) {
+                    let info = `<strong>Moneda:</strong> ${selectedOption.textContent}<br>`;
+                    info += `<strong>Símbolo:</strong> ${symbol}<br>`;
+                    info += `<strong>Decimales:</strong> ${decimales}<br>`;
+                    // Formatear cantidad manteniendo los decimales originales
+                    const cantidadFormateada = cantidadActualStr.replace(',', '.');
+                    info += `<strong>Stock actual:</strong> ${symbol}${cantidadFormateada}`;
+                    
+                    detallesMoneda.innerHTML = info;
+                    infoMoneda.style.display = 'block';
                 }
-                detallesMoneda.innerHTML = info;
-                infoMoneda.style.display = 'block';
+                
+                
+                // Cargar denominaciones
+                cargarDenominaciones(this.value, symbol, decimales);
             } else {
-                infoMoneda.style.display = 'none';
+                // Limpiar y deshabilitar
+                if (simboloMonedaMin) simboloMonedaMin.textContent = '-';
+                if (infoMoneda) infoMoneda.style.display = 'none';
+                if (denominacionesContainer) denominacionesContainer.style.display = 'none';
+                if (resumenOperacion) resumenOperacion.style.display = 'none';
+                if (submitBtn) submitBtn.disabled = true;
+            }
+        });
+    }
+    
+    // Función para cargar denominaciones
+    function cargarDenominaciones(monedaId, symbol, decimales) {
+        if (denominacionesCache[monedaId]) {
+            mostrarDenominaciones(denominacionesCache[monedaId], symbol, decimales);
+            return;
+        }
+        
+        // Hacer petición AJAX para obtener denominaciones
+        fetch(`/tauser/denominaciones/${monedaId}/`)
+            .then(response => response.json())
+            .then(data => {
+                denominacionesCache[monedaId] = data.denominaciones;
+                mostrarDenominaciones(data.denominaciones, symbol, decimales);
+            })
+            .catch(error => {
+                console.error('Error al cargar denominaciones:', error);
+                if (denominacionesContainer) denominacionesContainer.style.display = 'none';
+            });
+    }
+    
+    // Función para mostrar denominaciones
+    function mostrarDenominaciones(denominaciones, symbol, decimales) {
+        if (!denominacionesList || !denominacionesContainer) return;
+        
+        denominacionesList.innerHTML = '';
+        
+        if (denominaciones.length === 0) {
+            denominacionesList.innerHTML = '<div class="col-12"><div class="alert alert-warning">No hay denominaciones configuradas para esta moneda.</div></div>';
+            denominacionesContainer.style.display = 'block';
+            return;
+        }
+        
+        denominaciones.forEach(denominacion => {
+            const col = document.createElement('div');
+            col.className = 'col-md-6 col-lg-4 mb-3';
+            
+            const card = document.createElement('div');
+            card.className = 'card h-100';
+            
+            const cardBody = document.createElement('div');
+            cardBody.className = 'card-body';
+            
+            const tipoIcon = denominacion.tipo === 'BILLETE' ? 'fas fa-money-bill' : 'fas fa-coins';
+            const tipoColor = denominacion.tipo === 'BILLETE' ? 'text-success' : 'text-warning';
+            
+            cardBody.innerHTML = `
+                <div class="d-flex align-items-center mb-2">
+                    <i class="${tipoIcon} ${tipoColor} me-2"></i>
+                    <h6 class="card-title mb-0">${denominacion.mostrar_denominacion}</h6>
+                </div>
+                <div class="row">
+                    <div class="col-6">
+                        <label class="form-label small">Cantidad</label>
+                        <input type="number" 
+                               class="form-control denominacion-cantidad" 
+                               name="cantidad_${denominacion.id}"
+                               data-denominacion-id="${denominacion.id}"
+                               data-valor="${denominacion.valor}"
+                               min="0" 
+                               placeholder="0">
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted denominacion-total" data-denominacion-id="${denominacion.id}">
+                        Total: ${symbol}0.00
+                    </small>
+                </div>
+            `;
+            
+            card.appendChild(cardBody);
+            col.appendChild(card);
+            denominacionesList.appendChild(col);
+        });
+        
+        denominacionesContainer.style.display = 'block';
+        
+        // Agregar event listeners a los campos de denominaciones
+        agregarEventListenersDenominaciones(symbol, decimales);
+    }
+    
+    // Función para agregar event listeners a las denominaciones
+    function agregarEventListenersDenominaciones(symbol, decimales) {
+        const cantidadInputs = document.querySelectorAll('.denominacion-cantidad');
+        cantidadInputs.forEach(input => {
+            input.addEventListener('input', () => actualizarResumenDenominaciones(symbol, decimales));
+        });
+    }
+    
+    // Función para actualizar resumen de denominaciones
+    function actualizarResumenDenominaciones(symbol, decimales) {
+        if (!resumenOperacion || !detallesOperacion) return;
+        
+        const cantidadInputs = document.querySelectorAll('.denominacion-cantidad');
+        let totalGeneral = 0;
+        let resumen = '<strong>Detalle por denominación:</strong><br>';
+        let tieneCantidades = false;
+        
+        cantidadInputs.forEach(input => {
+            const cantidad = parseInt(input.value) || 0;
+            const denominacionId = input.getAttribute('data-denominacion-id');
+            const valor = parseFloat(input.getAttribute('data-valor'));
+            
+            if (cantidad > 0) {
+                const totalDenominacion = cantidad * valor;
+                totalGeneral += totalDenominacion;
+                resumen += `• ${cantidad} unidades × ${symbol}${valor.toFixed(decimales)} = ${symbol}${totalDenominacion.toFixed(decimales)}<br>`;
+                tieneCantidades = true;
+            }
+            
+            // Actualizar total individual
+            const totalElement = document.querySelector(`[data-denominacion-id="${denominacionId}"].denominacion-total`);
+            if (totalElement) {
+                const totalIndividual = cantidad * valor;
+                totalElement.textContent = `Total: ${symbol}${totalIndividual.toFixed(decimales)}`;
             }
         });
         
-        // Actualizar resumen cuando cambie la cantidad
-        cantidadAgregar.addEventListener('input', updateResumen);
-        cantidadMinima.addEventListener('input', updateResumen);
-        
-        function updateResumen() {
-            const selectedOption = monedaSelect.options[monedaSelect.selectedIndex];
-            if (monedaSelect.value && cantidadAgregar.value) {
-                const symbol = selectedOption.getAttribute('data-symbol') || '-';
-                const decimales = parseInt(selectedOption.getAttribute('data-decimales')) || 2;
-                const cantidadActual = parseFloat(selectedOption.getAttribute('data-cantidad-actual')) || 0;
-                const cantidadNueva = parseFloat(cantidadAgregar.value) || 0;
-                const cantidadMin = parseFloat(cantidadMinima.value) || 0;
-                
-                let resumen = `Moneda: ${selectedOption.textContent.split(' - ')[1]}<br>`;
-                resumen += `Cantidad actual: ${symbol}${cantidadActual.toFixed(decimales)}<br>`;
-                resumen += `Cantidad a agregar: ${symbol}${cantidadNueva.toFixed(decimales)}<br>`;
-                resumen += `Nueva cantidad: ${symbol}${(cantidadActual + cantidadNueva).toFixed(decimales)}<br>`;
-                if (cantidadMin > 0) {
-                    resumen += `Cantidad mínima: ${symbol}${cantidadMin.toFixed(decimales)}<br>`;
-                }
-                
-                detallesOperacion.innerHTML = resumen;
-                resumenOperacion.style.display = 'block';
-            } else {
-                resumenOperacion.style.display = 'none';
-            }
+        if (tieneCantidades) {
+            resumen += `<br><strong>Total general: ${symbol}${totalGeneral.toFixed(decimales)}</strong>`;
+            detallesOperacion.innerHTML = resumen;
+            resumenOperacion.style.display = 'block';
+            if (submitBtn) submitBtn.disabled = false;
+        } else {
+            resumenOperacion.style.display = 'none';
+            if (submitBtn) submitBtn.disabled = true;
         }
     }
     

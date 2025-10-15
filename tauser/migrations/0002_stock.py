@@ -18,7 +18,6 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('cantidad', models.DecimalField(decimal_places=2, help_text='Cantidad disponible en stock', max_digits=15, validators=[django.core.validators.MinValueValidator(0)], verbose_name='Cantidad')),
-                ('cantidad_minima', models.DecimalField(decimal_places=2, default=0, help_text='Cantidad mínima antes de alertar', max_digits=15, validators=[django.core.validators.MinValueValidator(0)], verbose_name='Cantidad Mínima')),
                 ('es_activo', models.BooleanField(default=True, help_text='Indica si este stock está activo', verbose_name='Activo')),
                 ('fecha_creacion', models.DateTimeField(auto_now_add=True, verbose_name='Fecha de Creación')),
                 ('fecha_actualizacion', models.DateTimeField(auto_now=True, verbose_name='Fecha de Actualización')),

@@ -1,6 +1,6 @@
 from django import forms
 from django.core.validators import RegexValidator
-from .models import Moneda
+from .models import Moneda, DenominacionMoneda
 
 
 class MonedaForm(forms.ModelForm):
@@ -131,3 +131,5 @@ class MonedaSearchForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-select'}),
         label='Estado'
     )
+
+

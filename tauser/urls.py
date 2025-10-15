@@ -15,6 +15,9 @@ urlpatterns = [
     path('<int:pk>/cargar-stock/', views.cargar_stock, name='cargar_stock'),
     path('<int:pk>/historial-stock/', views.historial_stock, name='historial_stock'),
     
+    # URLs para denominaciones
+    path('denominaciones/<int:moneda_id>/', views.obtener_denominaciones, name='obtener_denominaciones'),
+    
     # URLs para Simulador de Cajero Automático
     path('simulador/', views.simulador_cajero, name='simulador_cajero'),
     path('validar-transaccion/', views.validar_transaccion_retiro, name='validar_transaccion_retiro'),

@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
 from django.views.generic import ListView, CreateView, UpdateView, DetailView
 from django.urls import reverse_lazy
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
@@ -12,7 +12,7 @@ from django.db import transaction
 from django.core.paginator import Paginator
 
 
-from .models import Tauser, Stock, HistorialStock
+from .models import Tauser, Stock, HistorialStock, StockDenominacion, HistorialStockDenominacion
 from .forms import TauserForm, StockForm
 
 
@@ -100,7 +100,6 @@ class TauserDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
                 'stock': stock,
                 'tiene_stock': True,
                 'cantidad': stock.cantidad,
-                'cantidad_minima': stock.cantidad_minima,
                 'es_activo': stock.es_activo,
                 'esta_bajo_stock': stock.esta_bajo_stock(),
             })
@@ -118,7 +117,6 @@ class TauserDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
                 'stock': stock,
                 'tiene_stock': stock is not None,
                 'cantidad': stock.cantidad if stock else 0,
-                'cantidad_minima': stock.cantidad_minima if stock else 0,
                 'es_activo': stock.es_activo if stock else False,
                 'esta_bajo_stock': stock.esta_bajo_stock() if stock else False,
             })
@@ -174,75 +172,167 @@ def toggle_tauser_status(request, pk):
 @login_required
 @permission_required('tauser.add_stock', raise_exception=True)
 def cargar_stock(request, pk):
-    """Cargar/agregar stock a un tauser"""
+    """Cargar/agregar stock a un tauser por denominaciones"""
     tauser = get_object_or_404(Tauser, pk=pk)
     
     if request.method == 'POST':
         try:
             moneda_id = request.POST.get('moneda')
-            cantidad_agregar = request.POST.get('cantidad_agregar')
-            cantidad_minima = request.POST.get('cantidad_minima', 0)
             
-            if not moneda_id or not cantidad_agregar:
-                messages.error(request, 'Moneda y cantidad son requeridos.')
+            if not moneda_id:
+                messages.error(request, 'Moneda es requerida.')
                 return redirect('tauser:tauser_detail', pk=tauser.pk)
             
-            from monedas.models import Moneda
+            from monedas.models import Moneda, DenominacionMoneda
             moneda = get_object_or_404(Moneda, pk=moneda_id)
-            cantidad_agregar = float(cantidad_agregar)
-            cantidad_minima = float(cantidad_minima) if cantidad_minima else 0
             
-            if cantidad_agregar <= 0:
-                messages.error(request, 'La cantidad debe ser mayor a 0.')
+            # Obtener todas las denominaciones de la moneda seleccionada
+            denominaciones = DenominacionMoneda.objects.filter(
+                moneda=moneda, 
+                es_activa=True
+            ).order_by('-valor', 'tipo')
+            
+            if not denominaciones.exists():
+                messages.error(request, f'No hay denominaciones configuradas para {moneda.nombre}.')
+                return redirect('tauser:tauser_detail', pk=tauser.pk)
+            
+            # Procesar cantidades por denominación
+            denominaciones_con_cantidad = []
+            total_valor = 0
+            
+            for denominacion in denominaciones:
+                cantidad_key = f'cantidad_{denominacion.pk}'
+                
+                cantidad = int(request.POST.get(cantidad_key, 0) or 0)
+                
+                if cantidad > 0:
+                    valor_total = cantidad * denominacion.valor
+                    denominaciones_con_cantidad.append({
+                        'denominacion': denominacion,
+                        'cantidad': cantidad,
+                        'valor_total': valor_total
+                    })
+                    total_valor += valor_total
+            
+            if not denominaciones_con_cantidad:
+                messages.error(request, 'Debe especificar al menos una cantidad para alguna denominación.')
                 return redirect('tauser:tauser_detail', pk=tauser.pk)
             
             # Buscar si ya existe stock para esta moneda
             stock_existente = Stock.objects.filter(tauser=tauser, moneda=moneda).first()
             
             if stock_existente:
-                # Agregar cantidad al stock existente
-                resultado = stock_existente.agregar_cantidad(
-                    cantidad_agregar, 
-                    usuario=request.user,
-                    observaciones=f'Carga manual de stock'
-                )
-                if cantidad_minima > 0:
-                    stock_existente.cantidad_minima = cantidad_minima
+                # Actualizar stock existente
+                cantidad_anterior = stock_existente.cantidad
+                stock_existente.cantidad = stock_existente.cantidad + total_valor
                 stock_existente.save()
                 
-                if resultado:
-                    messages.success(request, 
-                        f'Se agregaron {moneda.simbolo}{cantidad_agregar:.{moneda.decimales}f} al stock de {moneda.nombre}. '
-                        f'Nueva cantidad: {stock_existente.mostrar_cantidad()}')
-                else:
-                    messages.error(request, 'Error al agregar cantidad al stock existente.')
+                # Registrar en historial general
+                HistorialStock.objects.create(
+                    stock=stock_existente,
+                    tipo_movimiento='ENTRADA',
+                    origen_movimiento='MANUAL',
+                    cantidad_movida=total_valor,
+                    cantidad_anterior=cantidad_anterior,
+                    cantidad_posterior=stock_existente.cantidad,
+                    usuario=request.user,
+                    observaciones=f'Carga manual por denominaciones - Total: {moneda.simbolo}{total_valor:.{moneda.decimales}f}'
+                )
                 
-                # Refrescar el objeto tauser para obtener los datos actualizados
-                tauser.refresh_from_db()
+                # Procesar cada denominación
+                for item in denominaciones_con_cantidad:
+                    denominacion = item['denominacion']
+                    cantidad = item['cantidad']
+                    
+                    # Buscar o crear stock por denominación
+                    stock_denominacion, created = StockDenominacion.objects.get_or_create(
+                        stock=stock_existente,
+                        denominacion=denominacion,
+                        defaults={
+                            'cantidad': cantidad,
+                            'es_activo': True
+                        }
+                    )
+                    
+                    if not created:
+                        # Actualizar stock existente por denominación
+                        cantidad_anterior_denom = stock_denominacion.cantidad
+                        stock_denominacion.cantidad += cantidad
+                        stock_denominacion.save()
+                        
+                        # Registrar en historial por denominación
+                        HistorialStockDenominacion.objects.create(
+                            stock_denominacion=stock_denominacion,
+                            tipo_movimiento='ENTRADA',
+                            origen_movimiento='MANUAL',
+                            cantidad_movida=cantidad,
+                            cantidad_anterior=cantidad_anterior_denom,
+                            cantidad_posterior=stock_denominacion.cantidad,
+                            usuario=request.user,
+                            observaciones='Carga manual por denominación'
+                        )
+                    else:
+                        # Registrar creación inicial
+                        HistorialStockDenominacion.objects.create(
+                            stock_denominacion=stock_denominacion,
+                            tipo_movimiento='ENTRADA',
+                            origen_movimiento='MANUAL',
+                            cantidad_movida=cantidad,
+                            cantidad_anterior=0,
+                            cantidad_posterior=cantidad,
+                            usuario=request.user,
+                            observaciones='Creación inicial por denominación'
+                        )
+                
+                messages.success(request, 
+                    f'Stock actualizado para {moneda.nombre}. Nuevo total: {moneda.simbolo}{stock_existente.cantidad:.{moneda.decimales}f}')
             else:
-                # Crear nuevo stock (siempre activo por defecto)
+                # Crear nuevo stock
                 nuevo_stock = Stock.objects.create(
                     tauser=tauser,
                     moneda=moneda,
-                    cantidad=cantidad_agregar,
-                    cantidad_minima=cantidad_minima,
+                    cantidad=total_valor,
                     es_activo=True
                 )
                 
-                # Registrar en historial la creación del stock
+                # Registrar en historial general
                 HistorialStock.objects.create(
                     stock=nuevo_stock,
                     tipo_movimiento='ENTRADA',
                     origen_movimiento='MANUAL',
-                    cantidad_movida=cantidad_agregar,
+                    cantidad_movida=total_valor,
                     cantidad_anterior=0,
-                    cantidad_posterior=cantidad_agregar,
+                    cantidad_posterior=total_valor,
                     usuario=request.user,
-                    observaciones='Creación inicial de stock'
+                    observaciones=f'Creación inicial por denominaciones - Total: {moneda.simbolo}{total_valor:.{moneda.decimales}f}'
                 )
                 
+                # Crear stock por denominación
+                for item in denominaciones_con_cantidad:
+                    denominacion = item['denominacion']
+                    cantidad = item['cantidad']
+                    
+                    stock_denominacion = StockDenominacion.objects.create(
+                        stock=nuevo_stock,
+                        denominacion=denominacion,
+                        cantidad=cantidad,
+                        es_activo=True
+                    )
+                    
+                    # Registrar en historial por denominación
+                    HistorialStockDenominacion.objects.create(
+                        stock_denominacion=stock_denominacion,
+                        tipo_movimiento='ENTRADA',
+                        origen_movimiento='MANUAL',
+                        cantidad_movida=cantidad,
+                        cantidad_anterior=0,
+                        cantidad_posterior=cantidad,
+                        usuario=request.user,
+                        observaciones='Creación inicial por denominación'
+                    )
+                
                 messages.success(request, 
-                    f'Stock creado para {moneda.nombre} con {moneda.simbolo}{cantidad_agregar:.{moneda.decimales}f}')
+                    f'Stock creado para {moneda.nombre} con {moneda.simbolo}{total_valor:.{moneda.decimales}f}')
             
             # Refrescar el objeto tauser para obtener los datos actualizados
             tauser.refresh_from_db()
@@ -256,6 +346,36 @@ def cargar_stock(request, pk):
             return redirect('tauser:tauser_detail', pk=tauser.pk)
     
     return redirect('tauser:tauser_detail', pk=tauser.pk)
+
+
+@login_required
+def obtener_denominaciones(request, moneda_id):
+    """Vista AJAX para obtener denominaciones de una moneda"""
+    try:
+        from monedas.models import DenominacionMoneda
+        
+        denominaciones = DenominacionMoneda.objects.filter(
+            moneda_id=moneda_id,
+            es_activa=True
+        ).order_by('-valor', 'tipo')
+        
+        denominaciones_data = []
+        for denominacion in denominaciones:
+            denominaciones_data.append({
+                'id': denominacion.pk,
+                'valor': float(denominacion.valor),
+                'tipo': denominacion.tipo,
+                'mostrar_denominacion': denominacion.mostrar_denominacion(),
+                'es_activa': denominacion.es_activa
+            })
+        
+        return JsonResponse({
+            'denominaciones': denominaciones_data
+        })
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
 
 
 @login_required
@@ -395,7 +515,6 @@ def validar_transaccion_retiro(request):
             'stock_disponible': {
                 'cantidad': float(stock.cantidad),
                 'cantidad_formateada': stock.mostrar_cantidad(),
-                'cantidad_minima': float(stock.cantidad_minima),
                 'esta_bajo_stock': stock.esta_bajo_stock()
             }
         })
@@ -565,6 +684,12 @@ def historial_stock(request, pk):
     if fecha_hasta:
         historial = historial.filter(fecha_movimiento__date__lte=fecha_hasta)
     
+    # Calcular totales (número de movimientos, no suma de cantidades)
+    total_entradas = historial.filter(tipo_movimiento='ENTRADA').count()
+    total_salidas = historial.filter(tipo_movimiento='SALIDA').count()
+    total_manuales = historial.filter(origen_movimiento='MANUAL').count()
+    total_transacciones = historial.filter(origen_movimiento='TRANSACCION').count()
+    
     # Paginación
     paginator = Paginator(historial, 50)  # 50 registros por página
     page_number = request.GET.get('page')
@@ -574,6 +699,10 @@ def historial_stock(request, pk):
         'titulo': f'Historial de Stock - {tauser.nombre}',
         'tauser': tauser,
         'page_obj': page_obj,
+        'total_entradas': total_entradas,
+        'total_salidas': total_salidas,
+        'total_manuales': total_manuales,
+        'total_transacciones': total_transacciones,
         'tipo_movimiento_choices': HistorialStock.TIPO_MOVIMIENTO_CHOICES,
         'origen_movimiento_choices': HistorialStock.ORIGEN_MOVIMIENTO_CHOICES,
         'filtros': {

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load moneda_extras %}
 
 {% block title %}{{ titulo }} - Monedas{% endblock %}
 
@@ -50,6 +51,59 @@
           {% endif %}
         </div>
 
+        <!-- Sección de Denominaciones -->
+        <div class="mt-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">
+              <i class="fas fa-coins me-2"></i>Denominaciones
+            </h5>
+            <button type="button" class="btn btn-success btn-sm" id="agregar-denominacion">
+              <i class="fas fa-plus me-2"></i>Agregar Denominación
+            </button>
+          </div>
+          
+          <div id="denominaciones-container">
+            {% if denominaciones %}
+              {% for denominacion in denominaciones %}
+              <div class="denominacion-item mb-3 p-3 border rounded">
+                <div class="row align-items-center">
+                  <div class="col-md-5">
+                    <label class="form-label">Valor</label>
+                    <input type="number" 
+                           class="form-control denominacion-valor" 
+                           name="denominaciones_valor[]" 
+                           value="{{ denominacion.valor|formatear_denominacion_sin_decimales:denominacion.tipo }}" 
+                           step="0.01" 
+                           min="0" 
+                           placeholder="Ej: 100"
+                           required>
+                    <small class="form-text text-muted">{{ denominacion|formatear_denominacion_con_tipo }}</small>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Tipo</label>
+                    <select class="form-select denominacion-tipo" name="denominaciones_tipo[]">
+                      <option value="BILLETE" {% if denominacion.tipo == 'BILLETE' %}selected{% endif %}>Billete</option>
+                      <option value="MONEDA" {% if denominacion.tipo == 'MONEDA' %}selected{% endif %}>Moneda</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3 text-end">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="button" class="btn btn-outline-danger btn-sm eliminar-denominacion" title="Eliminar">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            {% else %}
+              <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                No hay denominaciones configuradas. Haz clic en "Agregar Denominación" para comenzar.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
         <div class="d-flex justify-content-end mt-4">
           <a href="{% url 'monedas:moneda_list' %}" class="btn btn-outline-secondary me-2">Cancelar</a>
           <button type="submit" class="btn btn-primary">{{ accion }}</button>
@@ -58,4 +112,94 @@
     </div>
   </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('denominaciones-container');
+    const agregarBtn = document.getElementById('agregar-denominacion');
+    let denominacionCount = container.querySelectorAll('.denominacion-item').length;
+    
+    // Los valores ya están formateados correctamente por el filtro personalizado
+    
+    // Función para agregar nueva denominación
+    agregarBtn.addEventListener('click', function() {
+        const denominacionHtml = `
+            <div class="denominacion-item mb-3 p-3 border rounded">
+                <div class="row align-items-center">
+                    <div class="col-md-5">
+                        <label class="form-label">Valor</label>
+                        <input type="number" 
+                               class="form-control denominacion-valor" 
+                               name="denominaciones_valor[]" 
+                               step="0.01" 
+                               min="0" 
+                               placeholder="Ej: 100"
+                               required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Tipo</label>
+                        <select class="form-select denominacion-tipo" name="denominaciones_tipo[]">
+                            <option value="BILLETE">Billete</option>
+                            <option value="MONEDA">Moneda</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 text-end">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="button" class="btn btn-outline-danger btn-sm eliminar-denominacion" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remover mensaje de "no hay denominaciones" si existe
+        const alertInfo = container.querySelector('.alert-info');
+        if (alertInfo) {
+            alertInfo.remove();
+        }
+        
+        container.insertAdjacentHTML('beforeend', denominacionHtml);
+        denominacionCount++;
+        
+        // Agregar event listener al nuevo botón eliminar
+        const newItem = container.lastElementChild;
+        const eliminarBtn = newItem.querySelector('.eliminar-denominacion');
+        eliminarBtn.addEventListener('click', function() {
+            newItem.remove();
+            denominacionCount--;
+            
+            // Si no hay más denominaciones, mostrar mensaje
+            if (container.querySelectorAll('.denominacion-item').length === 0) {
+                container.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        No hay denominaciones configuradas. Haz clic en "Agregar Denominación" para comenzar.
+                    </div>
+                `;
+            }
+        });
+    });
+    
+    // Event listeners para botones eliminar existentes
+    container.addEventListener('click', function(e) {
+        if (e.target.closest('.eliminar-denominacion')) {
+            const item = e.target.closest('.denominacion-item');
+            item.remove();
+            denominacionCount--;
+            
+            // Si no hay más denominaciones, mostrar mensaje
+            if (container.querySelectorAll('.denominacion-item').length === 0) {
+                container.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        No hay denominaciones configuradas. Haz clic en "Agregar Denominación" para comenzar.
+                    </div>
+                `;
+            }
+        }
+    });
+});
+</script>
+
 {% endblock %}

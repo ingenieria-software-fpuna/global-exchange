@@ -88,7 +88,6 @@ def test_stock_system():
     print(f"Tauser: {stock.tauser.nombre}")
     print(f"Moneda: {stock.moneda.nombre} ({stock.moneda.codigo})")
     print(f"Cantidad: {stock.mostrar_cantidad()}")
-    print(f"Cantidad mínima: {stock.moneda.mostrar_monto(stock.cantidad_minima)}")
     print(f"¿Está bajo stock?: {'Sí' if stock.esta_bajo_stock() else 'No'}")
     print(f"Estado: {'Activo' if stock.es_activo else 'Inactivo'}")
     
