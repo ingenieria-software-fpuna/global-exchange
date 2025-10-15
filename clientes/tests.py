@@ -771,5 +771,109 @@ class ClienteActionsColumnTestCase(TestCase):
         self.assertFalse(context['can_edit_cliente'])
 
 
+class ClienteOperadorRoleTestCase(TestCase):
+    """Tests para verificar la asignación automática del rol Operador"""
+    
+    def setUp(self):
+        """Configurar datos de prueba"""
+        from django.contrib.auth.models import Group
+        from usuarios.models import Usuario
+        
+        # Crear tipo de cliente
+        self.tipo_cliente = TipoCliente.objects.create(
+            nombre='Tipo Test',
+            descuento=Decimal('5.00'),
+            activo=True
+        )
+        
+        # Crear grupo Operador
+        self.grupo_operador = Group.objects.create(name='Operador')
+        
+        # Crear usuarios
+        self.usuario1 = Usuario.objects.create_user(
+            email='usuario1@test.com',
+            nombre='Usuario',
+            apellido='Uno',
+            password='test123'
+        )
+        
+        self.usuario2 = Usuario.objects.create_user(
+            email='usuario2@test.com',
+            nombre='Usuario',
+            apellido='Dos',
+            password='test123'
+        )
+        
+        # Crear clientes
+        self.cliente1 = Cliente.objects.create(
+            nombre_comercial='Cliente Test 1',
+            ruc='12345678',
+            tipo_cliente=self.tipo_cliente,
+            activo=True
+        )
+        
+        self.cliente2 = Cliente.objects.create(
+            nombre_comercial='Cliente Test 2',
+            ruc='87654321',
+            tipo_cliente=self.tipo_cliente,
+            activo=True
+        )
+    
+    def test_asignar_cliente_agrega_rol_operador(self):
+        """Test que al asignar un cliente a un usuario se le agrega el rol Operador"""
+        # Verificar que el usuario no tiene el rol
+        self.assertFalse(self.usuario1.groups.filter(name='Operador').exists())
+        
+        # Asignar cliente al usuario
+        self.cliente1.usuarios_asociados.add(self.usuario1)
+        
+        # Verificar que ahora tiene el rol
+        self.assertTrue(self.usuario1.groups.filter(name='Operador').exists())
+    
+    def test_quitar_ultimo_cliente_quita_rol_operador(self):
+        """Test que al quitar el último cliente asignado se quita el rol Operador"""
+        # Asignar cliente al usuario
+        self.cliente1.usuarios_asociados.add(self.usuario1)
+        self.assertTrue(self.usuario1.groups.filter(name='Operador').exists())
+        
+        # Quitar el cliente
+        self.cliente1.usuarios_asociados.remove(self.usuario1)
+        
+        # Verificar que ya no tiene el rol
+        self.assertFalse(self.usuario1.groups.filter(name='Operador').exists())
+    
+    def test_quitar_un_cliente_mantiene_rol_si_tiene_otros(self):
+        """Test que al quitar un cliente pero tener otros asignados, se mantiene el rol"""
+        # Asignar dos clientes al usuario
+        self.cliente1.usuarios_asociados.add(self.usuario1)
+        self.cliente2.usuarios_asociados.add(self.usuario1)
+        self.assertTrue(self.usuario1.groups.filter(name='Operador').exists())
+        
+        # Quitar uno de los clientes
+        self.cliente1.usuarios_asociados.remove(self.usuario1)
+        
+        # Verificar que aún tiene el rol porque tiene otro cliente
+        self.assertTrue(self.usuario1.groups.filter(name='Operador').exists())
+        
+        # Quitar el último cliente
+        self.cliente2.usuarios_asociados.remove(self.usuario1)
+        
+        # Ahora sí debe perder el rol
+        self.assertFalse(self.usuario1.groups.filter(name='Operador').exists())
+    
+    def test_clear_usuarios_asociados_quita_rol(self):
+        """Test que al limpiar todos los usuarios asociados se quita el rol Operador"""
+        # Asignar cliente al usuario
+        self.cliente1.usuarios_asociados.add(self.usuario1)
+        self.assertTrue(self.usuario1.groups.filter(name='Operador').exists())
+        
+        # Limpiar todos los usuarios asociados
+        self.cliente1.usuarios_asociados.clear()
+        
+        # Verificar que ya no tiene el rol
+        self.assertFalse(self.usuario1.groups.filter(name='Operador').exists())
+
+
+
 
 
