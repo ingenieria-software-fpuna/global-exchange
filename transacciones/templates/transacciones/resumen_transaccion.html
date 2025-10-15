@@ -40,6 +40,38 @@
       </div>
       {% endif %}
 
+      <!-- Observaciones (si las hay) -->
+      {% if transaccion.observaciones %}
+        {% if transaccion.estado.codigo == 'PAGADA' %}
+        <div class="alert alert-success mb-4" style="border-left: 4px solid #198754;">
+          <h5 class="alert-heading mb-2">
+            <i class="fas fa-check-circle"></i> Observaciones
+          </h5>
+          <p class="mb-0" style="font-size: 1.1rem;">
+            {{ transaccion.observaciones }}
+          </p>
+        </div>
+        {% elif transaccion.estado.codigo == 'CANCELADA' or transaccion.estado.codigo == 'ANULADA' %}
+        <div class="alert alert-danger mb-4" style="border-left: 4px solid #dc3545;">
+          <h5 class="alert-heading mb-2">
+            <i class="fas fa-exclamation-circle"></i> Observaciones
+          </h5>
+          <p class="mb-0" style="font-size: 1.1rem;">
+            {{ transaccion.observaciones }}
+          </p>
+        </div>
+        {% else %}
+        <div class="alert alert-warning mb-4" style="border-left: 4px solid #ffc107;">
+          <h5 class="alert-heading mb-2">
+            <i class="fas fa-exclamation-triangle"></i> Observaciones
+          </h5>
+          <p class="mb-0" style="font-size: 1.1rem;">
+            {{ transaccion.observaciones }}
+          </p>
+        </div>
+        {% endif %}
+      {% endif %}
+      
       <!-- Detalles de la operación -->
       <div class="card shadow-sm mb-4">
         <div class="card-header">
@@ -49,6 +81,13 @@
           <div class="row">
             <div class="col-md-6">
               <p><strong>Tipo:</strong> {{ transaccion.tipo_operacion.nombre }}</p>
+              <p><strong>Moneda:</strong> 
+                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
+                  {{ transaccion.moneda_origen.nombre }} ({{ transaccion.moneda_origen.codigo }})
+                {% else %}
+                  {{ transaccion.moneda_destino.nombre }} ({{ transaccion.moneda_destino.codigo }})
+                {% endif %}
+              </p>
               <p><strong>Fecha:</strong> {{ transaccion.fecha_creacion|date:"d/m/Y H:i" }}</p>
               {% if transaccion.cliente %}
                 <p><strong>Cliente:</strong> {{ transaccion.cliente.nombre_comercial }}</p>
@@ -196,9 +235,9 @@
         <div class="card-body text-center">
           {% if puede_pagar %}
             <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-              <form method="post" action="{% url 'transacciones:procesar_pago' transaccion.id_transaccion %}" class="me-md-2">
+              <form id="form-procesar-pago" method="post" action="{% url 'transacciones:procesar_pago' transaccion.id_transaccion %}" class="me-md-2">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-success btn-lg" onclick="return confirm('¿Confirma que desea procesar el pago de esta transacción?')">
+                <button type="button" class="btn btn-success btn-lg" id="btn-procesar-pago">
                   <i class="fas fa-credit-card me-2"></i>
                   Procesar Pago
                 </button>
@@ -232,7 +271,7 @@
           <div class="mt-3">
             <a href="{% url 'tasa_cambio:dashboard' %}" class="btn btn-outline-primary">
               <i class="fas fa-arrow-left me-2"></i>
-              Volver al Dashboard
+              Ir al Simulador
             </a>
             {% if transaccion.estado.codigo == 'PAGADA' %}
             <a href="{% url 'tauser:simulador_cajero' %}" class="btn btn-success ms-2">
@@ -256,6 +295,70 @@
       </div>
       {% endif %}
 
+    </div>
+  </div>
+</div>
+
+<!-- Modal de confirmación para cambio de cotización -->
+<div class="modal fade" id="modalCambioCotizacion" tabindex="-1" aria-labelledby="modalCambioCotizacionLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="modalCambioCotizacionLabel">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          Cambio de Cotización Detectado
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning">
+          <h6><i class="fas fa-info-circle me-2"></i>La cotización ha cambiado</h6>
+          <p class="mb-0">La cotización de <strong id="modal-moneda"></strong> ha sido actualizada desde que iniciaste esta transacción.</p>
+        </div>
+
+        <div class="row">
+          <div class="col-md-6">
+            <div class="card border-danger">
+              <div class="card-header bg-danger text-white">
+                <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Cotización Original</h6>
+              </div>
+              <div class="card-body">
+                <p class="mb-1"><strong>Tasa:</strong> <span id="modal-tasa-original"></span></p>
+                <p class="mb-1"><strong>Monto a pagar:</strong> <span id="modal-monto-origen-original"></span></p>
+                <p class="mb-0"><strong>Monto a recibir:</strong> <span id="modal-monto-destino-original"></span></p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card border-success">
+              <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Nueva Cotización</h6>
+              </div>
+              <div class="card-body">
+                <p class="mb-1"><strong>Tasa:</strong> <span id="modal-tasa-nueva"></span></p>
+                <p class="mb-1"><strong>Monto a pagar:</strong> <span id="modal-monto-origen-nuevo"></span></p>
+                <p class="mb-0"><strong>Monto a recibir:</strong> <span id="modal-monto-destino-nuevo"></span></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <p><strong>¿Qué deseas hacer?</strong></p>
+          <ul>
+            <li><strong>Continuar:</strong> Se creará una nueva transacción con la cotización actualizada</li>
+            <li><strong>Cancelar:</strong> Se cancelará la transacción actual sin procesar el pago</li>
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn-cancelar-transaccion-modal">
+          <i class="fas fa-times me-2"></i>Cancelar Transacción
+        </button>
+        <button type="button" class="btn btn-success" id="btn-continuar-nueva-cotizacion">
+          <i class="fas fa-check me-2"></i>Continuar con Nueva Cotización
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -345,6 +448,199 @@
   // Iniciar el temporizador
   actualizarTemporizador();
 })();
+</script>
+{% endif %}
+
+<!-- Script para manejar el modal de cambio de cotización -->
+{% if transaccion.estado.codigo == 'PENDIENTE' and puede_pagar %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const btnProcesarPago = document.getElementById('btn-procesar-pago');
+    const formProcesarPago = document.getElementById('form-procesar-pago');
+    const modalCambioCotizacion = new bootstrap.Modal(document.getElementById('modalCambioCotizacion'));
+    const btnContinuarNuevaCotizacion = document.getElementById('btn-continuar-nueva-cotizacion');
+    const btnCancelarTransaccionModal = document.getElementById('btn-cancelar-transaccion-modal');
+    
+    if (btnProcesarPago) {
+        btnProcesarPago.addEventListener('click', function() {
+            // Verificar si hay cambio de cotización antes de procesar el pago
+            verificarCambioCotizacion();
+        });
+    }
+    
+    if (btnContinuarNuevaCotizacion) {
+        btnContinuarNuevaCotizacion.addEventListener('click', function() {
+            // Crear nueva transacción con la nueva cotización
+            crearNuevaTransaccion();
+        });
+    }
+    
+    if (btnCancelarTransaccionModal) {
+        btnCancelarTransaccionModal.addEventListener('click', function() {
+            // Cancelar la transacción actual
+            cancelarTransaccionDesdeModal();
+        });
+    }
+    
+    function verificarCambioCotizacion() {
+        // Mostrar loading en el botón
+        btnProcesarPago.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Verificando...';
+        btnProcesarPago.disabled = true;
+        
+        const url = '{% url "transacciones:verificar_cambio_cotizacion" transaccion.id_transaccion %}';
+        console.log('Haciendo petición a:', url);
+        
+        // Hacer petición AJAX para verificar si hay cambio de cotización
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Respuesta del servidor:', data); // Para debug
+            if (data.success) {
+                if (data.hay_cambio) {
+                    // Hay cambio de cotización, mostrar modal
+                    mostrarModalCambioCotizacion(data);
+                } else {
+                    // No hay cambio, proceder con el pago normalmente
+                    if (confirm('¿Confirma que desea procesar el pago de esta transacción?')) {
+                        formProcesarPago.submit();
+                    } else {
+                        restaurarBotonProcesarPago();
+                    }
+                }
+            } else {
+                alert('Error al verificar la cotización: ' + (data.error || data.message || 'Error desconocido'));
+                restaurarBotonProcesarPago();
+            }
+        })
+        .catch(error => {
+            console.error('Error completo:', error);
+            alert('Error de conexión al verificar la cotización: ' + error.message);
+            restaurarBotonProcesarPago();
+        });
+    }
+    
+    function mostrarModalCambioCotizacion(data) {
+        // Rellenar los datos del modal
+        document.getElementById('modal-moneda').textContent = data.moneda_nombre;
+        document.getElementById('modal-tasa-original').textContent = data.tasa_original + ' Gs.';
+        document.getElementById('modal-monto-origen-original').textContent = data.monto_origen_original + ' Gs.';
+        document.getElementById('modal-monto-destino-original').textContent = data.monto_destino_original + ' ' + data.moneda_simbolo;
+        
+        document.getElementById('modal-tasa-nueva').textContent = data.tasa_nueva + ' Gs.';
+        document.getElementById('modal-monto-origen-nuevo').textContent = data.monto_origen_nuevo + ' Gs.';
+        document.getElementById('modal-monto-destino-nuevo').textContent = data.monto_destino_nuevo + ' ' + data.moneda_simbolo;
+        
+        // Guardar datos para crear nueva transacción
+        btnContinuarNuevaCotizacion.setAttribute('data-transaccion-datos', JSON.stringify(data.nueva_transaccion_datos));
+        
+        restaurarBotonProcesarPago();
+        modalCambioCotizacion.show();
+    }
+    
+    function crearNuevaTransaccion() {
+        const datos = JSON.parse(btnContinuarNuevaCotizacion.getAttribute('data-transaccion-datos'));
+        console.log('Datos a enviar:', datos); // Para debug
+        
+        // Mostrar loading en el botón
+        btnContinuarNuevaCotizacion.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creando nueva transacción...';
+        btnContinuarNuevaCotizacion.disabled = true;
+        
+        const url = '{% url "transacciones:crear_con_nueva_cotizacion" transaccion.id_transaccion %}';
+        console.log('URL para crear nueva transacción:', url);
+        
+        // Hacer petición para crear nueva transacción
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(datos)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Respuesta crear nueva transacción:', data); // Para debug
+            if (data.success) {
+                // Redirigir a la nueva transacción
+                window.location.href = data.redirect_url;
+            } else {
+                alert('Error al crear la nueva transacción: ' + (data.error || data.message || 'Error desconocido'));
+                btnContinuarNuevaCotizacion.innerHTML = '<i class="fas fa-check me-2"></i>Continuar con Nueva Cotización';
+                btnContinuarNuevaCotizacion.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error completo:', error);
+            alert('Error de conexión al crear la nueva transacción: ' + error.message);
+            btnContinuarNuevaCotizacion.innerHTML = '<i class="fas fa-check me-2"></i>Continuar con Nueva Cotización';
+            btnContinuarNuevaCotizacion.disabled = false;
+        });
+    }
+    
+    function cancelarTransaccionDesdeModal() {
+        // Confirmar que el usuario realmente quiere cancelar
+        if (!confirm('¿Está seguro que desea cancelar esta transacción definitivamente?')) {
+            return;
+        }
+        
+        // Mostrar loading en el botón
+        btnCancelarTransaccionModal.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Cancelando...';
+        btnCancelarTransaccionModal.disabled = true;
+        
+        // Hacer petición POST para cancelar la transacción por cambio de cotización
+        fetch('{% url "transacciones:cancelar_por_cambio_cotizacion" transaccion.id_transaccion %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Cancelación exitosa, cerrar modal y recargar página
+                modalCambioCotizacion.hide();
+                alert('Transacción cancelada por cambio de cotización');
+                location.reload();
+            } else {
+                throw new Error(data.error || 'Error desconocido');
+            }
+        })
+        .catch(error => {
+            console.error('Error al cancelar:', error);
+            alert('Error al cancelar la transacción: ' + error.message);
+            // Restaurar botón
+            btnCancelarTransaccionModal.innerHTML = '<i class="fas fa-times me-2"></i>Cancelar Transacción';
+            btnCancelarTransaccionModal.disabled = false;
+        });
+    }
+    
+    function restaurarBotonProcesarPago() {
+        btnProcesarPago.innerHTML = '<i class="fas fa-credit-card me-2"></i>Procesar Pago';
+        btnProcesarPago.disabled = false;
+    }
+});
 </script>
 {% endif %}
 

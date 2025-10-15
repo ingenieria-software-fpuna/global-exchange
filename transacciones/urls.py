@@ -17,4 +17,7 @@ urlpatterns = [
     path('procesar-pago/<str:transaccion_id>/', views.procesar_pago, name='procesar_pago'),
     path('cancelar/<str:transaccion_id>/', views.cancelar_transaccion, name='cancelar_transaccion'),
     path('cancelar-por-expiracion/<str:transaccion_id>/', views.cancelar_por_expiracion, name='cancelar_por_expiracion'),
+    path('verificar-cambio-cotizacion/<str:transaccion_id>/', views.verificar_cambio_cotizacion, name='verificar_cambio_cotizacion'),
+    path('crear-con-nueva-cotizacion/<str:transaccion_id>/', views.crear_con_nueva_cotizacion, name='crear_con_nueva_cotizacion'),
+    path('cancelar-por-cambio-cotizacion/<str:transaccion_id>/', views.cancelar_por_cambio_cotizacion, name='cancelar_por_cambio_cotizacion'),
 ]
