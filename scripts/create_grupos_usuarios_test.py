@@ -54,12 +54,12 @@ def crear_grupos_ejemplo():
         {
             'nombre': 'Analista',
             'descripcion': 'Acceso completo a monedas, tasas, transacciones, métodos de pago/cobro, clientes y configuraciones del sistema',
-            'apps_completas': ['monedas', 'tasa_cambio', 'transacciones', 'metodo_cobro', 'metodo_pago', 'clientes', 'configuracion']
+            'apps_completas': ['tasa_cambio', 'configuracion']
         },
         {
             'nombre': 'Operador',
             'descripcion': 'Acceso de solo lectura a clientes, métodos de pago/cobro, tasas de cambio y transacciones',
-            'apps_solo_lectura': ['clientes', 'metodo_cobro', 'metodo_pago', 'tasa_cambio', 'transacciones'],
+            'apps_solo_lectura': ['clientes', 'tasa_cambio', 'transacciones'],
             'permisos_excluidos': ['view_tipocliente', 'can_view_all_clients', 'can_view_sensitive_columns']
         },
         {
