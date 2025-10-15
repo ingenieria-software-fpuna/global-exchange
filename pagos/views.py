@@ -1,0 +1,395 @@
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.http import JsonResponse, Http404
+from django.urls import reverse
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import ListView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.utils import timezone
+from django.db import transaction
+from django.db.models import Q, Count
+from decimal import Decimal, ROUND_HALF_UP
+import json
+from datetime import datetime, date
+
+from transacciones.models import Transaccion, TipoOperacion, EstadoTransaccion
+from .models import PagoPasarela
+from .forms import BilleteraElectronicaForm, TarjetaDebitoForm, TransferenciaBancariaForm
+from .services import PasarelaService
+from monedas.models import Moneda
+from metodo_pago.models import MetodoPago
+from metodo_cobro.models import MetodoCobro
+from clientes.models import Cliente
+from tasa_cambio.models import TasaCambio
+from configuracion.models import ConfiguracionSistema
+from django.db.models import Sum
+from datetime import datetime, timedelta
+
+# ============================================================================
+# FUNCIONES AUXILIARES PARA PAGOS CON PASARELA
+# ============================================================================
+
+def _procesar_pago_con_pasarela(request, transaccion, datos_formulario, nombre_metodo, datos_adicionales=None):
+    """
+    Función auxiliar para procesar pagos a través de la pasarela.
+    
+    Args:
+        request: HttpRequest objeto
+        transaccion: Objeto Transaccion
+        datos_formulario: Datos del formulario validado
+        nombre_metodo: Nombre del método de pago (ej: "Billetera Electrónica")
+        datos_adicionales: Datos adicionales para enviar a la pasarela
+        
+    Returns:
+        HttpResponse: Redirección al resumen o template con error
+    """
+    try:
+        with transaction.atomic():
+            # Inicializar servicio de pasarela
+            pasarela_service = PasarelaService()
+            
+            # Determinar el monto según el tipo de operación
+            if transaccion.tipo_operacion.codigo == 'VENTA':
+                # En ventas, el cliente paga el monto en PYG (moneda_destino)
+                monto_pago = float(transaccion.monto_destino)
+                moneda_pago = transaccion.moneda_destino.codigo
+            else:
+                # En compras, el cliente paga el monto en PYG (moneda_origen)
+                monto_pago = float(transaccion.monto_origen)
+                moneda_pago = transaccion.moneda_origen.codigo
+            
+            # Preparar datos adicionales
+            datos_pago = datos_adicionales or {}
+            datos_pago.update({
+                'transaccion_id': transaccion.id_transaccion,
+                'metodo_cobro_original': nombre_metodo,
+                'procesado_por': request.user.email,
+            })
+            
+            # Enviar pago a la pasarela
+            resultado = pasarela_service.procesar_pago(
+                monto=monto_pago,
+                metodo_cobro=transaccion.metodo_cobro.nombre,
+                moneda=moneda_pago,
+                escenario="exito",  # Por defecto, simular éxito
+                datos_adicionales=datos_pago
+            )
+            
+            if resultado['success']:
+                # Crear registro del pago en pasarela
+                pago_pasarela = PagoPasarela.objects.create(
+                    transaccion=transaccion,
+                    id_pago_externo=resultado['data']['id_pago'],
+                    monto=monto_pago,
+                    metodo_pasarela=pasarela_service._mapear_metodo(transaccion.metodo_cobro.nombre),
+                    moneda=moneda_pago,
+                    estado=resultado['data']['estado'],
+                    datos_pago=datos_pago,
+                    respuesta_pasarela=resultado['data'],
+                    fecha_procesamiento=timezone.now()
+                )
+                
+                # Si el pago fue exitoso, actualizar la transacción
+                if resultado['data']['estado'] == 'exito':
+                    estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
+                    transaccion.estado = estado_pagada
+                    transaccion.fecha_pago = timezone.now()
+                    
+                    # Agregar información a las observaciones
+                    transaccion.observaciones += f"\nPago procesado con {nombre_metodo} el {timezone.now()} por {request.user.email}"
+                    transaccion.observaciones += f"\nID Pago Pasarela: {resultado['data']['id_pago']}"
+                    if datos_adicionales:
+                        for key, value in datos_adicionales.items():
+                            if key not in ['pin_autorizado']:  # Excluir datos sensibles
+                                transaccion.observaciones += f"\n{key}: {value}"
+                    
+                    transaccion.save()
+                    
+                    messages.success(request, f'¡Pago procesado exitosamente con {nombre_metodo.lower()}!')
+                else:
+                    # Pago pendiente o fallido
+                    messages.warning(request, f'El pago está {resultado["data"]["estado"]}. Se le notificará cuando se complete.')
+                
+                return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion.id_transaccion)
+                
+            else:
+                # Error en la pasarela
+                error_msg = resultado.get('error', 'Error desconocido en la pasarela')
+                
+                # Crear registro del intento fallido
+                PagoPasarela.objects.create(
+                    transaccion=transaccion,
+                    id_pago_externo=f"ERROR-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                    monto=monto_pago,
+                    metodo_pasarela=pasarela_service._mapear_metodo(transaccion.metodo_cobro.nombre),
+                    moneda=moneda_pago,
+                    estado='fallo',
+                    datos_pago=datos_pago,
+                    mensaje_error=error_msg
+                )
+                
+                if resultado.get('error_type') == 'connection_error':
+                    messages.error(request, 'No se pudo conectar con la pasarela de pagos. Por favor, intente más tarde.')
+                elif resultado.get('error_type') == 'timeout':
+                    messages.error(request, 'La pasarela de pagos no respondió a tiempo. Por favor, intente más tarde.')
+                else:
+                    messages.error(request, f'Error al procesar el pago: {error_msg}')
+                
+                # No redirigir, permanecer en la página para reintento
+                return None
+                
+    except Exception as e:
+        messages.error(request, f'Error inesperado al procesar el pago: {str(e)}')
+        return None
+
+
+# ============================================================================
+# VISTAS PARA PROCESAMIENTO DE PAGOS POR MÉTODO DE COBRO
+# ============================================================================
+
+@login_required
+def pago_billetera_electronica(request, transaccion_id):
+    """
+    Vista para procesar pago con billetera electrónica.
+    """
+    transaccion = get_object_or_404(
+        Transaccion.objects.select_related(
+            'cliente', 'usuario', 'metodo_cobro', 'moneda_origen', 'moneda_destino'
+        ),
+        id_transaccion=transaccion_id
+    )
+    
+    # Verificar permisos
+    if transaccion.usuario != request.user:
+        if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+            raise Http404("Transacción no encontrada")
+    
+    # Verificar que la transacción esté pendiente
+    if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
+        messages.error(request, 'Esta transacción ya no se puede procesar.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+    
+    if transaccion.esta_expirada():
+        transaccion.cancelar_por_expiracion()
+        messages.error(request, 'La transacción ha expirado y fue cancelada automáticamente.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+    if request.method == 'POST':
+        form = BilleteraElectronicaForm(request.POST)
+        if form.is_valid():
+            # Procesar el pago a través de la pasarela
+            resultado = _procesar_pago_con_pasarela(
+                request, 
+                transaccion, 
+                form.cleaned_data, 
+                'Billetera Electrónica',
+                datos_adicionales={
+                    'telefono': form.cleaned_data['numero_telefono'],
+                    'pin_autorizado': True  # No enviamos el PIN real por seguridad
+                }
+            )
+            
+            # Si hay resultado, redirigir (éxito o error manejado)
+            if resultado:
+                return resultado
+    else:
+        form = BilleteraElectronicaForm()
+    
+    context = {
+        'transaccion': transaccion,
+        'form': form,
+        'tiempo_restante': (transaccion.fecha_expiracion - timezone.now()).total_seconds() if not transaccion.esta_expirada() else 0,
+    }
+    
+    return render(request, 'pagos/pago_billetera_electronica.html', context)
+
+
+@login_required
+def pago_tarjeta_debito(request, transaccion_id):
+    """
+    Vista para procesar pago con tarjeta de débito.
+    """
+    transaccion = get_object_or_404(
+        Transaccion.objects.select_related(
+            'cliente', 'usuario', 'metodo_cobro', 'moneda_origen', 'moneda_destino'
+        ),
+        id_transaccion=transaccion_id
+    )
+    
+    # Verificar permisos
+    if transaccion.usuario != request.user:
+        if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+            raise Http404("Transacción no encontrada")
+    
+    # Verificar que la transacción esté pendiente
+    if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
+        messages.error(request, 'Esta transacción ya no se puede procesar.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+    
+    if transaccion.esta_expirada():
+        transaccion.cancelar_por_expiracion()
+        messages.error(request, 'La transacción ha expirado y fue cancelada automáticamente.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+    if request.method == 'POST':
+        form = TarjetaDebitoForm(request.POST)
+        if form.is_valid():
+            # Enmascarar datos sensibles para el log
+            numero_tarjeta = form.cleaned_data['numero_tarjeta'].replace(' ', '')
+            numero_enmascarado = '**** **** **** ' + numero_tarjeta[-4:] if len(numero_tarjeta) >= 4 else '****'
+            
+            # Procesar el pago a través de la pasarela
+            resultado = _procesar_pago_con_pasarela(
+                request, 
+                transaccion, 
+                form.cleaned_data, 
+                'Tarjeta de Débito',
+                datos_adicionales={
+                    'numero_tarjeta_enmascarado': numero_enmascarado,
+                    'nombre_titular': form.cleaned_data['nombre_titular'],
+                    'fecha_vencimiento': form.cleaned_data['fecha_vencimiento']
+                    # No incluimos CVV por seguridad
+                }
+            )
+            
+            # Si hay resultado, redirigir (éxito o error manejado)
+            if resultado:
+                return resultado
+    else:
+        form = TarjetaDebitoForm()
+    
+    context = {
+        'transaccion': transaccion,
+        'form': form,
+        'tiempo_restante': (transaccion.fecha_expiracion - timezone.now()).total_seconds() if not transaccion.esta_expirada() else 0,
+    }
+    
+    return render(request, 'pagos/pago_tarjeta_debito.html', context)
+
+
+@login_required
+def pago_transferencia_bancaria(request, transaccion_id):
+    """
+    Vista para procesar pago con transferencia bancaria.
+    Muestra los datos de la cuenta destino y permite ingresar el comprobante.
+    """
+    transaccion = get_object_or_404(
+        Transaccion.objects.select_related(
+            'cliente', 'usuario', 'metodo_cobro', 'moneda_origen', 'moneda_destino'
+        ),
+        id_transaccion=transaccion_id
+    )
+    
+    # Verificar permisos
+    if transaccion.usuario != request.user:
+        if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+            raise Http404("Transacción no encontrada")
+    
+    # Verificar que la transacción esté pendiente
+    if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
+        messages.error(request, 'Esta transacción ya no se puede procesar.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+    
+    if transaccion.esta_expirada():
+        transaccion.cancelar_por_expiracion()
+        messages.error(request, 'La transacción ha expirado y fue cancelada automáticamente.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+    
+    # Datos de cuenta bancaria de la empresa (esto podría venir de configuración)
+    datos_cuenta = {
+        'banco': 'Banco Global Exchange',
+        'titular': 'Global Exchange S.A.',
+        'numero_cuenta': '1234567890',
+        'tipo_cuenta': 'Cuenta Corriente',
+        'ruc': '80123456-7',
+        'codigo_swift': 'GEXCPYPA',
+        'moneda': transaccion.moneda_destino.codigo if transaccion.tipo_operacion.codigo == 'COMPRA' else transaccion.moneda_origen.codigo
+    }
+
+    if request.method == 'POST':
+        form = TransferenciaBancariaForm(request.POST)
+        if form.is_valid():
+            # Procesar el pago a través de la pasarela
+            resultado = _procesar_pago_con_pasarela(
+                request, 
+                transaccion, 
+                form.cleaned_data, 
+                'Transferencia Bancaria',
+                datos_adicionales={
+                    'numero_comprobante': form.cleaned_data['numero_comprobante'],
+                    'banco_origen': form.cleaned_data['banco_origen'],
+                    'fecha_transferencia': form.cleaned_data['fecha_transferencia'].isoformat(),
+                    'observaciones': form.cleaned_data.get('observaciones', ''),
+                    'cuenta_destino': datos_cuenta['numero_cuenta']
+                }
+            )
+            
+            # Si hay resultado, redirigir (éxito o error manejado)
+            if resultado:
+                return resultado
+    else:
+        form = TransferenciaBancariaForm()
+    
+    context = {
+        'transaccion': transaccion,
+        'form': form,
+        'datos_cuenta': datos_cuenta,
+        'tiempo_restante': (transaccion.fecha_expiracion - timezone.now()).total_seconds() if not transaccion.esta_expirada() else 0,
+    }
+    
+    return render(request, 'pagos/pago_transferencia_bancaria.html', context)
+
+
+# ============================================================================
+# WEBHOOK PARA RECIBIR NOTIFICACIONES DE LA PASARELA
+# ============================================================================
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def webhook_pago(request):
+    """
+    Webhook para recibir notificaciones de la pasarela de pagos.
+    """
+    try:
+        # Obtener datos del webhook
+        data = json.loads(request.body)
+        
+        id_pago = data.get('id_pago')
+        estado = data.get('estado')
+        
+        if not id_pago or not estado:
+            return JsonResponse({'error': 'Datos incompletos'}, status=400)
+        
+        # Buscar el pago en nuestra base de datos
+        try:
+            pago_pasarela = PagoPasarela.objects.get(id_pago_externo=id_pago)
+        except PagoPasarela.DoesNotExist:
+            return JsonResponse({'error': 'Pago no encontrado'}, status=404)
+        
+        # Actualizar el estado del pago
+        with transaction.atomic():
+            pago_pasarela.estado = estado
+            pago_pasarela.respuesta_pasarela.update(data)
+            pago_pasarela.save()
+            
+            # Si el pago fue exitoso y la transacción aún está pendiente, actualizarla
+            if estado == 'exito' and pago_pasarela.transaccion.estado.codigo == EstadoTransaccion.PENDIENTE:
+                estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
+                pago_pasarela.transaccion.estado = estado_pagada
+                pago_pasarela.transaccion.fecha_pago = timezone.now()
+                pago_pasarela.transaccion.observaciones += f"\nPago confirmado por webhook el {timezone.now()}"
+                pago_pasarela.transaccion.save()
+                
+            elif estado == 'fallo':
+                # Si el pago falló, podríamos cancelar la transacción o mantenerla pendiente
+                pago_pasarela.transaccion.observaciones += f"\nPago fallido reportado por webhook el {timezone.now()}"
+                pago_pasarela.transaccion.save()
+        
+        return JsonResponse({'status': 'ok'})
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

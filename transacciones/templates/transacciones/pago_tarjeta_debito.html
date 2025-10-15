@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% load moneda_extras %}
+
+{% block title %}Pago con Tarjeta de Débito{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-8">
+      
+      <!-- Header -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-body text-center">
+          <h1 class="h3 mb-2">
+            <i class="fas fa-credit-card me-2"></i>
+            Pago con Tarjeta de Débito
+          </h1>
+          <p class="text-muted mb-0">ID Transacción: <strong>{{ transaccion.id_transaccion }}</strong></p>
+        </div>
+      </div>
+
+      <!-- Temporizador de expiración -->
+      {% if tiempo_restante > 0 %}
+      <div class="alert alert-warning" id="temporizador-alert" data-tiempo-restante="{{ tiempo_restante }}">
+        <div class="d-flex align-items-center">
+          <i class="fas fa-clock me-2"></i>
+          <div>
+            <strong>Tiempo restante para completar el pago:</strong>
+            <span id="tiempo-restante" class="fw-bold"></span>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="row">
+        <!-- Resumen de la transacción -->
+        <div class="col-md-6">
+          <div class="card shadow-sm mb-4">
+            <div class="card-header">
+              <h5 class="mb-0"><i class="fas fa-receipt me-2"></i>Resumen de Pago</h5>
+            </div>
+            <div class="card-body">
+              <div class="mb-3">
+                <strong>Tipo de operación:</strong><br>
+                {{ transaccion.tipo_operacion.nombre }}
+              </div>
+              
+              <div class="mb-3">
+                <strong>Moneda:</strong><br>
+                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
+                  {{ transaccion.moneda_origen.nombre }} ({{ transaccion.moneda_origen.codigo }})
+                {% else %}
+                  {{ transaccion.moneda_destino.nombre }} ({{ transaccion.moneda_destino.codigo }})
+                {% endif %}
+              </div>
+
+              <div class="mb-3">
+                <strong>Monto a pagar:</strong><br>
+                <span class="h5 text-primary">
+                  {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
+                    {{ transaccion.monto_destino|moneda_format:transaccion.moneda_destino.codigo }}
+                  {% else %}
+                    {{ transaccion.monto_origen|moneda_format:transaccion.moneda_origen.codigo }}
+                  {% endif %}
+                </span>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- Formulario de pago -->
+        <div class="col-md-6">
+          <div class="card shadow-sm">
+            <div class="card-header">
+              <h5 class="mb-0">
+                <i class="fas fa-credit-card me-2"></i>
+                Datos de Tarjeta de Débito
+              </h5>
+            </div>
+            <div class="card-body">
+              <form method="post" id="form-pago">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                  <label for="{{ form.numero_tarjeta.id_for_label }}" class="form-label">
+                    {{ form.numero_tarjeta.label }}
+                    <span class="text-danger">*</span>
+                  </label>
+                  {{ form.numero_tarjeta }}
+                  {% if form.numero_tarjeta.help_text %}
+                    <div class="form-text">{{ form.numero_tarjeta.help_text }}</div>
+                  {% endif %}
+                  {% if form.numero_tarjeta.errors %}
+                    <div class="text-danger">
+                      {% for error in form.numero_tarjeta.errors %}
+                        <small>{{ error }}</small>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+
+                <div class="row mb-3">
+                  <div class="col-md-6">
+                    <label for="{{ form.fecha_vencimiento.id_for_label }}" class="form-label">
+                      {{ form.fecha_vencimiento.label }}
+                      <span class="text-danger">*</span>
+                    </label>
+                    {{ form.fecha_vencimiento }}
+                    {% if form.fecha_vencimiento.help_text %}
+                      <div class="form-text">{{ form.fecha_vencimiento.help_text }}</div>
+                    {% endif %}
+                    {% if form.fecha_vencimiento.errors %}
+                      <div class="text-danger">
+                        {% for error in form.fecha_vencimiento.errors %}
+                          <small>{{ error }}</small>
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                  </div>
+                  <div class="col-md-6">
+                    <label for="{{ form.cvv.id_for_label }}" class="form-label">
+                      {{ form.cvv.label }}
+                      <span class="text-danger">*</span>
+                    </label>
+                    {{ form.cvv }}
+                    {% if form.cvv.help_text %}
+                      <div class="form-text">{{ form.cvv.help_text }}</div>
+                    {% endif %}
+                    {% if form.cvv.errors %}
+                      <div class="text-danger">
+                        {% for error in form.cvv.errors %}
+                          <small>{{ error }}</small>
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="mb-4">
+                  <label for="{{ form.nombre_titular.id_for_label }}" class="form-label">
+                    {{ form.nombre_titular.label }}
+                    <span class="text-danger">*</span>
+                  </label>
+                  {{ form.nombre_titular }}
+                  {% if form.nombre_titular.help_text %}
+                    <div class="form-text">{{ form.nombre_titular.help_text }}</div>
+                  {% endif %}
+                  {% if form.nombre_titular.errors %}
+                    <div class="text-danger">
+                      {% for error in form.nombre_titular.errors %}
+                        <small>{{ error }}</small>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+
+                <div class="alert alert-info">
+                  <i class="fas fa-shield-alt me-2"></i>
+                  <strong>Seguridad:</strong><br>
+                  • Sus datos están protegidos con encriptación SSL<br>
+                  • No almacenamos información de tarjetas<br>
+                  • Asegúrese de tener fondos suficientes en su cuenta
+                </div>
+
+                <div class="d-grid gap-2">
+                  <button type="submit" class="btn btn-success btn-lg" id="btn-confirmar-pago">
+                    <i class="fas fa-credit-card me-2"></i>
+                    Confirmar Pago
+                  </button>
+                  <a href="{% url 'transacciones:resumen_transaccion' transaccion.id_transaccion %}" 
+                     class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>
+                    Volver al Resumen
+                  </a>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Temporizador
+    const alertElement = document.getElementById('temporizador-alert');
+    if (alertElement) {
+        const tiempoRestante = parseInt(alertElement.dataset.tiempoRestante) || 0;
+        if (tiempoRestante > 0) {
+            iniciarTemporizador(tiempoRestante);
+        }
+    }
+
+    // Formateo automático del número de tarjeta
+    const tarjetaInput = document.getElementById('{{ form.numero_tarjeta.id_for_label }}');
+    if (tarjetaInput) {
+        tarjetaInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            value = value.replace(/(\d{4})(?=\d)/g, '$1 ');
+            e.target.value = value;
+        });
+    }
+
+    // Formateo automático de fecha de vencimiento
+    const fechaInput = document.getElementById('{{ form.fecha_vencimiento.id_for_label }}');
+    if (fechaInput) {
+        fechaInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 2) {
+                value = value.substring(0, 2) + '/' + value.substring(2, 4);
+            }
+            e.target.value = value;
+        });
+    }
+
+    // Confirmación antes de enviar
+    const form = document.getElementById('form-pago');
+    form.addEventListener('submit', function(e) {
+        const confirmacion = confirm('¿Está seguro de que desea procesar el pago con tarjeta de débito?');
+        if (!confirmacion) {
+            e.preventDefault();
+        }
+    });
+});
+
+function iniciarTemporizador(segundos) {
+    const elemento = document.getElementById('tiempo-restante');
+    const alert = document.getElementById('temporizador-alert');
+    
+    function formatearTiempo(segundos) {
+        const minutos = Math.floor(segundos / 60);
+        const segs = Math.floor(segundos % 60);
+        return `${minutos}:${segs.toString().padStart(2, '0')}`;
+    }
+    
+    function actualizarTemporizador() {
+        if (segundos <= 0) {
+            alert.className = 'alert alert-danger';
+            elemento.textContent = '¡Tiempo expirado!';
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+            return;
+        }
+        
+        elemento.textContent = formatearTiempo(segundos);
+        
+        if (segundos <= 300) { // 5 minutos
+            alert.className = 'alert alert-danger';
+        } else if (segundos <= 600) { // 10 minutos
+            alert.className = 'alert alert-warning';
+        }
+        
+        segundos--;
+        setTimeout(actualizarTemporizador, 1000);
+    }
+    
+    actualizarTemporizador();
+}
+</script>
+{% endblock %}

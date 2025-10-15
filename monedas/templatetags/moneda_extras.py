@@ -86,3 +86,50 @@ def formatear_guaranies(valor):
         return f"₲ {valor_int:,}".replace(',', '.')
     except (ValueError, TypeError):
         return "N/A"
+
+
+@register.filter
+def moneda_format(valor, codigo_moneda):
+    """
+    Formatea un valor monetario según el código de moneda.
+    """
+    if valor is None:
+        return "N/A"
+    
+    try:
+        valor_float = float(valor)
+        codigo_moneda = codigo_moneda.upper()
+        
+        # Definir símbolos y formato por moneda
+        simbolos_monedas = {
+            'USD': '$',
+            'EUR': '€',
+            'BRL': 'R$',
+            'ARS': '$',
+            'GBP': '£',
+            'JPY': '¥',
+            'CAD': 'C$',
+            'CHF': 'CHF',
+            'AUD': 'A$',
+            'CNY': '¥',
+            'MXN': '$',
+            'PYG': '₲',  # Guaraní paraguayo
+        }
+        
+        simbolo = simbolos_monedas.get(codigo_moneda, codigo_moneda)
+        
+        # Formatear según la moneda
+        if codigo_moneda == 'PYG':
+            # Para guaraníes, sin decimales y con separadores de miles
+            valor_int = int(valor_float)
+            return f"{simbolo} {valor_int:,}".replace(',', '.')
+        elif codigo_moneda in ['JPY', 'KRW']:
+            # Para yenes y wons, sin decimales
+            valor_int = int(valor_float)
+            return f"{simbolo} {valor_int:,}"
+        else:
+            # Para otras monedas, 2 decimales
+            return f"{simbolo} {valor_float:,.2f}"
+            
+    except (ValueError, TypeError):
+        return "N/A"
