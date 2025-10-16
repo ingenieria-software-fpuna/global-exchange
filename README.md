@@ -9,12 +9,15 @@ Este proyecto simula una pasarela de pago completa para pruebas de integración.
 
 ## Características
 - **API REST** con FastAPI para simular pagos
-- **Múltiples métodos de pago**: tarjeta, efectivo, transferencia
+- **Múltiples métodos de pago**: tarjeta, transferencia, tarjeta credito local, billetera
 - **Estados configurables**: éxito, fallo, pendiente
 - **Webhooks** para notificaciones asíncronas
 - **Panel de administración** web
 - **Documentación interactiva** con Swagger
 - **Soporte Docker** para deployment
+## OJO
+- Para las tarjetas y billetera rechaza si los ultimos 2 digitos son un numero primo
+- Para transferencia rechaza si el comprobante tiene menos de 6 caracteres o si hay una secuencia de tres ceros 000
 
 ##  Levantar el simulador:
 
