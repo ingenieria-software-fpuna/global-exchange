@@ -13,10 +13,11 @@ from django.db.models import Q, Count
 from decimal import Decimal, ROUND_HALF_UP
 import json
 from datetime import datetime, date
+import logging
 
 from transacciones.models import Transaccion, TipoOperacion, EstadoTransaccion
 from .models import PagoPasarela
-from .forms import BilleteraElectronicaForm, TarjetaDebitoForm, TransferenciaBancariaForm
+from .forms import BilleteraElectronicaForm, TarjetaDebitoForm, TransferenciaBancariaForm, TarjetaCreditoLocalForm
 from .services import PasarelaService
 from monedas.models import Moneda
 from metodo_pago.models import MetodoPago
@@ -26,6 +27,8 @@ from tasa_cambio.models import TasaCambio
 from configuracion.models import ConfiguracionSistema
 from django.db.models import Sum
 from datetime import datetime, timedelta
+
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # FUNCIONES AUXILIARES PARA PAGOS CON PASARELA
@@ -69,6 +72,7 @@ def _procesar_pago_con_pasarela(request, transaccion, datos_formulario, nombre_m
             })
             
             # Enviar pago a la pasarela
+            logger.info(f"Enviando pago a pasarela - Transacción: {transaccion.id_transaccion}, Método: {nombre_metodo}")
             resultado = pasarela_service.procesar_pago(
                 monto=monto_pago,
                 metodo_cobro=transaccion.metodo_cobro.nombre,
@@ -76,6 +80,7 @@ def _procesar_pago_con_pasarela(request, transaccion, datos_formulario, nombre_m
                 escenario="exito",  # Por defecto, simular éxito
                 datos_adicionales=datos_pago
             )
+            logger.info(f"Respuesta de pasarela - Transacción: {transaccion.id_transaccion}, Resultado: {resultado}")
             
             if resultado['success']:
                 # Crear registro del pago en pasarela
@@ -91,8 +96,9 @@ def _procesar_pago_con_pasarela(request, transaccion, datos_formulario, nombre_m
                     fecha_procesamiento=timezone.now()
                 )
                 
-                # Si el pago fue exitoso, actualizar la transacción
-                if resultado['data']['estado'] == 'exito':
+                # Manejar el resultado según el estado
+                if resultado['data']['estado'].lower() == 'exito':
+                    # Pago exitoso
                     estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
                     transaccion.estado = estado_pagada
                     transaccion.fecha_pago = timezone.now()
@@ -102,17 +108,33 @@ def _procesar_pago_con_pasarela(request, transaccion, datos_formulario, nombre_m
                     transaccion.observaciones += f"\nID Pago Pasarela: {resultado['data']['id_pago']}"
                     if datos_adicionales:
                         for key, value in datos_adicionales.items():
-                            if key not in ['pin_autorizado']:  # Excluir datos sensibles
+                            if key not in ['pin_autorizado', 'numero_tarjeta']:  # Excluir datos sensibles
                                 transaccion.observaciones += f"\n{key}: {value}"
                     
                     transaccion.save()
                     
                     messages.success(request, f'¡Pago procesado exitosamente con {nombre_metodo.lower()}!')
-                else:
-                    # Pago pendiente o fallido
-                    messages.warning(request, f'El pago está {resultado["data"]["estado"]}. Se le notificará cuando se complete.')
+                    return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion.id_transaccion)
                 
-                return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion.id_transaccion)
+                elif resultado['data']['estado'].lower() == 'fallo':
+                    # Pago fallido - mostrar el motivo específico del rechazo
+                    motivo_rechazo = resultado['data'].get('motivo_rechazo', 'Pago rechazado por la pasarela')
+                    logger.warning(f"Pago fallido - Transacción: {transaccion.id_transaccion}, Motivo: {motivo_rechazo}")
+                    
+                    # Agregar información del fallo a las observaciones
+                    transaccion.observaciones += f"\nIntento de pago fallido con {nombre_metodo} el {timezone.now()}"
+                    transaccion.observaciones += f"\nID Pago Pasarela: {resultado['data']['id_pago']}"
+                    transaccion.observaciones += f"\nMotivo del rechazo: {motivo_rechazo}"
+                    transaccion.save()
+                    
+                    messages.error(request, f'Pago rechazado: {motivo_rechazo}')
+                    # No redirigir, permitir que el usuario intente nuevamente
+                    return None
+                
+                else:
+                    # Pago pendiente u otro estado
+                    messages.warning(request, f'El pago está {resultado["data"]["estado"]}. Se le notificará cuando se complete.')
+                    return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion.id_transaccion)
                 
             else:
                 # Error en la pasarela
@@ -191,7 +213,7 @@ def pago_billetera_electronica(request, transaccion_id):
                 }
             )
             
-            # Si hay resultado, redirigir (éxito o error manejado)
+            # Si hay resultado, redirigir (éxito) - si es None, continuar para mostrar formulario con mensajes de error
             if resultado:
                 return resultado
     else:
@@ -247,6 +269,7 @@ def pago_tarjeta_debito(request, transaccion_id):
                 form.cleaned_data, 
                 'Tarjeta de Débito',
                 datos_adicionales={
+                    'numero_tarjeta': numero_tarjeta,  # Número sin enmascarar para la pasarela
                     'numero_tarjeta_enmascarado': numero_enmascarado,
                     'nombre_titular': form.cleaned_data['nombre_titular'],
                     'fecha_vencimiento': form.cleaned_data['fecha_vencimiento']
@@ -254,7 +277,7 @@ def pago_tarjeta_debito(request, transaccion_id):
                 }
             )
             
-            # Si hay resultado, redirigir (éxito o error manejado)
+            # Si hay resultado, redirigir (éxito) - si es None, continuar para mostrar formulario con mensajes de error
             if resultado:
                 return resultado
     else:
@@ -326,7 +349,7 @@ def pago_transferencia_bancaria(request, transaccion_id):
                 }
             )
             
-            # Si hay resultado, redirigir (éxito o error manejado)
+            # Si hay resultado, redirigir (éxito) - si es None, continuar para mostrar formulario con mensajes de error
             if resultado:
                 return resultado
     else:
@@ -375,16 +398,18 @@ def webhook_pago(request):
             pago_pasarela.save()
             
             # Si el pago fue exitoso y la transacción aún está pendiente, actualizarla
-            if estado == 'exito' and pago_pasarela.transaccion.estado.codigo == EstadoTransaccion.PENDIENTE:
+            if estado.lower() == 'exito' and pago_pasarela.transaccion.estado.codigo == EstadoTransaccion.PENDIENTE:
                 estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
                 pago_pasarela.transaccion.estado = estado_pagada
                 pago_pasarela.transaccion.fecha_pago = timezone.now()
                 pago_pasarela.transaccion.observaciones += f"\nPago confirmado por webhook el {timezone.now()}"
                 pago_pasarela.transaccion.save()
                 
-            elif estado == 'fallo':
-                # Si el pago falló, podríamos cancelar la transacción o mantenerla pendiente
+            elif estado.lower() == 'fallo':
+                # Si el pago falló, agregar información del motivo
+                motivo_rechazo = data.get('motivo_rechazo', 'Fallo reportado por la pasarela')
                 pago_pasarela.transaccion.observaciones += f"\nPago fallido reportado por webhook el {timezone.now()}"
+                pago_pasarela.transaccion.observaciones += f"\nMotivo del rechazo: {motivo_rechazo}"
                 pago_pasarela.transaccion.save()
         
         return JsonResponse({'status': 'ok'})
@@ -393,3 +418,82 @@ def webhook_pago(request):
         return JsonResponse({'error': 'JSON inválido'}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def pago_tarjeta_credito_local(request, transaccion_id):
+    """
+    Vista para procesar pago con tarjeta de crédito local (Panal, Cabal).
+    """
+    transaccion = get_object_or_404(
+        Transaccion.objects.select_related(
+            'cliente', 'usuario', 'metodo_cobro', 'moneda_origen', 'moneda_destino'
+        ),
+        id_transaccion=transaccion_id
+    )
+    
+    # Verificar permisos
+    if transaccion.usuario != request.user:
+        if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+            raise Http404("Transacción no encontrada")
+    
+    # Verificar que la transacción esté pendiente
+    if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
+        messages.error(request, 'Esta transacción ya no se puede procesar.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+    
+    if transaccion.esta_expirada():
+        transaccion.cancelar_por_expiracion()
+        messages.error(request, 'La transacción ha expirado y fue cancelada automáticamente.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+    if request.method == 'POST':
+        form = TarjetaCreditoLocalForm(request.POST)
+        if form.is_valid():
+            # Enmascarar datos sensibles para el log
+            numero_tarjeta = form.cleaned_data['numero_tarjeta'].replace(' ', '')
+            numero_enmascarado = '**** **** **** ' + numero_tarjeta[-4:] if len(numero_tarjeta) >= 4 else '****'
+            
+            # Calcular información de cuotas
+            cuotas = int(form.cleaned_data['cuotas'])
+            tipo_tarjeta = form.cleaned_data['tipo_tarjeta']
+            
+            # Procesar el pago a través de la pasarela
+            resultado = _procesar_pago_con_pasarela(
+                request, 
+                transaccion, 
+                form.cleaned_data, 
+                'Tarjeta de Crédito Local',
+                datos_adicionales={
+                    'numero_tarjeta': numero_tarjeta,  # Número sin enmascarar para la pasarela
+                    'numero_tarjeta_enmascarado': numero_enmascarado,
+                    'nombre_titular': form.cleaned_data['nombre_titular'],
+                    'fecha_vencimiento': form.cleaned_data['fecha_vencimiento'],
+                    'tipo_tarjeta': tipo_tarjeta.title(),
+                    'cuotas': cuotas,
+                    'es_tarjeta_local': True,
+                    'red_procesamiento': tipo_tarjeta
+                    # No incluimos CVV por seguridad
+                }
+            )
+            
+            # Si hay resultado, redirigir (éxito) - si es None, continuar para mostrar formulario con mensajes de error
+            if resultado:
+                return resultado
+    else:
+        form = TarjetaCreditoLocalForm()
+    
+    # Calcular información de cuotas para mostrar al usuario
+    if transaccion.tipo_operacion.codigo == 'VENTA':
+        monto_total = float(transaccion.monto_destino)
+    else:
+        monto_total = float(transaccion.monto_origen)
+    
+    context = {
+        'transaccion': transaccion,
+        'form': form,
+        'monto_total': monto_total,
+        'tiempo_restante': (transaccion.fecha_expiracion - timezone.now()).total_seconds() if not transaccion.esta_expirada() else 0,
+    }
+    
+    return render(request, 'pagos/pago_tarjeta_credito_local.html', context)
