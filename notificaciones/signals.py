@@ -18,16 +18,22 @@ Usuario = get_user_model()
 @receiver(pre_save, sender=TasaCambio)
 def capturar_tasa_anterior(sender, instance, **kwargs):
     """
-    Captura el precio base anterior antes de guardar una actualización.
+    Captura el precio base y comisiones anteriores antes de guardar una actualización.
     """
     if instance.pk:  # Solo si es una actualización
         try:
             tasa_anterior = TasaCambio.objects.get(pk=instance.pk)
             instance._precio_base_anterior = tasa_anterior.precio_base
+            instance._comision_compra_anterior = tasa_anterior.comision_compra
+            instance._comision_venta_anterior = tasa_anterior.comision_venta
         except TasaCambio.DoesNotExist:
             instance._precio_base_anterior = None
+            instance._comision_compra_anterior = None
+            instance._comision_venta_anterior = None
     else:
         instance._precio_base_anterior = None
+        instance._comision_compra_anterior = None
+        instance._comision_venta_anterior = None
 
 
 @receiver(post_save, sender=TasaCambio)
@@ -42,6 +48,8 @@ def notificar_cambio_tasa(sender, instance, created, **kwargs):
 
     # Obtener el precio anterior si existe
     precio_anterior = getattr(instance, '_precio_base_anterior', None)
+    comision_compra_anterior = getattr(instance, '_comision_compra_anterior', None)
+    comision_venta_anterior = getattr(instance, '_comision_venta_anterior', None)
     
     # Si es una nueva tasa o hubo cambio en el precio
     if created or (precio_anterior and precio_anterior != instance.precio_base):
@@ -52,27 +60,36 @@ def notificar_cambio_tasa(sender, instance, created, **kwargs):
             groups__name__in=['Operador', 'Visitante']
         ).distinct()
         
+        # Calcular tasas de compra y venta
+        tasa_compra_nueva = instance.precio_base - instance.comision_compra
+        tasa_venta_nueva = instance.precio_base + instance.comision_venta
+        
         # Determinar el tipo de cambio
         if created:
             titulo = f"Nueva cotización: {instance.moneda.nombre}"
             mensaje = (f"Se ha establecido una nueva cotización para {instance.moneda.nombre}. "
-                      f"Precio base: {instance.moneda.formatear_monto(instance.precio_base)}")
+                      f"Precio de compra: {instance.moneda.formatear_monto(tasa_compra_nueva)}, "
+                      f"Precio de venta: {instance.moneda.formatear_monto(tasa_venta_nueva)}")
         else:
             # Es una actualización
             if precio_anterior:
+                tasa_compra_anterior = precio_anterior - (comision_compra_anterior or 0)
+                tasa_venta_anterior = precio_anterior + (comision_venta_anterior or 0)
+                
                 cambio = instance.precio_base - precio_anterior
                 cambio_porcentual = ((cambio / precio_anterior) * 100) if precio_anterior > 0 else 0
                 direccion = "aumentó" if cambio > 0 else "disminuyó"
                 
                 titulo = f"Cambio en cotización: {instance.moneda.nombre}"
                 mensaje = (f"La cotización de {instance.moneda.nombre} {direccion}. "
-                          f"Precio anterior: {instance.moneda.formatear_monto(precio_anterior)}, "
-                          f"Precio nuevo: {instance.moneda.formatear_monto(instance.precio_base)} "
+                          f"Compra: {instance.moneda.formatear_monto(tasa_compra_anterior)} → {instance.moneda.formatear_monto(tasa_compra_nueva)}, "
+                          f"Venta: {instance.moneda.formatear_monto(tasa_venta_anterior)} → {instance.moneda.formatear_monto(tasa_venta_nueva)} "
                           f"({cambio_porcentual:+.2f}%)")
             else:
                 titulo = f"Actualización de cotización: {instance.moneda.nombre}"
                 mensaje = (f"Se actualizó la cotización de {instance.moneda.nombre}. "
-                          f"Precio base: {instance.moneda.formatear_monto(instance.precio_base)}")
+                          f"Precio de compra: {instance.moneda.formatear_monto(tasa_compra_nueva)}, "
+                          f"Precio de venta: {instance.moneda.formatear_monto(tasa_venta_nueva)}")
         
         # Crear notificaciones para todos los usuarios
         notificaciones = []
@@ -84,7 +101,11 @@ def notificar_cambio_tasa(sender, instance, created, **kwargs):
                 mensaje=mensaje,
                 moneda=instance.moneda,
                 precio_base_anterior=precio_anterior,
-                precio_base_nuevo=instance.precio_base
+                precio_base_nuevo=instance.precio_base,
+                comision_compra_anterior=comision_compra_anterior,
+                comision_compra_nueva=instance.comision_compra,
+                comision_venta_anterior=comision_venta_anterior,
+                comision_venta_nueva=instance.comision_venta
             )
             notificaciones.append(notificacion)
         
@@ -98,16 +119,33 @@ def notificar_cambio_tasa(sender, instance, created, **kwargs):
                 moneda=instance.moneda,
                 precio_anterior=precio_anterior,
                 precio_nuevo=instance.precio_base,
+                comision_compra_anterior=comision_compra_anterior,
+                comision_compra_nueva=instance.comision_compra,
+                comision_venta_anterior=comision_venta_anterior,
+                comision_venta_nueva=instance.comision_venta,
                 es_creacion=created
             )
 
 
-def enviar_emails_notificacion(usuarios_con_email, moneda, precio_anterior, precio_nuevo, es_creacion):
+def enviar_emails_notificacion(usuarios_con_email, moneda, precio_anterior, precio_nuevo, 
+                               comision_compra_anterior, comision_compra_nueva,
+                               comision_venta_anterior, comision_venta_nueva, es_creacion):
     """
     Envía correos electrónicos a los usuarios que tienen activada la preferencia de notificaciones por email.
     """
     if not usuarios_con_email.exists():
         return
+    
+    # Calcular tasas de compra y venta
+    tasa_compra_nueva = precio_nuevo - comision_compra_nueva
+    tasa_venta_nueva = precio_nuevo + comision_venta_nueva
+    
+    if precio_anterior and comision_compra_anterior is not None and comision_venta_anterior is not None:
+        tasa_compra_anterior = precio_anterior - comision_compra_anterior
+        tasa_venta_anterior = precio_anterior + comision_venta_anterior
+    else:
+        tasa_compra_anterior = None
+        tasa_venta_anterior = None
     
     # Calcular cambio porcentual
     if precio_anterior and precio_anterior > 0:
@@ -133,8 +171,10 @@ def enviar_emails_notificacion(usuarios_con_email, moneda, precio_anterior, prec
             context = {
                 'usuario': usuario,
                 'moneda': moneda,
-                'precio_anterior': precio_anterior or 0,
-                'precio_nuevo': precio_nuevo,
+                'tasa_compra_anterior': tasa_compra_anterior or 0,
+                'tasa_compra_nueva': tasa_compra_nueva,
+                'tasa_venta_anterior': tasa_venta_anterior or 0,
+                'tasa_venta_nueva': tasa_venta_nueva,
                 'cambio_porcentual': cambio_porcentual,
                 'es_aumento': es_aumento,
                 'es_creacion': es_creacion,

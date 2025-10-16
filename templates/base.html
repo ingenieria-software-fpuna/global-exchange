@@ -85,17 +85,23 @@
         .nav-link i.fa-bell {
             font-size: 1.1rem;
         }
+        .nav-link .badge.badge-notificaciones {
+            top: -5px !important;
+            left: 50% !important;
+            transform: translate(-25%, 0) !important;
+        }
         
         /* Dropdown de notificaciones */
         .notificaciones-dropdown {
-            min-width: 400px;
-            max-width: 450px;
-            max-height: 500px;
+            min-width: 320px;
+            max-width: 380px;
+            max-height: 450px;
             overflow-y: auto;
         }
         .notificacion-item {
             border-left: 3px solid transparent;
             transition: all 0.2s;
+            padding: 0.5rem 0.75rem !important;
         }
         .notificacion-item:hover {
             background-color: rgba(0,0,0,.02);
@@ -105,20 +111,32 @@
             border-left-color: var(--brand-primary);
         }
         .notificacion-item .notificacion-header {
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             font-weight: 600;
             color: #212529;
+            line-height: 1.2;
         }
         .notificacion-item .notificacion-mensaje {
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             color: #6c757d;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .notificacion-item .notificacion-fecha {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: #adb5bd;
         }
         .notificacion-item .badge-cambio {
-            font-size: 0.7rem;
+            font-size: 0.65rem;
+            padding: 0.2rem 0.35rem;
+        }
+        .notificacion-item .badge-sm {
+            font-size: 0.65rem;
+            padding: 0.15rem 0.35rem;
         }
         .notificaciones-dropdown .dropdown-header {
             background-color: #f8f9fa;
@@ -215,7 +233,7 @@
                         <a class="nav-link position-relative" href="#" id="notificacionesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notificaciones">
                             <i class="fas fa-bell"></i>
                             {% if notificaciones_no_leidas_count > 0 %}
-                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                <span class="position-absolute badge rounded-pill bg-danger badge-notificaciones">
                                     {{ notificaciones_no_leidas_count }}
                                     <span class="visually-hidden">notificaciones no leídas</span>
                                 </span>
@@ -357,28 +375,28 @@
                 
                 html += `
                     <li>
-                        <a class="dropdown-item notificacion-item ${claseLeida} px-3 py-2" 
+                        <a class="dropdown-item notificacion-item ${claseLeida}" 
                            href="#" 
                            data-notif-id="${notif.id}"
                            onclick="marcarLeidaYRedirigir(event, ${notif.id})">
-                            <div class="d-flex">
-                                <div class="me-2">
-                                    <i class="fas ${iconoTipo} text-primary"></i>
+                            <div class="d-flex gap-2">
+                                <div style="flex-shrink: 0;">
+                                    <i class="fas ${iconoTipo} text-primary" style="font-size: 0.8rem;"></i>
                                 </div>
-                                <div class="flex-grow-1">
-                                    <div class="notificacion-header d-flex justify-content-between align-items-start">
-                                        <span>${notif.titulo}</span>
+                                <div style="flex: 1; min-width: 0;">
+                                    <div class="notificacion-header d-flex justify-content-between align-items-start gap-1">
+                                        <span style="flex: 1;">${notif.titulo}</span>
                                         ${!notif.leida ? '<span class="badge bg-primary badge-sm">Nueva</span>' : ''}
                                     </div>
                                     <div class="notificacion-mensaje mt-1">
                                         ${notif.mensaje}
                                     </div>
-                                    <div class="d-flex justify-content-between align-items-center mt-2">
-                                        <span class="notificacion-fecha">
+                                    <div class="d-flex justify-content-between align-items-center mt-1 gap-2">
+                                        <span class="notificacion-fecha" style="white-space: nowrap;">
                                             <i class="far fa-clock me-1"></i>${notif.fecha_creacion}
                                         </span>
                                         ${notif.cambio_porcentual ? `
-                                            <span class="badge badge-cambio bg-${colorCambio}">
+                                            <span class="badge badge-cambio bg-${colorCambio}" style="flex-shrink: 0;">
                                                 <i class="fas ${iconoCambio}"></i>
                                                 ${notif.cambio_porcentual}%
                                             </span>
@@ -404,7 +422,7 @@
                     // Crear badge si no existe
                     const bellIcon = document.querySelector('#notificacionesDropdown i');
                     const newBadge = document.createElement('span');
-                    newBadge.className = 'position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger';
+                    newBadge.className = 'position-absolute badge rounded-pill bg-danger badge-notificaciones';
                     newBadge.innerHTML = `${count}<span class="visually-hidden">notificaciones no leídas</span>`;
                     bellIcon.parentElement.appendChild(newBadge);
                 }

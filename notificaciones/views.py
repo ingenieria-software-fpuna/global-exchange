@@ -7,6 +7,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponseForbidden
 from django.core.paginator import Paginator
 from django.contrib import messages
+from django.utils import timezone
 from .models import Notificacion
 from .forms import PreferenciasNotificacionesForm
 
@@ -157,7 +158,7 @@ def notificaciones_recientes(request):
                 'titulo': n.titulo,
                 'mensaje': n.mensaje[:100] + '...' if len(n.mensaje) > 100 else n.mensaje,
                 'leida': n.leida,
-                'fecha_creacion': n.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+                'fecha_creacion': timezone.localtime(n.fecha_creacion).strftime('%d/%m/%Y %H:%M'),
                 'moneda': n.moneda.codigo if n.moneda else None,
                 'es_aumento': n.es_aumento,
                 'cambio_porcentual': str(n.cambio_porcentual) if n.cambio_porcentual else None,

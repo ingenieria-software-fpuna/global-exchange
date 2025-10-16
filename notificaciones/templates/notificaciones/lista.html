@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load tz %}
 
 {% block title %}Notificaciones - Global Exchange{% endblock %}
 
@@ -56,7 +57,7 @@
                                         <span class="badge bg-primary">Nueva</span>
                                     {% endif %}
                                 </h5>
-                                <small class="text-muted">{{ notificacion.fecha_creacion|date:"d/m/Y H:i" }}</small>
+                                <small class="text-muted">{{ notificacion.fecha_creacion|localtime|date:"d/m/Y H:i" }}</small>
                             </div>
                             <p class="mb-1">{{ notificacion.mensaje }}</p>
                             
@@ -78,22 +79,16 @@
                                 </div>
                             {% endif %}
 
+                            {% if not notificacion.leida %}
                             <div class="mt-2">
-                                {% if not notificacion.leida %}
-                                    <form method="post" action="{% url 'notificaciones:marcar_leida' notificacion.pk %}" style="display: inline;">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-sm btn-outline-primary">
-                                            <i class="bi bi-check"></i> Marcar como leída
-                                        </button>
-                                    </form>
-                                {% endif %}
-                                <form method="post" action="{% url 'notificaciones:eliminar' notificacion.pk %}" style="display: inline;">
+                                <form method="post" action="{% url 'notificaciones:marcar_leida' notificacion.pk %}" style="display: inline;">
                                     {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Está seguro de eliminar esta notificación?');">
-                                        <i class="bi bi-trash"></i> Eliminar
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-check"></i> Marcar como leída
                                     </button>
                                 </form>
                             </div>
+                            {% endif %}
                         </div>
                     {% endfor %}
                 </div>

@@ -66,6 +66,26 @@ class Notificacion(models.Model):
         blank=True,
         help_text="Precio base nuevo (si aplica)"
     )
+    comision_compra_anterior = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Comisión de compra anterior (si aplica)"
+    )
+    comision_compra_nueva = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Comisión de compra nueva (si aplica)"
+    )
+    comision_venta_anterior = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Comisión de venta anterior (si aplica)"
+    )
+    comision_venta_nueva = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Comisión de venta nueva (si aplica)"
+    )
 
     class Meta:
         verbose_name = "Notificación"
@@ -102,4 +122,32 @@ class Notificacion(models.Model):
         """Determina si el cambio es un aumento"""
         if self.precio_base_anterior and self.precio_base_nuevo:
             return self.precio_base_nuevo > self.precio_base_anterior
+        return None
+
+    @property
+    def tasa_compra_anterior(self):
+        """Calcula la tasa de compra anterior"""
+        if self.precio_base_anterior is not None and self.comision_compra_anterior is not None:
+            return self.precio_base_anterior - self.comision_compra_anterior
+        return None
+
+    @property
+    def tasa_compra_nueva(self):
+        """Calcula la tasa de compra nueva"""
+        if self.precio_base_nuevo is not None and self.comision_compra_nueva is not None:
+            return self.precio_base_nuevo - self.comision_compra_nueva
+        return None
+
+    @property
+    def tasa_venta_anterior(self):
+        """Calcula la tasa de venta anterior"""
+        if self.precio_base_anterior is not None and self.comision_venta_anterior is not None:
+            return self.precio_base_anterior + self.comision_venta_anterior
+        return None
+
+    @property
+    def tasa_venta_nueva(self):
+        """Calcula la tasa de venta nueva"""
+        if self.precio_base_nuevo is not None and self.comision_venta_nueva is not None:
+            return self.precio_base_nuevo + self.comision_venta_nueva
         return None
