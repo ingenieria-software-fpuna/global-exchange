@@ -60,7 +60,8 @@ def crear_grupos_ejemplo():
             'nombre': 'Operador',
             'descripcion': 'Acceso de solo lectura a clientes, métodos de pago/cobro, tasas de cambio y transacciones',
             'apps_solo_lectura': ['clientes', 'tasa_cambio', 'transacciones'],
-            'permisos_excluidos': ['view_tipocliente', 'can_view_all_clients', 'can_view_sensitive_columns']
+            'permisos_excluidos': ['view_tipocliente', 'can_view_all_clients', 'can_view_sensitive_columns'],
+            'permisos_especiales': ['can_operate']  # Permiso para realizar operaciones de compra/venta
         },
         {
             'nombre': 'Visitante',
@@ -118,6 +119,16 @@ def crear_grupos_ejemplo():
                             if p.codename.startswith('view_') and p.codename not in permisos_excluidos
                         ]
                         permisos_asignados.extend(permisos_lectura)
+
+            # Permisos especiales adicionales (por codename)
+            if 'permisos_especiales' in config:
+                for codename in config['permisos_especiales']:
+                    # Buscar el permiso por codename en todas las apps
+                    for app_perms in permisos_por_app.values():
+                        permiso_especial = next((p for p in app_perms if p.codename == codename), None)
+                        if permiso_especial:
+                            permisos_asignados.append(permiso_especial)
+                            break
 
             # Asignar permisos al grupo
             if permisos_asignados:

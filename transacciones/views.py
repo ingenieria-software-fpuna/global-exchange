@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
 from django.http import JsonResponse, Http404
 from django.urls import reverse
@@ -115,6 +115,7 @@ def validar_limites_transaccion(monto_origen, moneda_origen, cliente=None, usuar
 
 
 @login_required
+@permission_required('transacciones.can_operate', raise_exception=True)
 @require_http_methods(["POST"])
 def iniciar_compra(request):
     """
@@ -727,6 +728,7 @@ def calcular_transaccion(monto, moneda_origen, moneda_destino, cliente=None, met
 
 
 @login_required
+@permission_required('transacciones.can_operate', raise_exception=True)
 def comprar_divisas(request):
     """
     Vista para la pantalla dedicada de compra de divisas.
@@ -1220,6 +1222,7 @@ def calcular_venta_completa(monto, moneda_origen, moneda_destino, cliente=None, 
 
 
 @login_required
+@permission_required('transacciones.can_operate', raise_exception=True)
 def vender_divisas(request):
     """
     Vista para mostrar el formulario de venta de divisas.
@@ -1500,6 +1503,7 @@ def api_metodos_cobro_por_moneda(request):
 
 
 @login_required
+@permission_required('transacciones.can_operate', raise_exception=True)
 @require_http_methods(["POST"])
 def iniciar_venta(request):
     """

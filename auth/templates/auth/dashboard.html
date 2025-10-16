@@ -23,6 +23,7 @@
                 <i class="fas fa-bolt text-primary me-2"></i>Acciones Rápidas
             </h2>
         </div>
+        {% if can_operate %}
         <div class="col-lg-4 col-md-6 mb-3">
             <div class="card border-0 shadow-sm h-100 hover-shadow">
                 <div class="card-body text-center p-3">
@@ -55,6 +56,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
     {% else %}
     <!-- Mensaje para usuarios sin permisos de transacciones -->
@@ -75,7 +77,8 @@
     </div>
     {% endif %}
 
-    <!-- Simulador - Siempre visible para todos los usuarios -->
+    <!-- Simulador - Solo visible para usuarios con permiso can_operate -->
+    {% if can_operate %}
     <div class="row mb-3">
         <div class="col-12 mb-1">
             <h2 class="h6 fw-semibold text-dark mb-0">
@@ -99,6 +102,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Administration Sections Row 1: User & Client Management -->
     {% if can_view_usuarios or can_view_groups or can_view_tipocliente or can_view_cliente %}

@@ -194,6 +194,7 @@ def tasacambio_detail_api(request, pk):
 
 
 @login_required
+@permission_required('transacciones.can_operate', raise_exception=True)
 # @permission_required('tasa_cambio.view_tasacambio', raise_exception=True)
 def dashboard_tasacambio(request):
     """Vista del dashboard específico para cotizaciones"""
