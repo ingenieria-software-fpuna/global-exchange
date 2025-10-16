@@ -331,6 +331,8 @@ def procesar_pago(request, transaccion_id):
         return redirect('pagos:pago_billetera_electronica', transaccion_id=transaccion_id)
     elif 'tarjeta de débito' in metodo_cobro or 'tarjeta de debito' in metodo_cobro:
         return redirect('pagos:pago_tarjeta_debito', transaccion_id=transaccion_id)
+    elif 'tarjeta de crédito local' in metodo_cobro or 'tarjeta de credito local' in metodo_cobro:
+        return redirect('pagos:pago_tarjeta_credito_local', transaccion_id=transaccion_id)
     elif 'transferencia bancaria' in metodo_cobro:
         return redirect('pagos:pago_transferencia_bancaria', transaccion_id=transaccion_id)
     else:
@@ -739,8 +741,15 @@ def comprar_divisas(request):
         usuarios_asociados=request.user
     ).select_related('tipo_cliente').order_by('nombre_comercial')
     
-    # Métodos de cobro activos (para recibir pago del cliente)
-    metodos_cobro = MetodoCobro.objects.filter(es_activo=True).order_by('nombre')
+    # Métodos de cobro activos que aceptan PYG (para recibir pago del cliente)
+    try:
+        moneda_pyg = Moneda.objects.get(codigo='PYG')
+        metodos_cobro = MetodoCobro.objects.filter(
+            es_activo=True,
+            monedas_permitidas=moneda_pyg
+        ).order_by('nombre')
+    except Moneda.DoesNotExist:
+        metodos_cobro = MetodoCobro.objects.filter(es_activo=True).order_by('nombre')
     
     # Métodos de pago activos (para entregar divisas al cliente)
     metodos_pago = MetodoPago.objects.filter(es_activo=True).order_by('nombre')

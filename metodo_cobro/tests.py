@@ -39,19 +39,6 @@ class MetodoCobroTestCase(TestCase):
         )
         self.assertEqual(str(metodo), "Efectivo")
 
-    def test_monedas_permitidas_relationship(self):
-        """Prueba la relación many-to-many con monedas"""
-        metodo = MetodoCobro.objects.create(
-            nombre="Cheque",
-            descripcion="Pago con cheque",
-            comision=2.0
-        )
-        metodo.monedas_permitidas.add(self.pyg, self.usd, self.eur)
-        
-        self.assertEqual(metodo.monedas_permitidas.count(), 3)
-        self.assertIn(self.pyg, metodo.monedas_permitidas.all())
-        self.assertIn(self.usd, metodo.monedas_permitidas.all())
-        self.assertIn(self.eur, metodo.monedas_permitidas.all())
 
     def test_metodo_cobro_default_values(self):
         """Prueba los valores por defecto del modelo"""

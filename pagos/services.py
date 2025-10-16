@@ -20,6 +20,8 @@ class PasarelaService:
         'billetera electronica': 'billetera',
         'tarjeta de débito': 'tarjeta',
         'tarjeta de debito': 'tarjeta',
+        'tarjeta de crédito local': 'tarjeta_credito_local',
+        'tarjeta de credito local': 'tarjeta_credito_local',
         'transferencia bancaria': 'transferencia',
     }
     
@@ -71,7 +73,7 @@ class PasarelaService:
             # Mapear método de cobro
             metodo_pasarela = self._mapear_metodo(metodo_cobro)
             
-            # Preparar payload
+            # Preparar payload base
             payload = {
                 "monto": float(monto),
                 "metodo": metodo_pasarela,
@@ -80,9 +82,26 @@ class PasarelaService:
                 "webhook_url": self.webhook_url
             }
             
-            # Agregar datos adicionales si existen
+            # Agregar datos específicos según el método de pago
             if datos_adicionales:
-                payload.update(datos_adicionales)
+                # Para métodos de tarjeta (débito y crédito local), agregar número de tarjeta
+                if metodo_pasarela in ['tarjeta', 'tarjeta_credito_local']:
+                    # Extraer el número de tarjeta sin enmascarar de los datos del formulario
+                    numero_tarjeta = datos_adicionales.get('numero_tarjeta')
+                    if numero_tarjeta:
+                        payload['numero_tarjeta'] = numero_tarjeta.replace(' ', '')
+                
+                # Para billetera electrónica, agregar número de teléfono
+                elif metodo_pasarela == 'billetera':
+                    telefono = datos_adicionales.get('telefono')
+                    if telefono:
+                        payload['numero_billetera'] = telefono
+                
+                # Para transferencia bancaria, agregar número de comprobante
+                elif metodo_pasarela == 'transferencia':
+                    comprobante = datos_adicionales.get('numero_comprobante')
+                    if comprobante:
+                        payload['numero_comprobante'] = comprobante
             
             logger.info(f"Enviando pago a pasarela: {payload}")
             

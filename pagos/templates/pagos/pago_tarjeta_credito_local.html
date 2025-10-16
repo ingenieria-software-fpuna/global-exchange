@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load moneda_extras %}
 
-{% block title %}Pago con Tarjeta de Débito{% endblock %}
+{% block title %}Pago con Tarjeta de Crédito Local{% endblock %}
 
 {% block content %}
 <div class="container py-4">
@@ -13,7 +13,7 @@
         <div class="card-body text-center">
           <h1 class="h3 mb-2">
             <i class="fas fa-credit-card me-2"></i>
-            Pago con Tarjeta de Débito
+            Pago con Tarjeta de Crédito Local
           </h1>
           <p class="text-muted mb-0">ID Transacción: <strong>{{ transaccion.id_transaccion }}</strong></p>
         </div>
@@ -64,7 +64,6 @@
                   {% endif %}
                 </span>
               </div>
-
             </div>
           </div>
         </div>
@@ -75,13 +74,32 @@
             <div class="card-header">
               <h5 class="mb-0">
                 <i class="fas fa-credit-card me-2"></i>
-                Datos de Tarjeta de Débito
+                Datos de Tarjeta de Crédito Local
               </h5>
             </div>
             <div class="card-body">
               <form method="post" id="form-pago">
                 {% csrf_token %}
                 
+                <!-- Tipo de tarjeta -->
+                <div class="mb-3">
+                  <label for="{{ form.tipo_tarjeta.id_for_label }}" class="form-label">
+                    {{ form.tipo_tarjeta.label }}
+                    <span class="text-danger">*</span>
+                  </label>
+                  {{ form.tipo_tarjeta }}
+                  {% if form.tipo_tarjeta.help_text %}
+                    <div class="form-text">{{ form.tipo_tarjeta.help_text }}</div>
+                  {% endif %}
+                  {% if form.tipo_tarjeta.errors %}
+                    <div class="text-danger">
+                      {% for error in form.tipo_tarjeta.errors %}
+                        <small>{{ error }}</small>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+
                 <div class="mb-3">
                   <label for="{{ form.numero_tarjeta.id_for_label }}" class="form-label">
                     {{ form.numero_tarjeta.label }}
@@ -119,17 +137,17 @@
                     {% endif %}
                   </div>
                   <div class="col-md-6">
-                    <label for="{{ form.cvv.id_for_label }}" class="form-label">
-                      {{ form.cvv.label }}
+                    <label for="{{ form.codigo_seguridad.id_for_label }}" class="form-label">
+                      {{ form.codigo_seguridad.label }}
                       <span class="text-danger">*</span>
                     </label>
-                    {{ form.cvv }}
-                    {% if form.cvv.help_text %}
-                      <div class="form-text">{{ form.cvv.help_text }}</div>
+                    {{ form.codigo_seguridad }}
+                    {% if form.codigo_seguridad.help_text %}
+                      <div class="form-text">{{ form.codigo_seguridad.help_text }}</div>
                     {% endif %}
-                    {% if form.cvv.errors %}
+                    {% if form.codigo_seguridad.errors %}
                       <div class="text-danger">
-                        {% for error in form.cvv.errors %}
+                        {% for error in form.codigo_seguridad.errors %}
                           <small>{{ error }}</small>
                         {% endfor %}
                       </div>
@@ -137,7 +155,7 @@
                   </div>
                 </div>
 
-                <div class="mb-4">
+                <div class="mb-3">
                   <label for="{{ form.nombre_titular.id_for_label }}" class="form-label">
                     {{ form.nombre_titular.label }}
                     <span class="text-danger">*</span>
@@ -155,12 +173,37 @@
                   {% endif %}
                 </div>
 
+                <!-- Cuotas -->
+                <div class="mb-4">
+                  <label for="{{ form.cuotas.id_for_label }}" class="form-label">
+                    {{ form.cuotas.label }}
+                    <span class="text-danger">*</span>
+                  </label>
+                  {{ form.cuotas }}
+                  {% if form.cuotas.help_text %}
+                    <div class="form-text">{{ form.cuotas.help_text }}</div>
+                  {% endif %}
+                  {% if form.cuotas.errors %}
+                    <div class="text-danger">
+                      {% for error in form.cuotas.errors %}
+                        <small>{{ error }}</small>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                  
+                  <div class="alert alert-warning mt-2" id="cuotas-info" data-monto-total="{{ monto_total|floatformat:2 }}">
+                    <h6><i class="fas fa-calculator me-2"></i>Información de Cuotas</h6>
+                    <p class="mb-1"><strong>Monto total:</strong> ₲ {{ monto_total|floatformat:0 }}</p>
+                    <p class="mb-0"><strong>Monto por cuota:</strong> <span id="monto-cuota">₲ {{ monto_total|floatformat:0 }}</span></p>
+                  </div>
+                </div>
+
                 <div class="alert alert-info">
                   <i class="fas fa-shield-alt me-2"></i>
                   <strong>Seguridad:</strong><br>
                   • Sus datos están protegidos con encriptación SSL<br>
-                  • No almacenamos información de tarjetas<br>
-                  • Asegúrese de tener fondos suficientes en su cuenta
+                  • No almacenamos información completa de su tarjeta<br>
+                  • El procesamiento se realiza a través de pasarelas certificadas     
                 </div>
 
                 <div class="d-grid gap-2">
@@ -183,7 +226,9 @@
     </div>
   </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <!-- Scripts -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -218,10 +263,32 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Convertir nombre a mayúsculas
+    const nombreInput = document.getElementById('{{ form.nombre_titular.id_for_label }}');
+    if (nombreInput) {
+        nombreInput.addEventListener('input', function(e) {
+            e.target.value = e.target.value.toUpperCase();
+        });
+    }
+
+    // Cálculo de cuotas
+    const cuotasSelect = document.getElementById('{{ form.cuotas.id_for_label }}');
+    const montoCuotaElement = document.getElementById('monto-cuota');
+    const cuotasInfo = document.getElementById('cuotas-info');
+    const montoTotal = parseFloat(cuotasInfo?.dataset.montoTotal) || 0;
+    
+    if (cuotasSelect && montoCuotaElement) {
+        cuotasSelect.addEventListener('change', function() {
+            const cuotas = parseInt(this.value);
+            const montoCuota = Math.ceil(montoTotal / cuotas);
+            montoCuotaElement.textContent = `₲ ${montoCuota.toLocaleString()}`;
+        });
+    }
+
     // Confirmación antes de enviar
     const form = document.getElementById('form-pago');
     form.addEventListener('submit', function(e) {
-        const confirmacion = confirm('¿Está seguro de que desea procesar el pago con tarjeta de débito?');
+        const confirmacion = confirm('¿Está seguro de que desea procesar el pago con tarjeta de crédito local?');
         if (!confirmacion) {
             e.preventDefault();
         }
