@@ -741,8 +741,15 @@ def comprar_divisas(request):
         usuarios_asociados=request.user
     ).select_related('tipo_cliente').order_by('nombre_comercial')
     
-    # Métodos de cobro activos (para recibir pago del cliente)
-    metodos_cobro = MetodoCobro.objects.filter(es_activo=True).order_by('nombre')
+    # Métodos de cobro activos que aceptan PYG (para recibir pago del cliente)
+    try:
+        moneda_pyg = Moneda.objects.get(codigo='PYG')
+        metodos_cobro = MetodoCobro.objects.filter(
+            es_activo=True,
+            monedas_permitidas=moneda_pyg
+        ).order_by('nombre')
+    except Moneda.DoesNotExist:
+        metodos_cobro = MetodoCobro.objects.filter(es_activo=True).order_by('nombre')
     
     # Métodos de pago activos (para entregar divisas al cliente)
     metodos_pago = MetodoPago.objects.filter(es_activo=True).order_by('nombre')
