@@ -7,8 +7,6 @@ Los métodos de cobro serán:
 - Tarjeta de débito (Solo para PYG)
 - Billetera electrónica (Solo para PYG)
 - Tarjeta de crédito (Solo para PYG, USD)
-- Cheque (Solo para PYG, USD, EUR)
-- Cheque adelantado (Solo para PYG, USD, EUR)
 - Efectivo (Todas las monedas excepto PYG)
 """
 
@@ -66,18 +64,6 @@ def crear_metodos_cobro():
             'descripcion': 'Pago con tarjeta de crédito',
             'comision': Decimal('3.00'),
             'monedas': [pyg, usd]
-        },
-        {
-            'nombre': 'Cheque',
-            'descripcion': 'Pago con cheque bancario',
-            'comision': Decimal('0.50'),
-            'monedas': [pyg, usd, eur]
-        },
-        {
-            'nombre': 'Cheque adelantado',
-            'descripcion': 'Pago con cheque adelantado',
-            'comision': Decimal('0.75'),
-            'monedas': [pyg, usd, eur]
         },
         {
             'nombre': 'Efectivo',
