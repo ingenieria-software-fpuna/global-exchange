@@ -66,6 +66,12 @@ def crear_metodos_cobro():
             'monedas': [pyg, usd]
         },
         {
+            'nombre': 'Tarjeta de crédito local',
+            'descripcion': 'Pago con tarjeta de crédito local (Panal, Cabal)',
+            'comision': Decimal('2.50'),
+            'monedas': [pyg]
+        },
+        {
             'nombre': 'Efectivo',
             'descripcion': 'Pago en efectivo',
             'comision': Decimal('0.00'),

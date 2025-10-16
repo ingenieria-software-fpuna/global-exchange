@@ -143,3 +143,96 @@ class TransferenciaBancariaForm(forms.Form):
             'placeholder': 'Observaciones adicionales...'
         })
     )
+
+
+class TarjetaCreditoLocalForm(forms.Form):
+    """Formulario para datos de tarjeta de crédito local (Panal, Cabal)"""
+    
+    TIPO_TARJETA_CHOICES = [
+        ('panal', 'Panal'),
+        ('cabal', 'Cabal')
+    ]
+    
+    tipo_tarjeta = forms.ChoiceField(
+        choices=TIPO_TARJETA_CHOICES,
+        label="Tipo de tarjeta",
+        help_text="Seleccione el tipo de tarjeta de crédito local",
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )
+    
+    numero_tarjeta = forms.CharField(
+        max_length=19,
+        label="Número de tarjeta",
+        help_text="Ingrese los dígitos de su tarjeta de crédito local",
+        validators=[
+            RegexValidator(
+                regex=r'^[\d\s]{13,19}$',
+                message="Ingrese un número de tarjeta válido"
+            )
+        ],
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'XXXX XXXX XXXX XXXX'
+        })
+    )
+    
+    nombre_titular = forms.CharField(
+        max_length=100,
+        label="Nombre del titular",
+        help_text="Nombre completo como aparece en la tarjeta",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'JUAN PEREZ',
+            'style': 'text-transform: uppercase;'
+        })
+    )
+    
+    fecha_vencimiento = forms.CharField(
+        max_length=5,
+        label="Fecha de vencimiento",
+        help_text="MM/AA",
+        validators=[
+            RegexValidator(
+                regex=r'^(0[1-9]|1[0-2])\/\d{2}$',
+                message="Ingrese una fecha válida en formato MM/AA"
+            )
+        ],
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'MM/AA'
+        })
+    )
+    
+    codigo_seguridad = forms.CharField(
+        max_length=4,
+        label="Código de seguridad",
+        help_text="CVV (3 o 4 dígitos al reverso de la tarjeta)",
+        validators=[
+            RegexValidator(
+                regex=r'^\d{3,4}$',
+                message="El código de seguridad debe tener 3 o 4 dígitos"
+            )
+        ],
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'XXX'
+        })
+    )
+    
+    cuotas = forms.ChoiceField(
+        choices=[
+            ('1', '1 cuota (único pago)'),
+            ('2', '2 cuotas'),
+            ('3', '3 cuotas'),
+            ('6', '6 cuotas'),
+            ('12', '12 cuotas'),
+        ],
+        label="Cantidad de cuotas",
+        help_text="Seleccione el número de cuotas para el pago",
+        initial='1',
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )

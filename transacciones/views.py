@@ -331,6 +331,8 @@ def procesar_pago(request, transaccion_id):
         return redirect('pagos:pago_billetera_electronica', transaccion_id=transaccion_id)
     elif 'tarjeta de débito' in metodo_cobro or 'tarjeta de debito' in metodo_cobro:
         return redirect('pagos:pago_tarjeta_debito', transaccion_id=transaccion_id)
+    elif 'tarjeta de crédito local' in metodo_cobro or 'tarjeta de credito local' in metodo_cobro:
+        return redirect('pagos:pago_tarjeta_credito_local', transaccion_id=transaccion_id)
     elif 'transferencia bancaria' in metodo_cobro:
         return redirect('pagos:pago_transferencia_bancaria', transaccion_id=transaccion_id)
     else:
