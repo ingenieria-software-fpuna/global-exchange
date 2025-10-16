@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Notificaciones - Global Exchange{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="bi bi-bell"></i> Mis Notificaciones
+                    {% if no_leidas > 0 %}
+                        <span class="badge bg-danger">{{ no_leidas }}</span>
+                    {% endif %}
+                </h2>
+                
+                <div class="btn-group" role="group">
+                    <a href="{% url 'notificaciones:preferencias' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-cog"></i> Preferencias
+                    </a>
+                    {% if no_leidas > 0 %}
+                    <form method="post" action="{% url 'notificaciones:marcar_todas_leidas' %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="bi bi-check-all"></i> Marcar todas como leídas
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="btn-group mb-3" role="group" aria-label="Filtros">
+                <a href="?filtro=todas" class="btn btn-outline-secondary {% if filtro == 'todas' %}active{% endif %}">
+                    Todas
+                </a>
+                <a href="?filtro=no_leidas" class="btn btn-outline-secondary {% if filtro == 'no_leidas' %}active{% endif %}">
+                    No leídas ({{ no_leidas }})
+                </a>
+                <a href="?filtro=leidas" class="btn btn-outline-secondary {% if filtro == 'leidas' %}active{% endif %}">
+                    Leídas
+                </a>
+            </div>
+
+            <!-- Lista de notificaciones -->
+            {% if page_obj %}
+                <div class="list-group">
+                    {% for notificacion in page_obj %}
+                        <div class="list-group-item {% if not notificacion.leida %}list-group-item-primary{% endif %}">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h5 class="mb-1">
+                                    <i class="bi bi-currency-exchange text-success"></i>
+                                    {{ notificacion.titulo }}
+                                    {% if not notificacion.leida %}
+                                        <span class="badge bg-primary">Nueva</span>
+                                    {% endif %}
+                                </h5>
+                                <small class="text-muted">{{ notificacion.fecha_creacion|date:"d/m/Y H:i" }}</small>
+                            </div>
+                            <p class="mb-1">{{ notificacion.mensaje }}</p>
+                            
+                            {% if notificacion.moneda %}
+                                <small class="text-muted">
+                                    <i class="bi bi-tag"></i> {{ notificacion.moneda.nombre }} ({{ notificacion.moneda.codigo }})
+                                </small>
+                            {% endif %}
+
+                            {% if notificacion.cambio_porcentual %}
+                                <div class="mt-2">
+                                    <span class="badge {% if notificacion.es_aumento %}bg-success{% else %}bg-danger{% endif %}">
+                                        {% if notificacion.es_aumento %}
+                                            <i class="bi bi-arrow-up"></i> +{{ notificacion.cambio_porcentual }}%
+                                        {% else %}
+                                            <i class="bi bi-arrow-down"></i> {{ notificacion.cambio_porcentual }}%
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            {% endif %}
+
+                            <div class="mt-2">
+                                {% if not notificacion.leida %}
+                                    <form method="post" action="{% url 'notificaciones:marcar_leida' notificacion.pk %}" style="display: inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-check"></i> Marcar como leída
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                <form method="post" action="{% url 'notificaciones:eliminar' notificacion.pk %}" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Está seguro de eliminar esta notificación?');">
+                                        <i class="bi bi-trash"></i> Eliminar
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Paginación -->
+                {% if page_obj.has_other_pages %}
+                    <nav aria-label="Paginación de notificaciones" class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=1&filtro={{ filtro }}">Primera</a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}&filtro={{ filtro }}">Anterior</a>
+                                </li>
+                            {% endif %}
+
+                            <li class="page-item active">
+                                <span class="page-link">
+                                    Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                                </span>
+                            </li>
+
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}&filtro={{ filtro }}">Siguiente</a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&filtro={{ filtro }}">Última</a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% endif %}
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> No hay notificaciones para mostrar.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

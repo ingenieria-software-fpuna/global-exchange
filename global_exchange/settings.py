@@ -54,7 +54,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     
     # Apps del proyecto
-    'grupos', 'usuarios', 'auth.apps.AuthConfig', 'clientes', 'monedas', 'tasa_cambio', 'metodo_pago', 'metodo_cobro', 'configuracion', 'transacciones', 'pagos',
+    'grupos', 'usuarios', 'auth.apps.AuthConfig', 'clientes', 'monedas', 'tasa_cambio', 'metodo_pago', 'metodo_cobro', 'configuracion', 'transacciones', 'pagos', 'notificaciones',
 ]
 
 MIDDLEWARE = [
@@ -81,6 +81,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'grupos.context_processors.permissions_context',
+                'notificaciones.context_processors.notificaciones_no_leidas',
             ],
         },
     },
@@ -169,6 +170,7 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 
 # Configuración del sitio
 SITE_NAME = os.environ.get('SITE_NAME', 'Global Exchange')
+SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000')
 
 # Configuración de logging
 # Asegurar que el directorio de logs existe
