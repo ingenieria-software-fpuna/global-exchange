@@ -327,7 +327,6 @@ def pago_transferencia_bancaria(request, transaccion_id):
         'numero_cuenta': '1234567890',
         'tipo_cuenta': 'Cuenta Corriente',
         'ruc': '80123456-7',
-        'codigo_swift': 'GEXCPYPA',
         'moneda': transaccion.moneda_destino.codigo if transaccion.tipo_operacion.codigo == 'COMPRA' else transaccion.moneda_origen.codigo
     }
 
