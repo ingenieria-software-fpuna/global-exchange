@@ -81,6 +81,11 @@ class TransaccionViewsTest(TestCase):
         
 
         
+        # Asignar permisos necesarios
+        from django.contrib.auth.models import Permission
+        can_operate = Permission.objects.get(codename='can_operate')
+        self.user.user_permissions.add(can_operate)
+        
         self.client = Client()
         self.client.force_login(self.user)
 
