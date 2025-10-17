@@ -118,15 +118,6 @@ def crear_campos_metodos_pago():
             'regex_validacion': r'^\+?[1-9]\d{1,14}$',
             'placeholder': 'Ej: +595981234567'
         },
-        {
-            'nombre': 'codigo_verificacion',
-            'etiqueta': 'Código de Verificación',
-            'tipo': 'text',
-            'es_obligatorio': True,
-            'max_length': 6,
-            'regex_validacion': r'^\d{6}$',
-            'placeholder': 'Código de 6 dígitos'
-        }
     ]
     
     # Campos para Pago en Cuenta Bancaria
