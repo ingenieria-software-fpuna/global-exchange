@@ -1,4 +1,4 @@
-.PHONY: db-up db-clean app-run app-migrate check-admin-group app-setup user user-fast app-reset help docs-html docs-clean docs-live app-test create-currencies stripe-up stripe-down stripe-logs stripe-secret stripe-trigger create-stripe-method
+.PHONY: db-up db-clean app-run app-migrate check-admin-group app-setup user user-fast app-reset help docs-html docs-clean docs-live app-test create-currencies stripe-up stripe-down stripe-logs stripe-secret stripe-trigger
 
 #-------------- Operaciones de base de datos ----------------#
 db-up:
@@ -36,10 +36,6 @@ create-payment-methods:
 create-collection-methods:
 	@echo "Poblando base de datos con métodos de cobro de ejemplo..."
 	poetry run python scripts/create_metodos_cobro_test.py
-
-create-stripe-method:
-	@echo "Configurando método de cobro Stripe..."
-	poetry run python scripts/create_stripe_method.py
 
 create-groups-users:
 	@echo "Creando grupos y usuarios de ejemplo..."
@@ -116,9 +112,6 @@ endif
 	@echo ""
 	@echo "→ Creando métodos de cobro..."
 	@make create-collection-methods
-	@echo ""
-	@echo "→ Configurando Stripe..."
-	@make create-stripe-method
 	@echo ""
 	@echo "→ Creando grupos y usuarios..."
 	@make create-groups-users
@@ -234,7 +227,6 @@ help:
 	@echo "  create-currencies - Poblar base de datos con monedas y tasas de ejemplo"
 	@echo "  create-payment-methods - Poblar base con métodos de pago de ejemplo"
 	@echo "  create-collection-methods - Poblar base con métodos de cobro de ejemplo"
-	@echo "  create-stripe-method - Configurar método de cobro Stripe"
 	@echo "  create-groups-users - Crear grupos y usuarios de ejemplo con permisos"
 	@echo "  create-client-types - Crear tipos de cliente (VIP, Minorista, Corporativo)"
 	@echo "  create-clients - Crear clientes de ejemplo con operadores asignados"

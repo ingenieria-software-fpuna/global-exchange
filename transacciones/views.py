@@ -328,7 +328,7 @@ def procesar_pago(request, transaccion_id):
     # Redirigir según el método de cobro
     metodo_cobro = transaccion.metodo_cobro.nombre.lower()
 
-    if 'stripe' in metodo_cobro:
+    if 'tarjeta de crédito' in metodo_cobro or 'tarjeta de credito' in metodo_cobro:
         return redirect('pagos:pago_stripe', transaccion_id=transaccion_id)
     elif 'billetera electrónica' in metodo_cobro or 'billetera electronica' in metodo_cobro:
         return redirect('pagos:pago_billetera_electronica', transaccion_id=transaccion_id)

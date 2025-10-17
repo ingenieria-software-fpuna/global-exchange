@@ -10,7 +10,7 @@ urlpatterns = [
     path('<str:transaccion_id>/tarjeta-credito-local/', views.pago_tarjeta_credito_local, name='pago_tarjeta_credito_local'),
     path('<str:transaccion_id>/transferencia/', views.pago_transferencia_bancaria, name='pago_transferencia_bancaria'),
 
-    # Vistas de Stripe Checkout
+    # Vistas de Tarjeta de Crédito Internacional (Stripe Checkout)
     path('<str:transaccion_id>/stripe/', views.pago_stripe, name='pago_stripe'),
     path('stripe/success/', views.stripe_success, name='stripe_success'),
     path('stripe/cancel/', views.stripe_cancel, name='stripe_cancel'),

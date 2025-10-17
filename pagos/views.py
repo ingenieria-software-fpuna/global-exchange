@@ -695,11 +695,11 @@ def stripe_success(request):
 
     except PagoPasarela.DoesNotExist:
         messages.error(request, 'Pago no encontrado.')
-        return redirect('transacciones:listado_transacciones')
+        return redirect('transacciones:mis_transacciones')
     except Exception as e:
         logger.error(f"Error al procesar retorno de Stripe: {str(e)}")
         messages.error(request, f'Error al procesar el pago: {str(e)}')
-        return redirect('transacciones:listado_transacciones')
+        return redirect('transacciones:mis_transacciones')
 
 
 def stripe_cancel(request):
