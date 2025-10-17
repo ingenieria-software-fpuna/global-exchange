@@ -62,16 +62,6 @@
               {% endfor %}
             </select>
             <div class="form-text">Seleccione cómo desea pagar por las divisas.</div>
-            
-            <!-- Campos dinámicos del método de cobro -->
-            <div id="campos-metodo-cobro" class="mt-3" style="display: none;">
-              <h6 class="text-primary mb-2">
-                <i class="fas fa-list me-1"></i>Información Requerida para el Método de Cobro
-              </h6>
-              <div id="campos-cobro-container">
-                <!-- Los campos se cargarán dinámicamente aquí -->
-              </div>
-            </div>
           </div>
 
           <!-- Método de Entrega/Pago -->
@@ -217,163 +207,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         monto.value && 
                         parseFloat(monto.value) > 0 &&
                         monedaDestino.value;
-        
-        // Validar campos del método de cobro si existen
-        const camposCobroValidos = validarCamposMetodoCobro(false);
-        
-        return esValido && camposCobroValidos;
+        return esValido;
     }
     
-    // Función para cargar campos del método de cobro
-    async function cargarCamposMetodoCobro(metodoCobroId) {
-        const camposContainer = document.getElementById('campos-cobro-container');
-        const camposDiv = document.getElementById('campos-metodo-cobro');
-        
-        if (!metodoCobroId) {
-            camposDiv.style.display = 'none';
-            return;
-        }
-        
-        try {
-            const response = await fetch(`{% url 'metodo_cobro:api_campos_metodo_cobro' %}?metodo_cobro_id=${metodoCobroId}`);
-            const result = await response.json();
-            
-            if (result.success && result.campos.length > 0) {
-                camposContainer.innerHTML = '';
-                
-                result.campos.forEach(campo => {
-                    const campoDiv = document.createElement('div');
-                    campoDiv.className = 'mb-3 campo-metodo-cobro';
-                    
-                    let inputHtml = '';
-                    const required = campo.es_obligatorio ? 'required' : '';
-                    const maxLength = campo.max_length ? `maxlength="${campo.max_length}"` : '';
-                    const placeholder = campo.placeholder || '';
-                    
-                    switch (campo.tipo) {
-                        case 'select':
-                            const opciones = campo.opciones.map(opcion => 
-                                `<option value="${opcion}">${opcion}</option>`
-                            ).join('');
-                            inputHtml = `
-                                <select name="campo_cobro_${campo.nombre}" class="form-select" ${required}>
-                                    <option value="">Seleccione una opción</option>
-                                    ${opciones}
-                                </select>
-                            `;
-                            break;
-                        case 'textarea':
-                            inputHtml = `
-                                <textarea name="campo_cobro_${campo.nombre}" class="form-control" 
-                                          placeholder="${placeholder}" ${required} ${maxLength}></textarea>
-                            `;
-                            break;
-                        default:
-                            const inputType = campo.tipo === 'number' ? 'number' : 
-                                           campo.tipo === 'email' ? 'email' : 
-                                           campo.tipo === 'phone' ? 'tel' : 'text';
-                            inputHtml = `
-                                <input type="${inputType}" name="campo_cobro_${campo.nombre}" 
-                                       class="form-control" placeholder="${placeholder}" 
-                                       ${required} ${maxLength}>
-                            `;
-                    }
-                    
-                    campoDiv.innerHTML = `
-                        <label class="form-label">
-                            ${campo.etiqueta}
-                            ${campo.es_obligatorio ? '<span class="text-danger">*</span>' : ''}
-                        </label>
-                        ${inputHtml}
-                        <div class="invalid-feedback"></div>
-                    `;
-                    
-                    camposContainer.appendChild(campoDiv);
-                });
-                
-                camposDiv.style.display = 'block';
-                
-                // Agregar event listeners a los campos
-                const camposInputs = camposContainer.querySelectorAll('.campo-metodo-cobro input, .campo-metodo-cobro select, .campo-metodo-cobro textarea');
-                camposInputs.forEach(input => {
-                    input.addEventListener('input', function() {
-                        validarCamposMetodoCobro(false);
-                        calcularPreview();
-                    });
-                    input.addEventListener('change', function() {
-                        validarCamposMetodoCobro(false);
-                        calcularPreview();
-                    });
-                    input.addEventListener('blur', function() {
-                        validarCamposMetodoCobro(false);
-                    });
-                });
-                
-            } else {
-                camposDiv.style.display = 'none';
-            }
-        } catch (error) {
-            console.error('Error al cargar campos del método de cobro:', error);
-            camposDiv.style.display = 'none';
-        }
-    }
-    
-    // Función para validar campos del método de cobro
-    function validarCamposMetodoCobro(mostrarErrores = false) {
-        const camposInputs = document.querySelectorAll('.campo-metodo-cobro input, .campo-metodo-cobro select, .campo-metodo-cobro textarea');
-        let todosValidos = true;
-        
-        camposInputs.forEach(input => {
-            const campoDiv = input.closest('.campo-metodo-cobro');
-            const label = campoDiv.querySelector('label');
-            const esObligatorio = label.querySelector('.text-danger') !== null;
-            const valor = input.value.trim();
-            
-            // Limpiar errores previos
-            input.classList.remove('is-invalid');
-            const feedback = campoDiv.querySelector('.invalid-feedback');
-            if (feedback) {
-                feedback.textContent = '';
-            }
-            
-            let esValido = true;
-            let mensajeError = '';
-            
-            // Validar campo obligatorio
-            if (esObligatorio && !valor) {
-                esValido = false;
-                mensajeError = 'Este campo es obligatorio';
-            }
-            
-            // Validar regex si existe y hay valor
-            if (esValido && valor && input.dataset.regex) {
-                const regex = new RegExp(input.dataset.regex);
-                if (!regex.test(valor)) {
-                    esValido = false;
-                    mensajeError = 'El formato no es válido';
-                }
-            }
-            
-            // Validar longitud máxima
-            if (esValido && valor && input.maxLength && valor.length > parseInt(input.maxLength)) {
-                esValido = false;
-                mensajeError = `Máximo ${input.maxLength} caracteres`;
-            }
-            
-            if (!esValido) {
-                todosValidos = false;
-                if (mostrarErrores) {
-                    input.classList.add('is-invalid');
-                    if (feedback) {
-                        feedback.textContent = mensajeError;
-                    }
-                }
-            }
-        });
-        
-        return todosValidos;
-    }
-
     // Función para calcular preview
     async function calcularPreview() {
         const datos = {
@@ -574,12 +410,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Event listener para método de cobro
-    metodoCobro.addEventListener('change', function() {
-        cargarCamposMetodoCobro(this.value);
-        calcularPreview();
-    });
-    
     // Validar formulario completo cuando cambien campos obligatorios
     [cliente, metodoCobro, metodoPago].forEach(element => {
         element.addEventListener('change', function() {
@@ -611,12 +441,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!monto.value || parseFloat(monto.value) <= 0) {
             alert('Por favor ingrese un monto válido.');
-            return;
-        }
-        
-        // Validar campos del método de cobro
-        if (!validarCamposMetodoCobro(true)) {
-            alert('Por favor complete correctamente todos los campos requeridos del método de cobro.');
             return;
         }
         

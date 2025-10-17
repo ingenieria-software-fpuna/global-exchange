@@ -29,11 +29,6 @@ class MetodoCobro(models.Model):
         Moneda,
         help_text="Monedas en las que se puede usar este método de cobro"
     )
-    campos = models.ManyToManyField(
-        'metodo_pago.Campo',
-        blank=True,
-        help_text="Campos específicos requeridos para este método de cobro"
-    )
     fecha_creacion = models.DateTimeField(
         default=timezone.now,
         help_text="Fecha y hora de creación del registro"
@@ -59,7 +54,3 @@ class MetodoCobro(models.Model):
     def permite_moneda(self, moneda):
         """Verifica si el método permite una moneda específica"""
         return self.monedas_permitidas.filter(id=moneda.id).exists()
-    
-    def get_campos_activos(self):
-        """Retorna los campos activos asociados a este método de cobro"""
-        return self.campos.filter(es_activo=True).order_by('nombre')
