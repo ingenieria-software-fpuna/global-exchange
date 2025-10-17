@@ -76,6 +76,91 @@
             background-color: var(--brand-primary);
             border-color: var(--brand-primary);
         }
+
+        /* Notificaciones */
+        .nav-link .badge {
+            font-size: 0.7rem;
+            padding: 0.25rem 0.4rem;
+        }
+        .nav-link i.fa-bell {
+            font-size: 1.1rem;
+        }
+        .nav-link .badge.badge-notificaciones {
+            top: -5px !important;
+            left: 50% !important;
+            transform: translate(-25%, 0) !important;
+        }
+        
+        /* Dropdown de notificaciones */
+        .notificaciones-dropdown {
+            min-width: 320px;
+            max-width: 380px;
+            max-height: 450px;
+            overflow-y: auto;
+        }
+        .notificacion-item {
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+            padding: 0.5rem 0.75rem !important;
+        }
+        .notificacion-item:hover {
+            background-color: rgba(0,0,0,.02);
+        }
+        .notificacion-item.no-leida {
+            background-color: rgba(13, 110, 253, 0.05);
+            border-left-color: var(--brand-primary);
+        }
+        .notificacion-item .notificacion-header {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #212529;
+            line-height: 1.2;
+        }
+        .notificacion-item .notificacion-mensaje {
+            font-size: 0.75rem;
+            color: #6c757d;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .notificacion-item .notificacion-fecha {
+            font-size: 0.7rem;
+            color: #adb5bd;
+        }
+        .notificacion-item .badge-cambio {
+            font-size: 0.65rem;
+            padding: 0.2rem 0.35rem;
+        }
+        .notificacion-item .badge-sm {
+            font-size: 0.65rem;
+            padding: 0.15rem 0.35rem;
+        }
+        .notificaciones-dropdown .dropdown-header {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .notificaciones-dropdown .dropdown-footer {
+            background-color: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            text-align: center;
+        }
+        .notificaciones-dropdown .dropdown-footer a {
+            color: var(--brand-primary);
+            font-weight: 500;
+            text-decoration: none;
+        }
+        .notificaciones-dropdown .dropdown-footer a:hover {
+            text-decoration: underline;
+        }
+        .notificaciones-empty {
+            padding: 2rem;
+            text-align: center;
+            color: #6c757d;
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -95,13 +180,11 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     {% if user.is_authenticated %}
-                        {% if can_view_dashboard %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'auth:dashboard' %}">
                                 <i class="fas fa-gauge-high me-1"></i>Dashboard
                             </a>
                         </li>
-                        {% endif %}
                         {% if can_view_usuarios or can_view_roles or can_view_tipocliente or is_admin_role %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -144,6 +227,41 @@
                 </ul>
                 <ul class="navbar-nav">
                     {% if user.is_authenticated %}
+                    <!-- Notificaciones - Solo para Operador y Visitante -->
+                    {% if puede_ver_notificaciones %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link position-relative" href="#" id="notificacionesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notificaciones">
+                            <i class="fas fa-bell"></i>
+                            {% if notificaciones_no_leidas_count > 0 %}
+                                <span class="position-absolute badge rounded-pill bg-danger badge-notificaciones">
+                                    {{ notificaciones_no_leidas_count }}
+                                    <span class="visually-hidden">notificaciones no leídas</span>
+                                </span>
+                            {% endif %}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end shadow notificaciones-dropdown" aria-labelledby="notificacionesDropdown">
+                            <li class="dropdown-header d-flex justify-content-between align-items-center">
+                                <span>Notificaciones</span>
+                                <button type="button" class="btn btn-sm btn-link text-primary p-0" id="marcarTodasLeidasBtn" style="font-size: 0.75rem;">
+                                    Marcar todas leídas
+                                </button>
+                            </li>
+                            <li><hr class="dropdown-divider m-0"></li>
+                            <div id="notificacionesContainer">
+                                <!-- Las notificaciones se cargarán aquí dinámicamente -->
+                                <li class="text-center py-3">
+                                    <span class="spinner-border spinner-border-sm" role="status">
+                                        <span class="visually-hidden">Cargando...</span>
+                                    </span>
+                                </li>
+                            </div>
+                            <li><hr class="dropdown-divider m-0"></li>
+                            <li class="dropdown-footer py-2">
+                                <a href="{% url 'notificaciones:lista' %}" class="d-block">Ver todas las notificaciones</a>
+                            </li>
+                        </ul>
+                    </li>
+                    {% endif %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-user-circle me-1"></i>{{ user.nombre|default:user.email }}
@@ -154,11 +272,13 @@
                                     <i class="fas fa-gauge-high me-2"></i>Dashboard
                                 </a>
                             </li>
+                            {% if can_view_transacciones %}
                             <li>
                                 <a class="dropdown-item" href="{% url 'transacciones:mis_transacciones' %}">
                                     <i class="fas fa-exchange-alt me-2"></i>Mis transacciones
                                 </a>
                             </li>
+                            {% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <a class="dropdown-item" href="{% url 'auth:logout' %}">
@@ -182,6 +302,28 @@
     <main id="content" class="main-content">
         <div class="{% block main_container_class %}container py-4{% endblock %}">
             {% block page_header %}{% endblock %}
+            
+            <!-- Mensajes de Django -->
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                        {% if message.tags == 'error' %}
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                        {% elif message.tags == 'warning' %}
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                        {% elif message.tags == 'success' %}
+                            <i class="fas fa-check-circle me-2"></i>
+                        {% elif message.tags == 'info' %}
+                            <i class="fas fa-info-circle me-2"></i>
+                        {% else %}
+                            <i class="fas fa-bell me-2"></i>
+                        {% endif %}
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+            
             {% block content %}{% endblock %}
         </div>
     </main>
@@ -199,6 +341,196 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Script para notificaciones popup -->
+    {% if puede_ver_notificaciones %}
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const notificacionesDropdown = document.getElementById('notificacionesDropdown');
+        const notificacionesContainer = document.getElementById('notificacionesContainer');
+        const marcarTodasBtn = document.getElementById('marcarTodasLeidasBtn');
+        
+        // Cargar notificaciones cuando se abre el dropdown
+        if (notificacionesDropdown) {
+            notificacionesDropdown.addEventListener('show.bs.dropdown', function() {
+                cargarNotificaciones();
+            });
+        }
+        
+        // Función para cargar notificaciones
+        function cargarNotificaciones() {
+            fetch('{% url "notificaciones:recientes" %}')
+                .then(response => response.json())
+                .then(data => {
+                    renderizarNotificaciones(data.notificaciones);
+                    actualizarContador(data.total_no_leidas);
+                })
+                .catch(error => {
+                    console.error('Error al cargar notificaciones:', error);
+                    notificacionesContainer.innerHTML = `
+                        <li class="notificaciones-empty">
+                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                            <p class="mb-0 mt-2">Error al cargar notificaciones</p>
+                        </li>
+                    `;
+                });
+        }
+        
+        // Función para renderizar notificaciones
+        function renderizarNotificaciones(notificaciones) {
+            if (notificaciones.length === 0) {
+                notificacionesContainer.innerHTML = `
+                    <li class="notificaciones-empty">
+                        <i class="fas fa-bell-slash fa-2x text-muted"></i>
+                        <p class="mb-0 mt-2">No tienes notificaciones</p>
+                    </li>
+                `;
+                return;
+            }
+            
+            let html = '';
+            notificaciones.forEach(notif => {
+                const claseLeida = notif.leida ? '' : 'no-leida';
+                const iconoTipo = 'fa-exchange-alt';
+                const colorCambio = notif.es_aumento ? 'success' : 'danger';
+                const iconoCambio = notif.es_aumento ? 'fa-arrow-up' : 'fa-arrow-down';
+                
+                html += `
+                    <li>
+                        <a class="dropdown-item notificacion-item ${claseLeida}" 
+                           href="#" 
+                           data-notif-id="${notif.id}"
+                           onclick="marcarLeidaYRedirigir(event, ${notif.id})">
+                            <div class="d-flex gap-2">
+                                <div style="flex-shrink: 0;">
+                                    <i class="fas ${iconoTipo} text-primary" style="font-size: 0.8rem;"></i>
+                                </div>
+                                <div style="flex: 1; min-width: 0;">
+                                    <div class="notificacion-header d-flex justify-content-between align-items-start gap-1">
+                                        <span style="flex: 1;">${notif.titulo}</span>
+                                        ${!notif.leida ? '<span class="badge bg-primary badge-sm">Nueva</span>' : ''}
+                                    </div>
+                                    <div class="notificacion-mensaje mt-1">
+                                        ${notif.mensaje}
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mt-1 gap-2">
+                                        <span class="notificacion-fecha" style="white-space: nowrap;">
+                                            <i class="far fa-clock me-1"></i>${notif.fecha_creacion}
+                                        </span>
+                                        ${notif.cambio_porcentual ? `
+                                            <span class="badge badge-cambio bg-${colorCambio}" style="flex-shrink: 0;">
+                                                <i class="fas ${iconoCambio}"></i>
+                                                ${notif.cambio_porcentual}%
+                                            </span>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </li>
+                `;
+            });
+            
+            notificacionesContainer.innerHTML = html;
+        }
+        
+        // Función para actualizar el contador del badge
+        function actualizarContador(count) {
+            const badge = document.querySelector('#notificacionesDropdown .badge');
+            if (count > 0) {
+                if (badge) {
+                    badge.textContent = count;
+                } else {
+                    // Crear badge si no existe
+                    const bellIcon = document.querySelector('#notificacionesDropdown i');
+                    const newBadge = document.createElement('span');
+                    newBadge.className = 'position-absolute badge rounded-pill bg-danger badge-notificaciones';
+                    newBadge.innerHTML = `${count}<span class="visually-hidden">notificaciones no leídas</span>`;
+                    bellIcon.parentElement.appendChild(newBadge);
+                }
+            } else {
+                if (badge) {
+                    badge.remove();
+                }
+            }
+        }
+        
+        // Marcar todas como leídas
+        if (marcarTodasBtn) {
+            marcarTodasBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                fetch('{% url "notificaciones:marcar_todas_leidas" %}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        cargarNotificaciones();
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            });
+        }
+        
+        // Función auxiliar para obtener cookie CSRF
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    });
+    
+    // Función global para marcar como leída y redirigir
+    function marcarLeidaYRedirigir(event, notifId) {
+        event.preventDefault();
+        
+        fetch(`/notificaciones/marcar-leida/${notifId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(() => {
+            window.location.href = '{% url "notificaciones:lista" %}';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            window.location.href = '{% url "notificaciones:lista" %}';
+        });
+    }
+    
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    </script>
+    {% endif %}
     
     <!-- Navegación atrás global -->
     <script>

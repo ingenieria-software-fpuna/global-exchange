@@ -66,6 +66,95 @@
           </div>
         </div>
 
+        <!-- Campos del Método de Pago -->
+        <div class="row mt-4">
+          <div class="col-12">
+            <h5 class="text-primary mb-3">
+              <i class="fas fa-list me-2"></i>Campos Requeridos
+            </h5>
+            
+            <div class="mb-3">
+              <div class="border rounded p-3 bg-light">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <p class="mb-0 text-muted">Configure los campos que el usuario debe completar para usar este método de pago.</p>
+                  <button type="button" class="btn btn-sm btn-outline-primary" id="add-campo">
+                    <i class="fas fa-plus me-1"></i>Agregar Campo
+                  </button>
+                </div>
+                
+                <div id="campos-container">
+                  {{ campo_formset.management_form }}
+                  
+                  {% for form in campo_formset %}
+                    <div class="campo-form border rounded p-3 mb-3 bg-white" data-form-index="{{ forloop.counter0 }}">
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Campo {{ forloop.counter }}</h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-campo" style="display: none;">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                      
+                      <div class="row g-2">
+                        <div class="col-md-3">
+                          <label class="form-label small">Nombre del Campo</label>
+                          {{ form.nombre }}
+                          {% for e in form.nombre.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label small">Etiqueta</label>
+                          {{ form.etiqueta }}
+                          {% for e in form.etiqueta.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-2">
+                          <label class="form-label small">Tipo</label>
+                          {{ form.tipo }}
+                          {% for e in form.tipo.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-2">
+                          <label class="form-label small">Longitud Máx</label>
+                          {{ form.max_length }}
+                          {% for e in form.max_length.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                          <div class="form-check">
+                            {{ form.es_obligatorio }}
+                            <label class="form-check-label small" for="{{ form.es_obligatorio.id_for_label }}">Obligatorio</label>
+                          </div>
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label small">Regex de Validación</label>
+                          {{ form.regex_validacion }}
+                          {% for e in form.regex_validacion.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label small">Placeholder</label>
+                          {{ form.placeholder }}
+                          {% for e in form.placeholder.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                          <label class="form-label small">Opciones (una por línea)</label>
+                          {{ form.opciones }}
+                          {% for e in form.opciones.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                          <div class="form-check">
+                            {{ form.es_activo }}
+                            <label class="form-check-label small" for="{{ form.es_activo.id_for_label }}">Activo</label>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <!-- Campos ocultos para el formset -->
+                      {{ form.DELETE }}
+                      {{ form.id }}
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="d-flex justify-content-end mt-4">
           <a href="{% url 'metodo_pago:metodopago_list' %}" class="btn btn-outline-secondary me-2">Cancelar</a>
           <button type="submit" class="btn btn-primary">{{ accion }}</button>
@@ -74,5 +163,126 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('campos-container');
+    const addButton = document.getElementById('add-campo');
+    const totalForms = document.getElementById('id_form-TOTAL_FORMS');
+    let formCount = parseInt(totalForms.value);
+    
+    // Mostrar botones de eliminar si hay más de un campo
+    function toggleRemoveButtons() {
+        const forms = container.querySelectorAll('.campo-form');
+        forms.forEach((form, index) => {
+            const removeBtn = form.querySelector('.remove-campo');
+            if (forms.length > 1) {
+                removeBtn.style.display = 'block';
+            } else {
+                removeBtn.style.display = 'none';
+            }
+        });
+    }
+    
+    // Agregar nuevo campo
+    addButton.addEventListener('click', function() {
+        const newForm = document.createElement('div');
+        newForm.className = 'campo-form border rounded p-3 mb-3 bg-white';
+        newForm.setAttribute('data-form-index', formCount);
+        
+        newForm.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">Campo ${formCount + 1}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-campo">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label small">Nombre del Campo</label>
+                    <input type="text" name="form-${formCount}-nombre" class="form-control" placeholder="ej: numero_telefono">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Etiqueta</label>
+                    <input type="text" name="form-${formCount}-etiqueta" class="form-control" placeholder="Número de Teléfono">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Tipo</label>
+                    <select name="form-${formCount}-tipo" class="form-control">
+                        <option value="text">Texto</option>
+                        <option value="number">Número</option>
+                        <option value="email">Email</option>
+                        <option value="phone">Teléfono</option>
+                        <option value="select">Selección</option>
+                        <option value="textarea">Área de texto</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Longitud Máx</label>
+                    <input type="number" name="form-${formCount}-max_length" class="form-control" min="1" max="1000">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="form-check">
+                        <input type="checkbox" name="form-${formCount}-es_obligatorio" class="form-check-input" checked>
+                        <label class="form-check-label small">Obligatorio</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">Regex de Validación</label>
+                    <input type="text" name="form-${formCount}-regex_validacion" class="form-control" placeholder="^[0-9]{10,15}$">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">Placeholder</label>
+                    <input type="text" name="form-${formCount}-placeholder" class="form-control" placeholder="Ej: +595981234567">
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">Opciones (una por línea)</label>
+                    <textarea name="form-${formCount}-opciones" class="form-control" rows="3" placeholder="Una opción por línea"></textarea>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <div class="form-check">
+                        <input type="checkbox" name="form-${formCount}-es_activo" class="form-check-input" checked>
+                        <label class="form-check-label small">Activo</label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Campos ocultos para el formset -->
+            <input type="hidden" name="form-${formCount}-DELETE" value="">
+            <input type="hidden" name="form-${formCount}-id" value="">
+        `;
+        
+        container.appendChild(newForm);
+        formCount++;
+        totalForms.value = formCount;
+        toggleRemoveButtons();
+    });
+    
+    // Eliminar campo
+    container.addEventListener('click', function(e) {
+        if (e.target.closest('.remove-campo')) {
+            const formToRemove = e.target.closest('.campo-form');
+            const deleteInput = formToRemove.querySelector('input[name$="-DELETE"]');
+            
+            if (deleteInput) {
+                deleteInput.value = 'on';
+                formToRemove.style.display = 'none';
+            } else {
+                formToRemove.remove();
+                formCount--;
+                totalForms.value = formCount;
+            }
+            
+            toggleRemoveButtons();
+        }
+    });
+    
+    // Inicializar botones de eliminar
+    toggleRemoveButtons();
+});
+</script>
 {% endblock %}
 

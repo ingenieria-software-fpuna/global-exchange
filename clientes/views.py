@@ -104,6 +104,11 @@ class ClienteListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     def get_queryset(self):
         queryset = Cliente.objects.select_related('tipo_cliente').prefetch_related('usuarios_asociados')
         
+        # Verificar si el usuario tiene permiso para ver todos los clientes
+        if not self.request.user.has_perm('clientes.can_view_all_clients'):
+            # Si no tiene el permiso, mostrar solo los clientes asociados al usuario
+            queryset = queryset.filter(usuarios_asociados=self.request.user)
+        
         # Filtro de búsqueda
         q = self.request.GET.get('q')
         if q:
@@ -128,12 +133,13 @@ class ClienteListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['tipos_cliente'] = TipoCliente.objects.filter(activo=True)
+        context['tipos_cliente'] = TipoCliente.objects.all()
         context['q'] = self.request.GET.get('q', '')
         context['tipo_cliente_filter'] = self.request.GET.get('tipo_cliente', '')
         context['estado_filter'] = self.request.GET.get('estado', '')
         context['can_create_cliente'] = self.request.user.has_perm('clientes.add_cliente')
         context['can_edit_cliente'] = self.request.user.has_perm('clientes.change_cliente')
+        context['can_view_sensitive_columns'] = self.request.user.has_perm('clientes.can_view_sensitive_columns')
         return context
 
 class ClienteCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):

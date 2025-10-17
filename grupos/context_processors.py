@@ -107,6 +107,13 @@ def permissions_context(request):
         context['can_create_metodocobro'] = request.user.has_perm('metodo_cobro.add_metodocobro')
         context['can_edit_metodocobro'] = request.user.has_perm('metodo_cobro.change_metodocobro')
         
+        # Permisos específicos para transacciones
+        context['can_view_transacciones'] = request.user.has_perm('transacciones.view_transaccion')
+        context['can_create_transacciones'] = request.user.has_perm('transacciones.add_transaccion')
+        context['can_edit_transacciones'] = request.user.has_perm('transacciones.change_transaccion')
+        context['can_delete_transacciones'] = request.user.has_perm('transacciones.delete_transaccion')
+        context['can_operate'] = request.user.has_perm('transacciones.can_operate')  # Permiso para comprar/vender
+        
         # Permisos específicos para configuración
         context['can_view_configuracion'] = request.user.has_perm('configuracion.change_configuracionsistema')
         
@@ -121,6 +128,7 @@ def permissions_context(request):
             context['can_view_tasacambio'] or
             context['can_view_metodopago'] or
             context['can_view_metodocobro'] or
+            context['can_view_transacciones'] or
             context['can_view_configuracion']
         )
         
@@ -165,6 +173,11 @@ def permissions_context(request):
         context['can_view_metodocobro'] = False
         context['can_create_metodocobro'] = False
         context['can_edit_metodocobro'] = False
+        context['can_view_transacciones'] = False
+        context['can_create_transacciones'] = False
+        context['can_edit_transacciones'] = False
+        context['can_delete_transacciones'] = False
+        context['can_operate'] = False
         context['can_view_configuracion'] = False
     
     return context

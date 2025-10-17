@@ -41,3 +41,23 @@ metodo_pago
 
 - ``MetodoPago``: nombre único, ``comision`` 0–100%, ``es_activo``.
 
+configuracion
+-------------
+
+- ``ConfiguracionSistema``: Modelo Singleton con límites de transacciones diarios/mensuales. Método de clase ``get_configuracion()`` retorna única instancia.
+
+notificaciones
+--------------
+
+- ``Notificacion``: Notificaciones de cambios en tasas de cambio para Operadores y Visitantes. Signals detectan cambios automáticamente y envían emails. Context processor agrega contador de no leídas al template.
+
+pagos
+-----
+
+- ``PagoPasarela``: Registra pagos procesados a través de pasarelas externas. Estados: exito/fallo/pendiente. ``PasarelaService`` integra con API simulada. ``StripeService`` integra con Stripe Checkout. Soporte para webhooks asíncronos.
+
+roles
+-----
+
+- Módulo deprecated. Funcionalidad migrada a ``grupos`` que usa el sistema nativo de Django ``auth.models.Group``. Ver documentación de ``grupos`` para gestión de roles y permisos.
+

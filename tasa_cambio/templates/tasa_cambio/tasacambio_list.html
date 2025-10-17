@@ -72,13 +72,19 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>Moneda</th>
+                                    <th class="text-center">Precio Compra</th>
+                                    <th class="text-center">Precio Venta</th>
+                                    {% if can_view_sensitive_columns %}
                                     <th>Precio Base</th>
                                     <th>Comisión Compra</th>
                                     <th>Comisión Venta</th>
                                     <th>Spread</th>
-                                    <th>Fecha creacion</th>
+                                    <th>Fecha creación</th>
                                     <th>Estado</th>
+                                    {% endif %}
+                                    {% if perms.tasa_cambio.view_tasacambio %}
                                     <th class="text-center">Acciones</th>
+                                    {% endif %}
                                 </tr>
                             </thead>
                             <tbody>
@@ -94,6 +100,17 @@
                                             </span>
                                         </div>
                                     </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-primary text-white fs-6">
+                                            {{ tasacambio.tasa_compra|formatear_guaranies }}
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-primary text-white fs-6">
+                                            {{ tasacambio.tasa_venta|formatear_guaranies }}
+                                        </span>
+                                    </td>
+                                    {% if can_view_sensitive_columns %}
                                     <td>
                                         <span class="badge bg-info text-white fs-6">
                                             {{ tasacambio.precio_base|formatear_guaranies }}
@@ -136,7 +153,8 @@
                                             </span>
                                         {% endif %}
                                     </td>
-
+                                    {% endif %}
+                                    {% if perms.tasa_cambio.view_tasacambio %}
                                     <td class="text-center">
                                         <div class="btn-group" role="group">
                                             <a href="{% url 'tasa_cambio:tasacambio_historial' tasacambio.moneda.id %}"
@@ -144,21 +162,9 @@
                                                title="Ver historial">
                                                 <i class="fas fa-chart-line"></i>
                                             </a>
-                                            {% if perms.tasa_cambio.change_tasacambio %}
-                                            <button type="button"
-                                                    class="btn btn-sm {% if tasacambio.es_activa %}btn-outline-warning{% else %}btn-outline-success{% endif %} toggle-status-btn"
-                                                    title="{% if tasacambio.es_activa %}Desactivar{% else %}Activar{% endif %}"
-                                                    data-tasacambio-id="{{ tasacambio.pk }}"
-                                                    data-current-status="{% if tasacambio.es_activa %}true{% else %}false{% endif %}">
-                                                {% if tasacambio.es_activa %}
-                                                    <i class="fas fa-eye-slash"></i>
-                                                {% else %}
-                                                    <i class="fas fa-eye"></i>
-                                                {% endif %}
-                                            </button>
-                                            {% endif %}
                                         </div>
                                     </td>
+                                    {% endif %}
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -212,37 +218,4 @@
     {% endif %}
  </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.toggle-status-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.dataset.tasacambioId;
-      try {
-        const resp = await fetch(`{% url 'tasa_cambio:toggle_status' 0 %}`.replace('/0/', `/${id}/`), {
-          method: 'POST',
-          headers: { 'X-CSRFToken': getCookie('csrftoken') },
-        });
-        const data = await resp.json();
-        if (data.success) { window.location.reload(); }
-        else { alert(data.message || 'Error al cambiar estado'); }
-      } catch (e) { alert('Error de red'); }
-    });
-  });
-
-  function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-      const cookies = document.cookie.split(';');
-      for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i].trim();
-        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-          break;
-        }
-      }
-    }
-    return cookieValue;
-  }
-});
-</script>
 {% endblock %}

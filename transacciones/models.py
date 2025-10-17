@@ -300,6 +300,9 @@ class Transaccion(models.Model):
             models.Index(fields=['fecha_expiracion']),
             models.Index(fields=['tipo_operacion', '-fecha_creacion']),
         ]
+        permissions = [
+            ('can_operate', 'Puede realizar operaciones de compra y venta'),
+        ]
 
     def __str__(self):
         return f"Transacción {self.id_transaccion} - {self.tipo_operacion.nombre}"
@@ -393,33 +396,48 @@ class Transaccion(models.Model):
         """Retorna un diccionario con el resumen financiero detallado con la NUEVA lógica"""
         from decimal import Decimal
         
-        # NUEVA LÓGICA: monto_origen es lo que el cliente PAGA (total)
-        monto_total_pagado = self.monto_origen
-        
-        # Calcular comisiones individuales sobre el monto total que paga
+        # Calcular comisiones según el tipo de operación
         comision_cobro = Decimal('0')
         comision_pago = Decimal('0')
         
-        if self.metodo_cobro and self.metodo_cobro.comision > 0:
-            comision_cobro = monto_total_pagado * (Decimal(str(self.metodo_cobro.comision)) / Decimal('100'))
-        
-        if self.metodo_pago and self.metodo_pago.comision > 0:
-            comision_pago = monto_total_pagado * (Decimal(str(self.metodo_pago.comision)) / Decimal('100'))
+        if self.tipo_operacion.codigo == 'VENTA':
+            # Para VENTAS: las comisiones se calculan sobre el PYG bruto (subtotal)
+            # Necesitamos recalcular el PYG bruto desde la divisa vendida
+            monto_pyg_bruto = self.monto_origen * self.tasa_cambio
+            
+            if self.metodo_cobro and self.metodo_cobro.comision > 0:
+                comision_cobro = monto_pyg_bruto * (Decimal(str(self.metodo_cobro.comision)) / Decimal('100'))
+            
+            if self.metodo_pago and self.metodo_pago.comision > 0:
+                comision_pago = monto_pyg_bruto * (Decimal(str(self.metodo_pago.comision)) / Decimal('100'))
+        else:
+            # Para COMPRAS: las comisiones se calculan sobre el monto que paga el cliente (PYG)
+            monto_total_pagado = self.monto_origen
+            
+            if self.metodo_cobro and self.metodo_cobro.comision > 0:
+                comision_cobro = monto_total_pagado * (Decimal(str(self.metodo_cobro.comision)) / Decimal('100'))
+            
+            if self.metodo_pago and self.metodo_pago.comision > 0:
+                comision_pago = monto_total_pagado * (Decimal(str(self.metodo_pago.comision)) / Decimal('100'))
         
         comision_total = comision_cobro + comision_pago
         
         # Descuento aplicado (sobre las comisiones)
         descuento_aplicado = Decimal('0')
         descuento_pct = Decimal('0')
-        if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.descuento > 0:
+        if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.activo and self.cliente.tipo_cliente.descuento > 0:
             descuento_pct = Decimal(str(self.cliente.tipo_cliente.descuento))
             descuento_aplicado = comision_total * (descuento_pct / Decimal('100'))
         
-        # El monto base es lo que ingresó el cliente (sin desglose)
-        monto_base = monto_total_pagado
-        
-        # El cliente paga exactamente lo que ingresó
-        total_cliente = monto_total_pagado
+        # Definir variables según el tipo de operación
+        if self.tipo_operacion.codigo == 'VENTA':
+            # Para ventas: el cliente entrega divisa extranjera
+            monto_base = self.monto_origen  # Divisa extranjera que entrega
+            total_cliente = self.monto_origen  # Lo que entrega el cliente
+        else:
+            # Para compras: el cliente paga PYG
+            monto_base = self.monto_origen  # PYG que paga
+            total_cliente = self.monto_origen  # Lo que paga el cliente
         
         # Formatear montos
         def formatear_monto(valor, moneda):
@@ -433,17 +451,21 @@ class Transaccion(models.Model):
             'subtotal': float(self.monto_origen),
             'subtotal_formateado': formatear_monto(self.monto_origen, self.moneda_origen),
             
-            # Comisiones
+            # Comisiones - formatear según el tipo de operación
             'comision_cobro': float(comision_cobro),
-            'comision_cobro_formateado': formatear_monto(comision_cobro, self.moneda_origen),
+            'comision_cobro_formateado': formatear_monto(comision_cobro, 
+                self.moneda_destino if self.tipo_operacion.codigo == 'VENTA' else self.moneda_origen),
             'comision_pago': float(comision_pago),
-            'comision_pago_formateado': formatear_monto(comision_pago, self.moneda_origen),
+            'comision_pago_formateado': formatear_monto(comision_pago, 
+                self.moneda_destino if self.tipo_operacion.codigo == 'VENTA' else self.moneda_origen),
             'comision_total': float(comision_total),
-            'comision_total_formateado': formatear_monto(comision_total, self.moneda_origen),
+            'comision_total_formateado': formatear_monto(comision_total, 
+                self.moneda_destino if self.tipo_operacion.codigo == 'VENTA' else self.moneda_origen),
             
-            # Descuento
+            # Descuento - formatear según el tipo de operación
             'descuento_aplicado': float(descuento_aplicado),
-            'descuento_aplicado_formateado': formatear_monto(descuento_aplicado, self.moneda_origen),
+            'descuento_aplicado_formateado': formatear_monto(descuento_aplicado, 
+                self.moneda_destino if self.tipo_operacion.codigo == 'VENTA' else self.moneda_origen),
             'descuento_pct': float(descuento_pct),
             
             # Total final
@@ -531,7 +553,7 @@ class Transaccion(models.Model):
 
                 # Calcular precio de venta con descuento (como se hace en calcular_compra)
                 comision_venta_ajustada = Decimal(str(tasa_actual.comision_venta))
-                if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.descuento > 0:
+                if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.activo and self.cliente.tipo_cliente.descuento > 0:
                     descuento_pct = Decimal(str(self.cliente.tipo_cliente.descuento))
                     comision_venta_ajustada = comision_venta_ajustada * (Decimal('1') - (descuento_pct / Decimal('100')))
 
@@ -546,15 +568,15 @@ class Transaccion(models.Model):
                 if not tasa_actual:
                     return False
 
-                # Calcular precio de compra con descuento (como se hace en calcular_venta)
-                precio_base_compra = Decimal(str(tasa_actual.precio_base)) - Decimal(str(tasa_actual.comision_compra))
-
-                if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.descuento > 0:
+                # Calcular precio de compra con descuento aplicado a la comisión (como se hace en calcular_venta)
+                comision_compra_ajustada = Decimal(str(tasa_actual.comision_compra))
+                if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.activo and self.cliente.tipo_cliente.descuento > 0:
                     descuento_pct = Decimal(str(self.cliente.tipo_cliente.descuento))
-                    # Para ventas, el descuento aumenta la tasa (cliente recibe más PYG)
-                    tasa_esperada = precio_base_compra * (Decimal('1') + (descuento_pct / Decimal('100')))
-                else:
-                    tasa_esperada = precio_base_compra
+                    # El descuento reduce la comisión de compra (cliente recibe más PYG)
+                    comision_compra_ajustada = comision_compra_ajustada * (Decimal('1') - (descuento_pct / Decimal('100')))
+                
+                # Precio de compra ajustado: precio_base - comision_compra_ajustada
+                tasa_esperada = Decimal(str(tasa_actual.precio_base)) - comision_compra_ajustada
 
             # Comparar con la tasa guardada en la transacción (con tolerancia)
             diferencia = abs(tasa_esperada - self.tasa_cambio)

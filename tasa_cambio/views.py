@@ -59,6 +59,7 @@ class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         context['fecha_desde'] = self.request.GET.get('fecha_desde', '')
         context['fecha_hasta'] = self.request.GET.get('fecha_hasta', '')
         context['monedas'] = Moneda.objects.filter(es_activa=True).order_by('nombre')
+        context['can_view_sensitive_columns'] = self.request.user.has_perm('tasa_cambio.can_view_sensitive_columns')
         return context
 
 
@@ -102,6 +103,9 @@ class TasaCambioHistorialView(LoginRequiredMixin, PermissionRequiredMixin, ListV
         context['estado'] = self.request.GET.get('estado', '')
         context['fecha_desde'] = self.request.GET.get('fecha_desde', '')
         context['fecha_hasta'] = self.request.GET.get('fecha_hasta', '')
+        
+        # Permiso para ver columnas sensibles
+        context['can_view_sensitive_columns'] = self.request.user.has_perm('tasa_cambio.can_view_sensitive_columns')
 
         # Datos para gráficos
         historial_datos = list(self.get_queryset()[:50].values(
@@ -163,28 +167,6 @@ class TasaCambioCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateVi
         return super().form_invalid(form)
 
 
-@login_required
-@permission_required('tasa_cambio.change_tasacambio', raise_exception=True)
-@require_http_methods(["POST"])
-def toggle_tasacambio_status(request, pk):
-    """Vista AJAX para cambiar el estado activo/inactivo de una cotización"""
-    try:
-        tasacambio = get_object_or_404(TasaCambio, pk=pk)
-        
-        tasacambio.es_activa = not tasacambio.es_activa
-        tasacambio.save()
-        
-        status_text = "activada" if tasacambio.es_activa else "desactivada"
-        return JsonResponse({
-            'success': True,
-            'message': f'Cotización {status_text} exitosamente.',
-            'nueva_estado': tasacambio.es_activa
-        })
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'Error al cambiar el estado: {str(e)}'
-        })
 
 
 @login_required
@@ -212,6 +194,7 @@ def tasacambio_detail_api(request, pk):
 
 
 @login_required
+@permission_required('transacciones.can_operate', raise_exception=True)
 # @permission_required('tasa_cambio.view_tasacambio', raise_exception=True)
 def dashboard_tasacambio(request):
     """Vista del dashboard específico para cotizaciones"""
@@ -297,7 +280,8 @@ def simular_cambio_api(request):
             cliente = Cliente.objects.select_related('tipo_cliente').get(
                 pk=cliente_id, activo=True, usuarios_asociados=request.user
             )
-            descuento_pct = D(str(cliente.tipo_cliente.descuento or 0))
+            # Solo aplicar descuento si el tipo de cliente está activo
+            descuento_pct = D(str(cliente.tipo_cliente.descuento or 0)) if cliente.tipo_cliente.activo else D('0')
             cliente_info = {
                 'id': cliente.id,
                 'nombre': cliente.nombre_comercial,

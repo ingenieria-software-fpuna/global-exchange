@@ -1,0 +1,215 @@
+{% load tz %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notificación de Cambio en Cotización</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #000000 !important;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            color: #000000 !important;
+        }
+        .header {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #007bff;
+            margin-bottom: 30px;
+        }
+        .header h2 {
+            color: #000000 !important;
+            margin: 0;
+        }
+        p {
+            color: #000000 !important;
+            margin: 15px 0;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+        .cotizacion-container {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: #ffffff !important;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 30px 0;
+        }
+        .cotizacion-container * {
+            color: #ffffff !important;
+        }
+        .moneda-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .precios-table {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 15px;
+        }
+        .precios-table * {
+            color: #000000 !important;
+        }
+        .precio-item {
+            text-align: center;
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .precio-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333 !important;
+            margin-bottom: 8px;
+        }
+        .precio-anterior {
+            font-size: 12px;
+            color: #999 !important;
+            text-decoration: line-through;
+            margin-bottom: 5px;
+        }
+        .precio-valor {
+            font-size: 20px;
+            font-weight: bold;
+            color: #000000 !important;
+        }
+        .cambio-container {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+        }
+        .cambio-valor {
+            font-size: 22px;
+            font-weight: bold;
+        }
+        .cambio-aumento {
+            color: #28a745 !important;
+        }
+        .cambio-disminucion {
+            color: #dc3545 !important;
+        }
+        .expiration {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+            color: #000000 !important;
+        }
+        .expiration * {
+            color: #000000 !important;
+        }
+        .security-info {
+            background: #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        .security-info h4 {
+            color: #000000 !important;
+            margin-top: 0;
+        }
+        .security-info p {
+            color: #000000 !important;
+            margin: 5px 0;
+        }
+        .warning {
+            color: #dc3545 !important;
+            font-weight: bold;
+        }
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            margin-top: 30px;
+            font-size: 12px;
+            color: #666;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #007bff;
+            color: white !important;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">Global Exchange</div>
+            <h2>{% if es_creacion %}Nueva Cotización{% else %}Cambio en Cotización{% endif %}</h2>
+        </div>
+        
+        <p>Hola <strong>{{ usuario.nombre }}</strong>,</p>
+        
+        <p>{% if es_creacion %}Se ha establecido una nueva cotización en tu cuenta. A continuación, los detalles:{% else %}Hemos detectado un cambio en la cotización de {{ moneda.nombre }}. Te notificamos los detalles:{% endif %}</p>
+        
+        <div class="cotizacion-container">
+            <div class="moneda-title">💱 {{ moneda.nombre }} ({{ moneda.codigo }})</div>
+            
+            <div class="precios-table">
+                <div class="precio-item">
+                    <div class="precio-label">💰 Precio de Compra</div>
+                    {% if not es_creacion and tasa_compra_anterior %}
+                    <div class="precio-anterior">Anterior: Gs. {{ tasa_compra_anterior|floatformat:0 }}</div>
+                    {% endif %}
+                    <div class="precio-valor">Gs. {{ tasa_compra_nueva|floatformat:0 }}</div>
+                </div>
+                
+                <div class="precio-item">
+                    <div class="precio-label">💵 Precio de Venta</div>
+                    {% if not es_creacion and tasa_venta_anterior %}
+                    <div class="precio-anterior">Anterior: Gs. {{ tasa_venta_anterior|floatformat:0 }}</div>
+                    {% endif %}
+                    <div class="precio-valor">Gs. {{ tasa_venta_nueva|floatformat:0 }}</div>
+                </div>
+                
+                {% if not es_creacion and cambio_porcentual %}
+                <div class="cambio-container">
+                    <div class="precio-label">Cambio:</div>
+                    <div class="cambio-valor {% if es_aumento %}cambio-aumento{% else %}cambio-disminucion{% endif %}">
+                        {% if es_aumento %}+{% else %}-{% endif %}{{ cambio_porcentual|floatformat:2 }}% 
+                        {% if es_aumento %}↑{% else %}↓{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="expiration">
+            📅 <strong>Fecha:</strong> {{ fecha|localtime|date:"d/m/Y H:i" }}
+        </div>
+        
+        <p style="margin-top: 30px;">💡 <strong>Consejo:</strong> Puedes desactivar las notificaciones por correo en cualquier momento desde tu <a href="{{ url_sitio }}/notificaciones/preferencias/" style="color: #007bff;">panel de preferencias</a>.</p>
+        
+        <div class="footer">
+            <p><strong>Global Exchange</strong><br>Sistema de Gestión de Cambio de Monedas</p>
+            <p>Este es un correo automático, por favor no responder.</p>
+        </div>
+    </div>
+</body>
+</html>

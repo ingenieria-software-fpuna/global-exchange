@@ -2,7 +2,6 @@ services:
 
   glx-db:
     image: postgres:13.6
-    restart: always
     ports:
       - "5432:5432"
     shm_size: 128mb
@@ -10,3 +9,23 @@ services:
       POSTGRES_PASSWORD: 1234
       POSTGRES_USER: admin
       POSTGRES_DB: glx_db
+
+  stripe-cli:
+    image: stripe/stripe-cli:latest
+    container_name: glx-stripe-cli-dev
+    environment:
+      STRIPE_API_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_DEVICE_NAME: glx-docker-dev
+    command:
+      - listen
+      - --forward-to
+      - http://host.docker.internal:8000/pagos/stripe/webhook/
+      - --skip-verify
+      - --api-key
+      - ${STRIPE_SECRET_KEY}
+      - --log-level
+      - debug
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default

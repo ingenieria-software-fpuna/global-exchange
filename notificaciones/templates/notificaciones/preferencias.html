@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Preferencias de Notificaciones - Global Exchange{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <!-- Breadcrumb -->
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'auth:dashboard' %}">Inicio</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'notificaciones:lista' %}">Notificaciones</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Preferencias</li>
+                </ol>
+            </nav>
+
+            <!-- Card de Preferencias -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-cog me-2"></i>
+                        Preferencias de Notificaciones
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- Mensajes de éxito/error -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <!-- Información -->
+                    <div class="alert alert-info mb-4">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Sobre las notificaciones:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Siempre recibirás notificaciones dentro del sistema (popup y página de notificaciones)</li>
+                            <li>Opcionalmente, puedes activar el envío de notificaciones por correo electrónico</li>
+                            <li>Los correos se enviarán a: <strong>{{ user.email }}</strong></li>
+                        </ul>
+                    </div>
+
+                    <!-- Formulario -->
+                    <form method="post" class="mt-4">
+                        {% csrf_token %}
+                        
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <h5 class="mb-1">
+                                            <i class="fas fa-envelope me-2 text-primary"></i>
+                                            Notificaciones por Email
+                                        </h5>
+                                        <p class="text-muted mb-0">
+                                            Recibe un correo electrónico cada vez que cambie una tasa de cambio
+                                        </p>
+                                    </div>
+                                    <div class="form-check form-switch ms-3">
+                                        {{ form.recibir_notificaciones_email }}
+                                        <label class="form-check-label" for="{{ form.recibir_notificaciones_email.id_for_label }}">
+                                            {% if form.recibir_notificaciones_email.value %}
+                                                <span class="badge bg-success">Activado</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Desactivado</span>
+                                            {% endif %}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% if form.recibir_notificaciones_email.help_text %}
+                                    <small class="form-text text-muted d-block mt-2">
+                                        <i class="fas fa-lightbulb me-1"></i>
+                                        {{ form.recibir_notificaciones_email.help_text }}
+                                    </small>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Botones -->
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <a href="{% url 'notificaciones:lista' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>
+                                Volver
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>
+                                Guardar Preferencias
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Información adicional -->
+            <div class="card mt-4 border-0 bg-light">
+                <div class="card-body">
+                    <h6 class="mb-3">
+                        <i class="fas fa-question-circle me-2"></i>
+                        Preguntas Frecuentes
+                    </h6>
+                    <div class="accordion" id="faqAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                    ¿Cuándo recibiré los correos?
+                                </button>
+                            </h2>
+                            <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    Recibirás un correo inmediatamente después de que se registre un cambio en cualquier tasa de cambio del sistema.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                    ¿Puedo desactivar los correos en cualquier momento?
+                                </button>
+                            </h2>
+                            <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    Sí, puedes activar o desactivar esta función en cualquier momento desde esta página. Los cambios son inmediatos.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                    ¿Seguiré viendo notificaciones en el sistema si desactivo los correos?
+                                </button>
+                            </h2>
+                            <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    Sí, las notificaciones dentro del sistema (popup y página de notificaciones) siempre estarán activas. Esta opción solo controla el envío por correo electrónico.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-check-input {
+        width: 3rem;
+        height: 1.5rem;
+        cursor: pointer;
+    }
+    .form-switch .form-check-input:checked {
+        background-color: #198754;
+        border-color: #198754;
+    }
+</style>
+{% endblock %}
