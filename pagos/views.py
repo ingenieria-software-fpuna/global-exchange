@@ -18,7 +18,7 @@ import logging
 from transacciones.models import Transaccion, TipoOperacion, EstadoTransaccion
 from .models import PagoPasarela
 from .forms import BilleteraElectronicaForm, TarjetaDebitoForm, TransferenciaBancariaForm, TarjetaCreditoLocalForm
-from .services import PasarelaService
+from .services import PasarelaService, StripeService
 from monedas.models import Moneda
 from metodo_pago.models import MetodoPago
 from metodo_cobro.models import MetodoCobro
@@ -494,5 +494,327 @@ def pago_tarjeta_credito_local(request, transaccion_id):
         'monto_total': monto_total,
         'tiempo_restante': (transaccion.fecha_expiracion - timezone.now()).total_seconds() if not transaccion.esta_expirada() else 0,
     }
-    
+
     return render(request, 'pagos/pago_tarjeta_credito_local.html', context)
+
+
+# ============================================================================
+# VISTAS PARA STRIPE CHECKOUT
+# ============================================================================
+
+@login_required
+def pago_stripe(request, transaccion_id):
+    """
+    Vista para procesar pago con Stripe Checkout.
+    Crea una sesión de checkout y redirige al usuario a Stripe.
+    """
+    transaccion = get_object_or_404(
+        Transaccion.objects.select_related(
+            'cliente', 'usuario', 'metodo_cobro', 'moneda_origen', 'moneda_destino', 'tipo_operacion'
+        ),
+        id_transaccion=transaccion_id
+    )
+
+    # Verificar permisos
+    if transaccion.usuario != request.user:
+        if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+            raise Http404("Transacción no encontrada")
+
+    # Verificar que la transacción esté pendiente
+    if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
+        messages.error(request, 'Esta transacción ya no se puede procesar.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+    if transaccion.esta_expirada():
+        transaccion.cancelar_por_expiracion()
+        messages.error(request, 'La transacción ha expirado y fue cancelada automáticamente.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+    # Determinar el monto según el tipo de operación
+    if transaccion.tipo_operacion.codigo == 'VENTA':
+        # En ventas, el cliente paga el monto en la moneda destino
+        monto_pago = float(transaccion.monto_destino)
+        moneda_pago = transaccion.moneda_destino.codigo
+    else:
+        # En compras, el cliente paga el monto en la moneda origen
+        monto_pago = float(transaccion.monto_origen)
+        moneda_pago = transaccion.moneda_origen.codigo
+
+    # Inicializar servicio de Stripe
+    stripe_service = StripeService()
+
+    # Verificar que Stripe esté configurado
+    if not stripe_service.esta_disponible():
+        messages.error(request, 'El servicio de Stripe no está configurado correctamente.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+    # Crear descripción del pago
+    if transaccion.tipo_operacion.codigo == 'VENTA':
+        descripcion = f"Venta de {transaccion.monto_origen} {transaccion.moneda_origen.codigo}"
+    else:
+        descripcion = f"Compra de {transaccion.monto_destino} {transaccion.moneda_destino.codigo}"
+
+    # Crear sesión de checkout
+    logger.info(f"Creando sesión Stripe para transacción: {transaccion.id_transaccion}")
+    resultado = stripe_service.crear_sesion_checkout(
+        monto=monto_pago,
+        moneda=moneda_pago,
+        transaccion_id=transaccion.id_transaccion,
+        descripcion=descripcion,
+        metadata={
+            'usuario_email': request.user.email,
+            'cliente_id': str(transaccion.cliente.id) if transaccion.cliente else '',
+            'tipo_operacion': transaccion.tipo_operacion.codigo,
+        }
+    )
+
+    if resultado['success']:
+        # Crear registro del pago con estado pendiente
+        try:
+            with transaction.atomic():
+                PagoPasarela.objects.create(
+                    transaccion=transaccion,
+                    id_pago_externo=resultado['session_id'],
+                    monto=monto_pago,
+                    metodo_pasarela='stripe',
+                    moneda=moneda_pago,
+                    estado='pendiente',
+                    datos_pago={
+                        'session_id': resultado['session_id'],
+                        'descripcion': descripcion,
+                        'procesado_por': request.user.email,
+                    },
+                    respuesta_pasarela={
+                        'session_id': resultado['session_id'],
+                        'payment_intent': resultado.get('payment_intent'),
+                    }
+                )
+
+                # Agregar información a las observaciones
+                transaccion.observaciones += f"\nSesión Stripe creada el {timezone.now()} por {request.user.email}"
+                transaccion.observaciones += f"\nSession ID: {resultado['session_id']}"
+                transaccion.save()
+
+                logger.info(f"Redirigiendo a Stripe Checkout - Session ID: {resultado['session_id']}")
+                # Redirigir al usuario a Stripe Checkout
+                return redirect(resultado['url'])
+
+        except Exception as e:
+            logger.error(f"Error al crear registro de pago Stripe: {str(e)}")
+            messages.error(request, f'Error al crear sesión de pago: {str(e)}')
+            return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+    else:
+        # Error al crear la sesión
+        error_msg = resultado.get('error', 'Error desconocido')
+        error_type = resultado.get('error_type', 'unknown')
+
+        logger.error(f"Error al crear sesión Stripe: {error_msg} (tipo: {error_type})")
+
+        if error_type == 'authentication_error':
+            messages.error(request, 'Error de configuración de Stripe. Por favor, contacte al administrador.')
+        elif error_type == 'connection_error':
+            messages.error(request, 'No se pudo conectar con Stripe. Por favor, intente más tarde.')
+        else:
+            messages.error(request, f'Error al procesar el pago: {error_msg}')
+
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+
+def stripe_success(request):
+    """
+    Vista para manejar el retorno exitoso desde Stripe Checkout.
+    No requiere @login_required porque el usuario viene de una redirección externa.
+    """
+    session_id = request.GET.get('session_id')
+
+    if not session_id:
+        # Si no hay usuario logueado, redirigir al login
+        if not request.user.is_authenticated:
+            messages.warning(request, 'Por favor inicie sesión para ver el resultado del pago.')
+            return redirect(f'{settings.LOGIN_URL}?next=/pagos/stripe/success/?session_id={session_id}')
+        messages.error(request, 'Sesión de pago no encontrada.')
+        return redirect('tasa_cambio:dashboard')
+
+    # Buscar el pago en nuestra base de datos
+    try:
+        pago_pasarela = PagoPasarela.objects.get(id_pago_externo=session_id)
+        transaccion = pago_pasarela.transaccion
+
+        # Verificar permisos solo si el usuario está autenticado
+        if request.user.is_authenticated:
+            if transaccion.usuario != request.user:
+                if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+                    raise Http404("Transacción no encontrada")
+        else:
+            # Si no está autenticado, guardar la URL y redirigir al login
+            login_url = f'{settings.LOGIN_URL}?next=/pagos/stripe/success/?session_id={session_id}'
+            return redirect(login_url)
+
+        # Recuperar información de la sesión de Stripe
+        stripe_service = StripeService()
+        resultado = stripe_service.recuperar_sesion(session_id)
+
+        if resultado['success']:
+            session = resultado['session']
+            payment_status = resultado['payment_status']
+
+            # Actualizar el estado del pago
+            with transaction.atomic():
+                if payment_status == 'paid':
+                    pago_pasarela.estado = 'exito'
+                    pago_pasarela.respuesta_pasarela.update({
+                        'payment_status': payment_status,
+                        'payment_intent': resultado['payment_intent'],
+                    })
+                    pago_pasarela.fecha_procesamiento = timezone.now()
+                    pago_pasarela.save()
+
+                    # Actualizar el estado de la transacción si aún está pendiente
+                    if transaccion.estado.codigo == EstadoTransaccion.PENDIENTE:
+                        estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
+                        transaccion.estado = estado_pagada
+                        transaccion.fecha_pago = timezone.now()
+                        transaccion.observaciones += f"\nPago confirmado con Stripe el {timezone.now()}"
+                        transaccion.observaciones += f"\nPayment Intent: {resultado['payment_intent']}"
+                        transaccion.save()
+
+                        messages.success(request, '¡Pago procesado exitosamente con Stripe!')
+                    else:
+                        messages.info(request, 'El pago ya fue procesado anteriormente.')
+
+                elif payment_status == 'unpaid':
+                    pago_pasarela.estado = 'pendiente'
+                    pago_pasarela.save()
+                    messages.warning(request, 'El pago aún está pendiente.')
+                else:
+                    messages.info(request, f'Estado del pago: {payment_status}')
+        else:
+            messages.error(request, 'No se pudo verificar el estado del pago.')
+
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion.id_transaccion)
+
+    except PagoPasarela.DoesNotExist:
+        messages.error(request, 'Pago no encontrado.')
+        return redirect('transacciones:mis_transacciones')
+    except Exception as e:
+        logger.error(f"Error al procesar retorno de Stripe: {str(e)}")
+        messages.error(request, f'Error al procesar el pago: {str(e)}')
+        return redirect('transacciones:mis_transacciones')
+
+
+def stripe_cancel(request):
+    """
+    Vista para manejar la cancelación del pago en Stripe Checkout.
+    No requiere @login_required porque el usuario viene de una redirección externa.
+    """
+    # Verificar si el usuario está autenticado
+    if not request.user.is_authenticated:
+        messages.warning(request, 'Pago cancelado. Por favor inicie sesión.')
+        return redirect(settings.LOGIN_URL)
+
+    messages.warning(request, 'El pago fue cancelado. Puede intentar nuevamente.')
+
+    # Redirigir al dashboard
+    return redirect('tasa_cambio:dashboard')
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def stripe_webhook(request):
+    """
+    Webhook para recibir notificaciones de eventos de Stripe.
+    """
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+
+    # En desarrollo local sin Stripe CLI, permitir webhooks sin firma
+    # IMPORTANTE: Nunca usar esto en producción
+    if settings.DEBUG and not sig_header and not settings.STRIPE_WEBHOOK_SECRET:
+        logger.warning("Webhook sin verificación - solo para desarrollo local")
+        try:
+            event = json.loads(payload)
+            event_type = event.get('type')
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido'}, status=400)
+    else:
+        # Verificación normal con firma
+        if not sig_header:
+            logger.error("Webhook Stripe sin firma")
+            return JsonResponse({'error': 'Firma ausente'}, status=400)
+
+        # Verificar el webhook
+        stripe_service = StripeService()
+        resultado = stripe_service.verificar_webhook(payload, sig_header)
+
+        if not resultado['success']:
+            logger.error(f"Error al verificar webhook Stripe: {resultado.get('error')}")
+            return JsonResponse({'error': resultado.get('error')}, status=400)
+
+        event = resultado['event']
+        event_type = resultado['type']
+
+    logger.info(f"Webhook Stripe recibido - Tipo: {event_type}")
+
+    try:
+        # Manejar diferentes tipos de eventos
+        if event_type == 'checkout.session.completed':
+            session = event['data']['object']
+            session_id = session['id']
+            payment_status = session.get('payment_status')
+
+            # Buscar el pago en nuestra base de datos
+            try:
+                pago_pasarela = PagoPasarela.objects.get(id_pago_externo=session_id)
+
+                with transaction.atomic():
+                    if payment_status == 'paid':
+                        pago_pasarela.estado = 'exito'
+                        pago_pasarela.respuesta_pasarela.update(session)
+                        pago_pasarela.fecha_procesamiento = timezone.now()
+                        pago_pasarela.save()
+
+                        # Actualizar transacción si aún está pendiente
+                        if pago_pasarela.transaccion.estado.codigo == EstadoTransaccion.PENDIENTE:
+                            estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
+                            pago_pasarela.transaccion.estado = estado_pagada
+                            pago_pasarela.transaccion.fecha_pago = timezone.now()
+                            pago_pasarela.transaccion.observaciones += f"\nPago confirmado por webhook Stripe el {timezone.now()}"
+                            pago_pasarela.transaccion.save()
+
+                            logger.info(f"Transacción {pago_pasarela.transaccion.id_transaccion} marcada como pagada")
+
+            except PagoPasarela.DoesNotExist:
+                logger.warning(f"Pago no encontrado para session_id: {session_id}")
+
+        elif event_type == 'payment_intent.payment_failed':
+            payment_intent = event['data']['object']
+            payment_intent_id = payment_intent['id']
+
+            # Buscar el pago por payment_intent
+            try:
+                pago_pasarela = PagoPasarela.objects.filter(
+                    respuesta_pasarela__payment_intent=payment_intent_id
+                ).first()
+
+                if pago_pasarela:
+                    with transaction.atomic():
+                        pago_pasarela.estado = 'fallo'
+                        pago_pasarela.mensaje_error = payment_intent.get('last_payment_error', {}).get('message', 'Pago fallido')
+                        pago_pasarela.respuesta_pasarela.update(payment_intent)
+                        pago_pasarela.save()
+
+                        # Agregar información del fallo a la transacción
+                        pago_pasarela.transaccion.observaciones += f"\nPago fallido reportado por Stripe el {timezone.now()}"
+                        pago_pasarela.transaccion.observaciones += f"\nMotivo: {pago_pasarela.mensaje_error}"
+                        pago_pasarela.transaccion.save()
+
+                        logger.warning(f"Pago fallido para transacción {pago_pasarela.transaccion.id_transaccion}")
+
+            except Exception as e:
+                logger.error(f"Error al procesar payment_intent.payment_failed: {str(e)}")
+
+        return JsonResponse({'status': 'success'})
+
+    except Exception as e:
+        logger.error(f"Error al procesar webhook Stripe: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)

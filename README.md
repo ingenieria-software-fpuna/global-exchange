@@ -22,6 +22,7 @@ Proyecto de Ingeniería de Software 2 (IS2) de la Facultad Politécnica de la Un
 - [Poetry](https://python-poetry.org/)
 - Algún cliente de postgres ([pgAdmin](https://www.pgadmin.org/), [DBeaver](https://dbeaver.io/), etc.)
 - Make (en windows, instalar de aquí: [Make for Windows](https://gnuwin32.sourceforge.net/packages/make.htm))
+- **Cuenta de Stripe** (para pagos) - [Crear cuenta de prueba](https://dashboard.stripe.com/register)
 
 ### Instalación
 1. Clonar el repositorio:
@@ -75,15 +76,58 @@ poetry install
 cp .env.example .env
 ```
 
-### Uso del proyecto
-
-Una vez instaladas las dependencias, puedes ejecutar el proyecto con los siguientes comandos:
+9. Configurar las claves de Stripe en el archivo `.env`:
 
 ```bash
-make app-setup  # Configuración (limpiar DB, levantar DB, aplicar migraciones)
-make user # Crear un usuario para usar el sistema
-make create-currencies # Crea monedas y tasas de cambio de prueba
-make app-run    # Correr el proyecto
+# Obtener las claves de: https://dashboard.stripe.com/test/apikeys
+STRIPE_SECRET_KEY=sk_test_tu_clave_secreta
+STRIPE_PUBLISHABLE_KEY=pk_test_tu_clave_publicable
+STRIPE_WEBHOOK_SECRET=  # Se generará automáticamente
+```
+
+### Uso del proyecto
+
+#### 🚀 Inicio Rápido (Recomendado)
+
+Configura todo el proyecto con un solo comando:
+
+```bash
+make app-setup
+```
+
+Este comando configura automáticamente:
+- ✅ Base de datos PostgreSQL
+- ✅ Stripe CLI para webhooks
+- ✅ Migraciones de base de datos
+- ✅ Usuarios, grupos y permisos
+- ✅ Monedas y métodos de pago (incluyendo Stripe)
+- ✅ Datos de prueba (clientes, transacciones, etc.)
+
+Después del setup:
+
+```bash
+# 1. Obtener el webhook secret de Stripe
+make stripe-secret
+# Copiar el valor whsec_... a .env como STRIPE_WEBHOOK_SECRET
+
+# 2. Iniciar el servidor Django
+make app-run
+
+# 3. (Opcional) Ver webhooks en tiempo real
+make stripe-logs
+```
+
+#### 📖 Guía Completa
+
+Para más detalles, ver [QUICK_START.md](QUICK_START.md)
+
+#### Comandos Útiles
+
+```bash
+make help           # Ver todos los comandos disponibles
+make app-test       # Ejecutar tests
+make stripe-trigger # Probar eventos de Stripe
+make db-clean       # Limpiar base de datos
 ```
 
 
