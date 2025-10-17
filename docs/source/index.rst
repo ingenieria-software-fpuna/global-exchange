@@ -14,6 +14,10 @@ Bienvenido a la documentación del proyecto Global Exchange.
    transacciones
    metodo_cobro
    metodo_pago
+   configuracion
+   notificaciones
+   pagos
+   roles
    scripts
    security-permissions
    configuration
