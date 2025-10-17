@@ -81,6 +81,11 @@ class TransaccionViewsTest(TestCase):
         
 
         
+        # Asignar permisos necesarios
+        from django.contrib.auth.models import Permission
+        can_operate = Permission.objects.get(codename='can_operate')
+        self.user.user_permissions.add(can_operate)
+        
         self.client = Client()
         self.client.force_login(self.user)
 
@@ -196,8 +201,8 @@ class TransaccionViewsTest(TestCase):
         
         self.assertTrue(resultado_activo['success'])
         self.assertEqual(resultado_activo['data']['descuento_pct'], 10.0)
-        # El descuento se aplica a la tasa, no a las comisiones
-        self.assertEqual(resultado_activo['data']['descuento_aplicado'], 0)
+        # El descuento se aplica a la comisión de venta
+        self.assertGreater(resultado_activo['data']['descuento_aplicado'], 0)
         
         # Test venta con cliente inactivo - no debe aplicar descuento
         resultado_venta_inactivo = calcular_venta_completa(
@@ -221,8 +226,8 @@ class TransaccionViewsTest(TestCase):
         
         self.assertTrue(resultado_venta_activo['success'])
         self.assertEqual(resultado_venta_activo['data']['descuento_pct'], 10.0)
-        # El descuento se aplica a la tasa, no a las comisiones
-        self.assertEqual(resultado_venta_activo['data']['descuento_aplicado'], 0)
+        # El descuento se aplica a la comisión de compra
+        self.assertGreater(resultado_venta_activo['data']['descuento_aplicado'], 0)
 
     def test_venta_descuento_aplicado_a_comision_compra(self):
         """Test: En ventas, el descuento se aplica a la comisión de compra, no al precio final"""

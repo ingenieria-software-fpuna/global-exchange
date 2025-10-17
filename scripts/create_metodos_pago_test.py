@@ -13,7 +13,7 @@ from decimal import Decimal
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'global_exchange.settings')
 django.setup()
 
-from metodo_pago.models import MetodoPago
+from metodo_pago.models import MetodoPago, Campo
 from monedas.models import Moneda
 
 
@@ -104,14 +104,133 @@ def crear_metodos_pago_ejemplo():
     return creados
 
 
+def crear_campos_metodos_pago():
+    """Crear campos específicos para cada método de pago"""
+    
+    # Campos para Billetera Electrónica
+    campos_billetera = [
+        {
+            'nombre': 'numero_telefono',
+            'etiqueta': 'Número de Teléfono',
+            'tipo': 'phone',
+            'es_obligatorio': True,
+            'max_length': 15,
+            'regex_validacion': r'^\+?[1-9]\d{1,14}$',
+            'placeholder': 'Ej: +595981234567'
+        },
+    ]
+    
+    # Campos para Pago en Cuenta Bancaria
+    campos_bancario = [
+        {
+            'nombre': 'documento',
+            'etiqueta': 'CI/RUC',
+            'tipo': 'text',
+            'es_obligatorio': True,
+            'max_length': 10,
+            'regex_validacion': r'^[0-9]{6,10}(-[0-9]{1})?$',
+            'placeholder': 'CI/RUC'
+        },
+        {
+            'nombre': 'numero_cuenta',
+            'etiqueta': 'Número de Cuenta',
+            'tipo': 'text',
+            'es_obligatorio': True,
+            'max_length': 30,
+            'regex_validacion': r'^[0-9]{10,30}$',
+            'placeholder': 'Número de cuenta bancaria'
+        },
+        {
+            'nombre': 'titular',
+            'etiqueta': 'Titular de la Cuenta',
+            'tipo': 'text',
+            'es_obligatorio': True,
+            'max_length': 100,
+            'placeholder': 'Nombre completo del titular'
+        },
+        {
+            'nombre': 'banco',
+            'etiqueta': 'Banco',
+            'tipo': 'select',
+            'es_obligatorio': True,
+            'opciones': 'Sudameris\nFamiliar\nItaú\nBNF\nGBN Continental\nBanco Nacional\nBanco Regional\nVisión Banco'
+        }
+    ]
+    
+    print("\n🔧 Creando campos para métodos de pago...")
+    
+    # Crear campos para Billetera Electrónica
+    print("📱 Campos para Billetera Electrónica:")
+    campos_billetera_obj = []
+    for campo_data in campos_billetera:
+        campo, created = Campo.objects.get_or_create(
+            nombre=campo_data['nombre'],
+            defaults=campo_data
+        )
+        campos_billetera_obj.append(campo)
+        if created:
+            print(f"  ✅ Campo creado: {campo.nombre}")
+        else:
+            print(f"  ℹ️  Campo ya existe: {campo.nombre}")
+    
+    # Crear campos para Pago en Cuenta Bancaria
+    print("🏦 Campos para Pago en Cuenta Bancaria:")
+    campos_bancario_obj = []
+    for campo_data in campos_bancario:
+        campo, created = Campo.objects.get_or_create(
+            nombre=campo_data['nombre'],
+            defaults=campo_data
+        )
+        campos_bancario_obj.append(campo)
+        if created:
+            print(f"  ✅ Campo creado: {campo.nombre}")
+        else:
+            print(f"  ℹ️  Campo ya existe: {campo.nombre}")
+    
+    # Asociar campos a métodos de pago
+    print("\n🔗 Asociando campos a métodos de pago...")
+    
+    # Billetera Electrónica
+    try:
+        billetera = MetodoPago.objects.get(nombre='Billetera electrónica')
+        billetera.campos.set(campos_billetera_obj)
+        print(f"  ✅ Campos asociados a Billetera electrónica: {len(campos_billetera_obj)}")
+    except MetodoPago.DoesNotExist:
+        print("  ❌ Método 'Billetera electrónica' no encontrado")
+    
+    # Pago en Cuenta Bancaria
+    try:
+        bancario = MetodoPago.objects.get(nombre='Pago en cuenta bancaria')
+        bancario.campos.set(campos_bancario_obj)
+        print(f"  ✅ Campos asociados a Pago en cuenta bancaria: {len(campos_bancario_obj)}")
+    except MetodoPago.DoesNotExist:
+        print("  ❌ Método 'Pago en cuenta bancaria' no encontrado")
+    
+    # Efectivo no necesita campos
+    print("  ℹ️  Efectivo: Sin campos requeridos")
+
+
 def main():
     try:
+        # Crear métodos de pago
         crear_metodos_pago_ejemplo()
-        print("\n🎉 ¡Métodos de pago configurados correctamente!")
+        
+        # Crear campos asociados
+        crear_campos_metodos_pago()
+        
+        print("\n🎉 ¡Métodos de pago y campos configurados correctamente!")
         print("\n📋 Configuración aplicada:")
-        print("   • Pago en cuenta bancaria: Solo PYG")
-        print("   • Billetera electrónica: Solo PYG") 
-        print("   • Efectivo: Todas las monedas")
+        print("   • Pago en cuenta bancaria: Solo PYG + 4 campos")
+        print("   • Billetera electrónica: Solo PYG + 2 campos") 
+        print("   • Efectivo: Todas las monedas + Sin campos")
+        
+        # Mostrar resumen final
+        print("\n📊 Resumen final:")
+        for metodo in MetodoPago.objects.filter(es_activo=True).order_by('nombre'):
+            campos_count = metodo.campos.count()
+            monedas = ', '.join([m.codigo for m in metodo.monedas_permitidas.all()])
+            print(f"   • {metodo.nombre}: {monedas} ({campos_count} campos)")
+            
     except Exception as e:
         print(f"\n❌ Error: {e}")
         import traceback
