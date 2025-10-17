@@ -159,6 +159,11 @@ AUTHENTICATION_BACKENDS = [
     #'django.contrib.auth.backends.ModelBackend',  # Backend por defecto como fallback
 ]
 
+# URLs de autenticación
+LOGIN_URL = '/auth/login/'
+LOGIN_REDIRECT_URL = '/tasa-cambio/'
+LOGOUT_REDIRECT_URL = '/auth/login/'
+
 # Configuración de Correo Electrónico
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
@@ -171,6 +176,11 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 # Configuración del sitio
 SITE_NAME = os.environ.get('SITE_NAME', 'Global Exchange')
 SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000')
+
+# Configuración de Stripe
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
 # Configuración de logging
 # Asegurar que el directorio de logs existe

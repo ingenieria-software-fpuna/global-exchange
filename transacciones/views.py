@@ -327,8 +327,10 @@ def procesar_pago(request, transaccion_id):
 
     # Redirigir según el método de cobro
     metodo_cobro = transaccion.metodo_cobro.nombre.lower()
-    
-    if 'billetera electrónica' in metodo_cobro or 'billetera electronica' in metodo_cobro:
+
+    if 'stripe' in metodo_cobro:
+        return redirect('pagos:pago_stripe', transaccion_id=transaccion_id)
+    elif 'billetera electrónica' in metodo_cobro or 'billetera electronica' in metodo_cobro:
         return redirect('pagos:pago_billetera_electronica', transaccion_id=transaccion_id)
     elif 'tarjeta de débito' in metodo_cobro or 'tarjeta de debito' in metodo_cobro:
         return redirect('pagos:pago_tarjeta_debito', transaccion_id=transaccion_id)
@@ -345,10 +347,10 @@ def procesar_pago(request, transaccion_id):
                 transaccion.fecha_pago = timezone.now()
                 transaccion.observaciones += f"\nPago procesado el {timezone.now()} por {request.user.email}"
                 transaccion.save()
-                
+
             messages.success(request, '¡Pago procesado exitosamente! La transacción ha sido completada.')
             return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
-            
+
         except Exception as e:
             messages.error(request, f'Error al procesar el pago: {str(e)}')
             return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)

@@ -21,3 +21,23 @@ services:
         DB_PORT: "5432"
       ports:
         - "8000:8000"
+
+    stripe-cli:
+      image: stripe/stripe-cli:latest
+      container_name: glx-stripe-cli
+      depends_on:
+        - glx-web
+      environment:
+        STRIPE_API_KEY: ${STRIPE_SECRET_KEY}
+        STRIPE_DEVICE_NAME: glx-docker
+      command:
+        - listen
+        - --forward-to
+        - http://glx-web:8000/pagos/stripe/webhook/
+        - --skip-verify
+        - --api-key
+        - ${STRIPE_SECRET_KEY}
+        - --log-level
+        - debug
+      networks:
+        - default
