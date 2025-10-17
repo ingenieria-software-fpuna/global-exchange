@@ -31,6 +31,7 @@ class AuthViewsTestCase(TestCase):
         self.assertIn('form', response.context)
 
     @patch('auth.services.EmailService.enviar_codigo_verificacion')
+    @patch.dict('os.environ', {'ENABLE_2FA': 'true'})
     def test_login_view_post_valid(self, mock_enviar_codigo):
         """Test login exitoso con envío de código de verificación"""
         mock_enviar_codigo.return_value = (True, "Email enviado exitosamente")
@@ -193,6 +194,7 @@ class AuthViewsTestCase(TestCase):
         pass
 
     @patch('auth.services.EmailService.enviar_codigo_verificacion')
+    @patch.dict('os.environ', {'ENABLE_2FA': 'true'})
     def test_registro_view_post_valid(self, mock_enviar_codigo):
         """Test registro exitoso de nuevo usuario"""
         mock_enviar_codigo.return_value = (True, "Email enviado exitosamente")
@@ -235,6 +237,7 @@ class AuthViewsTestCase(TestCase):
         self.assertIn('form', response.context)
 
     @patch('auth.services.EmailService.enviar_codigo_verificacion')
+    @patch.dict('os.environ', {'ENABLE_2FA': 'true'})
     def test_registro_view_email_send_failure(self, mock_enviar_codigo):
         """Test registro cuando falla el envío de email"""
         mock_enviar_codigo.return_value = (False, "Error de envío")
@@ -613,6 +616,7 @@ class AuthIntegrationTestCase(TestCase):
         )
 
     @patch('auth.services.EmailService.enviar_codigo_verificacion')
+    @patch.dict('os.environ', {'ENABLE_2FA': 'true'})
     def test_complete_registration_flow(self, mock_enviar_codigo):
         """Test del flujo completo de registro y verificación"""
         mock_enviar_codigo.return_value = (True, "Email enviado exitosamente")
@@ -655,6 +659,7 @@ class AuthIntegrationTestCase(TestCase):
         self.assertTrue(user.is_authenticated)
 
     @patch('auth.services.EmailService.enviar_codigo_verificacion')
+    @patch.dict('os.environ', {'ENABLE_2FA': 'true'})
     def test_complete_login_flow(self, mock_enviar_codigo):
         """Test del flujo completo de login y verificación"""
         mock_enviar_codigo.return_value = (True, "Email enviado exitosamente")
@@ -697,6 +702,7 @@ class AuthIntegrationTestCase(TestCase):
         self.assertTrue(user.is_authenticated)
 
     @patch('auth.services.EmailService.enviar_codigo_verificacion')
+    @patch.dict('os.environ', {'ENABLE_2FA': 'true'})
     def test_email_verification_content(self, mock_enviar_codigo):
         """Test que el contenido del email de verificación sea correcto"""
         mock_enviar_codigo.return_value = (True, "Email enviado exitosamente")
