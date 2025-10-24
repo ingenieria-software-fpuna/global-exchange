@@ -14,7 +14,7 @@
             <i class="fas fa-cash-register me-2"></i>
             Simulador de Cajero Automático
           </h1>
-          <p class="text-muted mb-0">Ingrese el ID de transacción para retirar su efectivo</p>
+          <p class="text-muted mb-0">Ingrese el código de verificación para retirar su efectivo</p>
           <div class="alert alert-info mt-3 mb-0">
             <i class="fas fa-info-circle me-2"></i>
             <strong>Tipos de transacciones:</strong>
@@ -44,17 +44,17 @@
             <div class="row">
               <div class="col-md-6">
                 <div class="mb-3">
-                  <label for="id_transaccion" class="form-label">
-                    <i class="fas fa-receipt me-1"></i>
-                    ID de Transacción
+                  <label for="codigo_verificacion" class="form-label">
+                    <i class="fas fa-key me-1"></i>
+                    Código de Verificación
                   </label>
                   <input type="text" 
                          class="form-control form-control-lg" 
-                         id="id_transaccion" 
-                         name="id_transaccion" 
-                         placeholder="Ej: TXN-20241201123456-ABC123"
+                         id="codigo_verificacion" 
+                         name="codigo_verificacion" 
+                         placeholder="Ej: ABC123"
                          required>
-                  <div class="form-text">Ingrese el ID de transacción que recibió por email o SMS</div>
+                  <div class="form-text">Ingrese el código de verificación que recibió por email o SMS</div>
                 </div>
               </div>
               <div class="col-md-6">
@@ -181,10 +181,10 @@ document.addEventListener('DOMContentLoaded', function() {
     formValidar.addEventListener('submit', function(e) {
         e.preventDefault();
         
-        const idTransaccion = document.getElementById('id_transaccion').value.trim();
+        const codigoVerificacion = document.getElementById('codigo_verificacion').value.trim();
         const tauserId = document.getElementById('tauser_id').value;
         
-        if (!idTransaccion || !tauserId) {
+        if (!codigoVerificacion || !tauserId) {
             mostrarError('Por favor complete todos los campos');
             return;
         }
@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: `id_transaccion=${encodeURIComponent(idTransaccion)}&tauser_id=${encodeURIComponent(tauserId)}`
+            body: `codigo_verificacion=${encodeURIComponent(codigoVerificacion)}&tauser_id=${encodeURIComponent(tauserId)}`
         })
         .then(response => response.json())
         .then(data => {
@@ -241,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: `id_transaccion=${encodeURIComponent(datosTransaccion.transaccion.id)}&tauser_id=${encodeURIComponent(datosTransaccion.tauser.id)}`
+            body: `codigo_verificacion=${encodeURIComponent(datosTransaccion.transaccion.codigo_verificacion)}&tauser_id=${encodeURIComponent(datosTransaccion.tauser.id)}`
         })
         .then(response => response.json())
         .then(data => {
@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
         datosTransaccion = null;
         
         // Enfocar en el primer campo
-        document.getElementById('id_transaccion').focus();
+        document.getElementById('codigo_verificacion').focus();
     });
     
     function mostrarResultadoValidacion(data) {

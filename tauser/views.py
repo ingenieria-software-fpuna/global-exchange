@@ -415,13 +415,13 @@ def validar_transaccion_retiro(request):
     Maneja tanto compras como ventas con cobro en efectivo.
     """
     try:
-        id_transaccion = request.POST.get('id_transaccion')
+        codigo_verificacion = request.POST.get('codigo_verificacion')
         tauser_id = request.POST.get('tauser_id')
         
-        if not id_transaccion or not tauser_id:
+        if not codigo_verificacion or not tauser_id:
             return JsonResponse({
                 'success': False,
-                'error': 'ID de transacción y Tauser son requeridos'
+                'error': 'Código de verificación y Tauser son requeridos'
             })
         
         # Obtener la transacción
@@ -429,7 +429,7 @@ def validar_transaccion_retiro(request):
             from transacciones.models import Transaccion, EstadoTransaccion
             transaccion = Transaccion.objects.select_related(
                 'cliente', 'tipo_operacion', 'estado', 'moneda_destino', 'metodo_cobro'
-            ).get(id_transaccion=id_transaccion)
+            ).get(codigo_verificacion=codigo_verificacion)
         except Transaccion.DoesNotExist:
             return JsonResponse({
                 'success': False,
@@ -495,6 +495,7 @@ def validar_transaccion_retiro(request):
             'success': True,
             'transaccion': {
                 'id': transaccion.id_transaccion,
+                'codigo_verificacion': transaccion.codigo_verificacion,
                 'tipo': transaccion.tipo_operacion.nombre,
                 'cliente': transaccion.cliente.nombre_comercial if transaccion.cliente else 'Casual',
                 'moneda_destino': {
@@ -534,13 +535,13 @@ def procesar_retiro(request):
     Actualiza el stock del tauser y marca la transacción como retirada.
     """
     try:
-        id_transaccion = request.POST.get('id_transaccion')
+        codigo_verificacion = request.POST.get('codigo_verificacion')
         tauser_id = request.POST.get('tauser_id')
         
-        if not id_transaccion or not tauser_id:
+        if not codigo_verificacion or not tauser_id:
             return JsonResponse({
                 'success': False,
-                'error': 'ID de transacción y Tauser son requeridos'
+                'error': 'Código de verificación y Tauser son requeridos'
             })
         
         # Obtener la transacción
@@ -548,7 +549,7 @@ def procesar_retiro(request):
             from transacciones.models import Transaccion, EstadoTransaccion
             transaccion = Transaccion.objects.select_related(
                 'cliente', 'tipo_operacion', 'estado', 'moneda_destino', 'metodo_cobro'
-            ).get(id_transaccion=id_transaccion)
+            ).get(codigo_verificacion=codigo_verificacion)
         except Transaccion.DoesNotExist:
             return JsonResponse({
                 'success': False,
