@@ -1,6 +1,9 @@
 from django.db import models
 from django.core.validators import RegexValidator, MinValueValidator
 from django.core.exceptions import ValidationError
+from django.db.models.signals import m2m_changed
+from django.dispatch import receiver
+from django.contrib.auth.models import Group
 
 # Create your models here.
 
@@ -108,6 +111,10 @@ class Cliente(models.Model):
             models.Index(fields=['tipo_cliente']),
             models.Index(fields=['activo']),
         ]
+        permissions = [
+            ("can_view_all_clients", "Puede ver todos los clientes"),
+            ("can_view_sensitive_columns", "Puede ver columnas sensibles (usuarios asociados, estado, fecha creación)"),
+        ]
 
     def __str__(self):
         return f"{self.nombre_comercial} ({self.ruc})"
@@ -122,3 +129,53 @@ class Cliente(models.Model):
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
+
+
+@receiver(m2m_changed, sender=Cliente.usuarios_asociados.through)
+def gestionar_rol_operador(sender, instance, action, pk_set, **kwargs):
+    """
+    Signal que gestiona automáticamente el rol de Operador cuando se asignan o quitan clientes a usuarios.
+    - Cuando se asigna un cliente a un usuario, se le da el rol Operador.
+    - Cuando un usuario se queda sin clientes asignados, se le quita el rol Operador.
+    """
+    if action not in ['post_add', 'post_remove', 'post_clear']:
+        return
+    
+    # Obtener el grupo Operador
+    try:
+        grupo_operador = Group.objects.get(name='Operador')
+    except Group.DoesNotExist:
+        # Si el grupo no existe, no hacer nada
+        return
+    
+    # Obtener usuarios afectados
+    usuarios_afectados = set()
+    
+    if action == 'post_add':
+        # Usuarios que fueron agregados
+        from usuarios.models import Usuario
+        usuarios_afectados = Usuario.objects.filter(pk__in=pk_set)
+        
+        # Agregar rol de Operador a usuarios recién asignados
+        for usuario in usuarios_afectados:
+            if not usuario.groups.filter(pk=grupo_operador.pk).exists():
+                usuario.groups.add(grupo_operador)
+    
+    elif action in ['post_remove', 'post_clear']:
+        # Usuarios que fueron removidos o limpiados
+        from usuarios.models import Usuario
+        
+        if action == 'post_remove':
+            usuarios_afectados = Usuario.objects.filter(pk__in=pk_set)
+        elif action == 'post_clear':
+            # Si se limpiaron todos los usuarios asociados, verificar todos los que estaban
+            usuarios_afectados = Usuario.objects.filter(groups=grupo_operador)
+        
+        # Verificar cada usuario afectado
+        for usuario in usuarios_afectados:
+            # Contar cuántos clientes tiene asignados este usuario
+            clientes_count = Cliente.objects.filter(usuarios_asociados=usuario).count()
+            
+            # Si no tiene ningún cliente asignado, quitar el rol de Operador
+            if clientes_count == 0:
+                usuario.groups.remove(grupo_operador)

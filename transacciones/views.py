@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
 from django.http import JsonResponse, Http404
 from django.urls import reverse
@@ -115,6 +115,7 @@ def validar_limites_transaccion(monto_origen, moneda_origen, cliente=None, usuar
 
 
 @login_required
+@permission_required('transacciones.can_operate', raise_exception=True)
 @require_http_methods(["POST"])
 def iniciar_compra(request):
     """
@@ -304,7 +305,7 @@ def resumen_transaccion(request, transaccion_id):
 @require_http_methods(["POST"])
 def procesar_pago(request, transaccion_id):
     """
-    Procesa el 'pago' de una transacción (simulado por ahora).
+    Redirige a la pantalla de pago específica según el método de cobro seleccionado.
     """
     transaccion = get_object_or_404(Transaccion, id_transaccion=transaccion_id)
     
@@ -324,25 +325,35 @@ def procesar_pago(request, transaccion_id):
         messages.error(request, 'La transacción ha expirado y fue cancelada automáticamente.')
         return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
 
-    # Nota: La verificación de cambio de cotización ahora se maneja en el frontend
-    # mediante verificar_cambio_cotizacion() antes de llegar aquí. Si llegamos aquí,
-    # es porque el usuario ya confirmó proceder con la cotización actual o no hay cambios.
-    
-    # Procesar el 'pago' (por ahora solo cambiar estado)
-    try:
-        with transaction.atomic():
-            estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
-            transaccion.estado = estado_pagada
-            transaccion.fecha_pago = timezone.now()
-            transaccion.observaciones += f"\nPago procesado el {timezone.now()} por {request.user.email}"
-            transaccion.save()
-            
-        messages.success(request, '¡Pago procesado exitosamente! La transacción ha sido completada.')
-        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
-        
-    except Exception as e:
-        messages.error(request, f'Error al procesar el pago: {str(e)}')
-        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+    # Redirigir según el método de cobro
+    metodo_cobro = transaccion.metodo_cobro.nombre.lower()
+
+    if 'tarjeta de crédito' in metodo_cobro or 'tarjeta de credito' in metodo_cobro:
+        return redirect('pagos:pago_stripe', transaccion_id=transaccion_id)
+    elif 'billetera electrónica' in metodo_cobro or 'billetera electronica' in metodo_cobro:
+        return redirect('pagos:pago_billetera_electronica', transaccion_id=transaccion_id)
+    elif 'tarjeta de débito' in metodo_cobro or 'tarjeta de debito' in metodo_cobro:
+        return redirect('pagos:pago_tarjeta_debito', transaccion_id=transaccion_id)
+    elif 'tarjeta de crédito local' in metodo_cobro or 'tarjeta de credito local' in metodo_cobro:
+        return redirect('pagos:pago_tarjeta_credito_local', transaccion_id=transaccion_id)
+    elif 'transferencia bancaria' in metodo_cobro:
+        return redirect('pagos:pago_transferencia_bancaria', transaccion_id=transaccion_id)
+    else:
+        # Para otros métodos de cobro no implementados, procesar directamente
+        try:
+            with transaction.atomic():
+                estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
+                transaccion.estado = estado_pagada
+                transaccion.fecha_pago = timezone.now()
+                transaccion.observaciones += f"\nPago procesado el {timezone.now()} por {request.user.email}"
+                transaccion.save()
+
+            messages.success(request, '¡Pago procesado exitosamente! La transacción ha sido completada.')
+            return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+        except Exception as e:
+            messages.error(request, f'Error al procesar el pago: {str(e)}')
+            return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
 
 
 @login_required
@@ -443,15 +454,7 @@ def verificar_cambio_cotizacion(request, transaccion_id):
         # Verificar si hay cambio de cotización
         hay_cambio = not transaccion.tiene_tasa_actualizada()
         
-        # DEBUG: Mostrar información para debugging
-        print(f"DEBUG: Transacción {transaccion.id_transaccion}")
-        print(f"  - Moneda origen: {transaccion.moneda_origen.codigo}")
-        print(f"  - Moneda destino: {transaccion.moneda_destino.codigo}")
-        print(f"  - Tasa guardada: {transaccion.tasa_cambio}")
-        print(f"  - ¿Hay cambio?: {hay_cambio}")
-        
-        if not hay_cambio:
-            print("DEBUG: No hay cambio de cotización")
+        if not hay_cambio:          
             return JsonResponse({
                 'success': True,
                 'hay_cambio': False,
@@ -727,6 +730,7 @@ def calcular_transaccion(monto, moneda_origen, moneda_destino, cliente=None, met
 
 
 @login_required
+@permission_required('transacciones.can_operate', raise_exception=True)
 def comprar_divisas(request):
     """
     Vista para la pantalla dedicada de compra de divisas.
@@ -741,8 +745,15 @@ def comprar_divisas(request):
         usuarios_asociados=request.user
     ).select_related('tipo_cliente').order_by('nombre_comercial')
     
-    # Métodos de cobro activos (para recibir pago del cliente)
-    metodos_cobro = MetodoCobro.objects.filter(es_activo=True).order_by('nombre')
+    # Métodos de cobro activos que aceptan PYG (para recibir pago del cliente)
+    try:
+        moneda_pyg = Moneda.objects.get(codigo='PYG')
+        metodos_cobro = MetodoCobro.objects.filter(
+            es_activo=True,
+            monedas_permitidas=moneda_pyg
+        ).order_by('nombre')
+    except Moneda.DoesNotExist:
+        metodos_cobro = MetodoCobro.objects.filter(es_activo=True).order_by('nombre')
     
     # Métodos de pago activos (para entregar divisas al cliente)
     metodos_pago = MetodoPago.objects.filter(es_activo=True).order_by('nombre')
@@ -1213,6 +1224,7 @@ def calcular_venta_completa(monto, moneda_origen, moneda_destino, cliente=None, 
 
 
 @login_required
+@permission_required('transacciones.can_operate', raise_exception=True)
 def vender_divisas(request):
     """
     Vista para mostrar el formulario de venta de divisas.
@@ -1493,6 +1505,7 @@ def api_metodos_cobro_por_moneda(request):
 
 
 @login_required
+@permission_required('transacciones.can_operate', raise_exception=True)
 @require_http_methods(["POST"])
 def iniciar_venta(request):
     """
@@ -1775,3 +1788,17 @@ class MisTransaccionesListView(LoginRequiredMixin, ListView):
         })
 
         return context
+
+
+# ============================================================================
+# FUNCIONES DE PAGOS MOVIDAS A LA APP 'pagos'
+# ============================================================================
+# Las funciones de procesamiento de pagos ahora están en pagos/views.py
+# - _procesar_pago_con_pasarela()
+# - pago_billetera_electronica()
+# - pago_tarjeta_debito() 
+# - pago_transferencia_bancaria()
+# - webhook_pago()
+#
+# Esta app solo maneja la lógica de transacciones.
+# ============================================================================

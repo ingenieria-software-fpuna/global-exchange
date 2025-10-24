@@ -1,4 +1,4 @@
-.PHONY: db-up db-clean app-run app-migrate check-admin-group app-setup user user-fast app-reset help docs-html docs-clean docs-live app-test create-currencies
+.PHONY: db-up db-clean app-run app-migrate check-admin-group app-setup user user-fast app-reset help docs-html docs-clean docs-live app-test create-currencies stripe-up stripe-down stripe-logs stripe-secret stripe-trigger
 
 #-------------- Operaciones de base de datos ----------------#
 db-up:
@@ -82,26 +82,76 @@ create-transactions:
 	poetry run python scripts/create_transacciones_test.py
 
 app-setup:
-	@echo "Configurando el proyecto Django..."
-	make db-clean
-	make db-up
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║          CONFIGURACIÓN COMPLETA DEL PROYECTO GLX           ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "→ Limpiando base de datos..."
+	@make db-clean
+	@echo ""
+	@echo "→ Levantando base de datos..."
+	@make db-up
+	@echo ""
+	@echo "→ Iniciando Stripe CLI..."
+	@make stripe-up
+	@echo ""
+	@echo "→ Esperando servicios..."
 ifeq ($(OS),Windows_NT)
-	timeout /t 5 /nobreak > nul
+	@timeout /t 5 /nobreak > nul
 else
-	sleep 5
+	@sleep 5
 endif
-	make app-migrate
-	make check-admin-group
-	make create-currencies
-	make create-payment-methods
-	make create-collection-methods
-	make create-groups-users
-	make create-client-types
-	make create-clients
-	make create-historical-rates
-	make setup-transactions
+	@echo ""
+	@echo "→ Aplicando migraciones..."
+	@make app-migrate
+	@echo ""
+	@echo "→ Configurando grupos y permisos..."
+	@make check-admin-group
+	@echo ""
+	@echo "→ Creando monedas y tasas de cambio..."
+	@make create-currencies
+	@echo ""
+	@echo "→ Creando métodos de pago..."
+	@make create-payment-methods
+	@echo ""
+	@echo "→ Creando métodos de cobro..."
+	@make create-collection-methods
+	@echo ""
+	@echo "→ Creando grupos y usuarios..."
+	@make create-groups-users
+	@echo ""
+	@echo "→ Creando tipos de cliente..."
+	@make create-client-types
+	@echo ""
+	@echo "→ Creando clientes de ejemplo..."
+	@make create-clients
+	@echo ""
+	@echo "→ Creando datos históricos..."
+	@make create-historical-rates
+	@echo ""
+	@echo "→ Configurando transacciones..."
+	@make setup-transactions
 	make create-tausers
-	make create-transactions
+	@echo ""
+	@echo "→ Creando transacciones de ejemplo..."
+	@make create-transactions
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║                  ✅ SETUP COMPLETADO                       ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "📋 IMPORTANTE: Configura tu webhook secret de Stripe"
+	@echo ""
+	@echo "1. Ejecuta: make stripe-secret"
+	@echo "2. Copia el valor 'whsec_...' a tu archivo .env"
+	@echo "3. Reinicia tu servidor Django"
+	@echo ""
+	@echo "🚀 Para iniciar el servidor:"
+	@echo "   make app-run"
+	@echo ""
+	@echo "📊 Para ver webhooks en tiempo real:"
+	@echo "   make stripe-logs"
+	@echo ""
 
 #-------------- Comandos de administración ----------------#
 
@@ -131,6 +181,45 @@ app-test:
 	poetry run python manage.py test -v 2
 	@echo "Tests completados"
 
+#-------------- Stripe CLI (Docker) ----------------#
+stripe-up:
+	@echo "Iniciando Stripe CLI en Docker..."
+	docker compose -f docker-compose-dev.yml up -d stripe-cli
+	@echo "Esperando que Stripe CLI se inicie..."
+	@sleep 3
+	@echo ""
+	@echo "✅ Stripe CLI iniciado"
+	@echo ""
+	@echo "Para obtener el webhook secret ejecuta:"
+	@echo "  make stripe-secret"
+
+stripe-down:
+	@echo "Deteniendo Stripe CLI..."
+	docker compose -f docker-compose-dev.yml stop stripe-cli
+	@echo "Stripe CLI detenido"
+
+stripe-logs:
+	@echo "Mostrando logs de Stripe CLI (Ctrl+C para salir)..."
+	docker compose -f docker-compose-dev.yml logs -f stripe-cli
+
+stripe-secret:
+	@echo "Obteniendo webhook signing secret..."
+	@bash scripts/get-stripe-webhook-secret.sh
+
+stripe-trigger:
+	@echo "Trigger manual de eventos Stripe"
+	@echo ""
+	@echo "Eventos disponibles:"
+	@echo "  1. checkout.session.completed (Pago exitoso)"
+	@echo "  2. payment_intent.payment_failed (Pago fallido)"
+	@echo ""
+	@read -p "Seleccione evento (1 o 2): " event; \
+	case $$event in \
+		1) docker exec -it $$(docker ps -qf "name=stripe-cli") stripe trigger checkout.session.completed ;; \
+		2) docker exec -it $$(docker ps -qf "name=stripe-cli") stripe trigger payment_intent.payment_failed ;; \
+		*) echo "Opción inválida" ;; \
+	esac
+
 # Ayuda
 help:
 	@echo "Comandos disponibles:"
@@ -159,6 +248,14 @@ help:
 	@echo "  docs-deploy       - Construir documentación para Django (disponible en /docs/)"
 	@echo "  docs-live         - Servidor live de docs (sphinx-autobuild)"
 	@echo "  docs-clean        - Limpiar artefactos de build de docs"
+	@echo ""
+	@echo "Comandos de Stripe CLI:"
+	@echo "  stripe-up         - Iniciar Stripe CLI en Docker (webhook forwarding)"
+	@echo "  stripe-down       - Detener Stripe CLI"
+	@echo "  stripe-logs       - Ver logs de Stripe CLI"
+	@echo "  stripe-secret     - Obtener webhook signing secret"
+	@echo "  stripe-trigger    - Trigger manual de eventos de prueba"
+	@echo ""
 	@echo "  help              - Mostrar esta ayuda"
 	@echo ""
 	@echo "Ejemplos de uso:"

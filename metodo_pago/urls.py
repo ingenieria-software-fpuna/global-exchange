@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     MetodoPagoListView, MetodoPagoCreateView, MetodoPagoUpdateView,
-    toggle_metodopago_status,
+    toggle_metodopago_status, api_campos_metodo_pago,
 )
 
 app_name = 'metodo_pago'
@@ -13,5 +13,6 @@ urlpatterns = [
 
     # API AJAX
     path('toggle-status/<int:pk>/', toggle_metodopago_status, name='toggle_status'),
+    path('api/campos/', api_campos_metodo_pago, name='api_campos_metodo_pago'),
 ]
 

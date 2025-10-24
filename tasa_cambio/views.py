@@ -59,6 +59,7 @@ class TasaCambioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         context['fecha_desde'] = self.request.GET.get('fecha_desde', '')
         context['fecha_hasta'] = self.request.GET.get('fecha_hasta', '')
         context['monedas'] = Moneda.objects.filter(es_activa=True).order_by('nombre')
+        context['can_view_sensitive_columns'] = self.request.user.has_perm('tasa_cambio.can_view_sensitive_columns')
         return context
 
 
@@ -102,6 +103,9 @@ class TasaCambioHistorialView(LoginRequiredMixin, PermissionRequiredMixin, ListV
         context['estado'] = self.request.GET.get('estado', '')
         context['fecha_desde'] = self.request.GET.get('fecha_desde', '')
         context['fecha_hasta'] = self.request.GET.get('fecha_hasta', '')
+        
+        # Permiso para ver columnas sensibles
+        context['can_view_sensitive_columns'] = self.request.user.has_perm('tasa_cambio.can_view_sensitive_columns')
 
         # Datos para gráficos
         historial_datos = list(self.get_queryset()[:50].values(
@@ -190,6 +194,7 @@ def tasacambio_detail_api(request, pk):
 
 
 @login_required
+@permission_required('transacciones.can_operate', raise_exception=True)
 # @permission_required('tasa_cambio.view_tasacambio', raise_exception=True)
 def dashboard_tasacambio(request):
     """Vista del dashboard específico para cotizaciones"""

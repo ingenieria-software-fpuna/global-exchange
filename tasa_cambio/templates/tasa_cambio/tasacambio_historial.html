@@ -102,14 +102,15 @@
                     <thead class="table-light">
                         <tr>
                             <th>Fecha</th>
+                            <th class="text-center">Precio Compra</th>
+                            <th class="text-center">Precio Venta</th>
+                            {% if can_view_sensitive_columns %}
                             <th class="text-center">Precio Base</th>
                             <th class="text-center">Comisión Compra</th>
                             <th class="text-center">Comisión Venta</th>
-                            <th class="text-center">Precio Compra</th>
-                            <th class="text-center">Precio Venta</th>
                             <th class="text-center">Spread</th>
                             <th class="text-center">Estado</th>
-                            {% comment %} <th class="text-center">Acciones</th> {% endcomment %}
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -123,7 +124,18 @@
                                 </div>
                             </td>
                             <td class="text-center">
-                                <span class="badge bg-secondary text-white">
+                                <span class="badge bg-primary text-white fs-6">
+                                    {{ tasa.tasa_compra|formatear_guaranies }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-primary text-white fs-6">
+                                    {{ tasa.tasa_venta|formatear_guaranies }}
+                                </span>
+                            </td>
+                            {% if can_view_sensitive_columns %}
+                            <td class="text-center">
+                                <span class="badge bg-info text-white">
                                     {{ tasa.precio_base|formatear_guaranies }}
                                 </span>
                             </td>
@@ -138,18 +150,8 @@
                                 </span>
                             </td>
                             <td class="text-center">
-                                <span class="badge bg-success text-white">
-                                    {{ tasa.tasa_compra|formatear_guaranies }}
-                                </span>
-                            </td>
-                            <td class="text-center">
-                                <span class="badge bg-info text-white">
-                                    {{ tasa.tasa_venta|formatear_guaranies }}
-                                </span>
-                            </td>
-                            <td class="text-center">
                                 <div>
-                                    <span class="badge bg-primary text-white">
+                                    <span class="badge bg-success text-white">
                                         {{ tasa.spread|formatear_guaranies }}
                                     </span>
                                     <div class="small text-muted mt-1">
@@ -168,9 +170,7 @@
                                     </span>
                                 {% endif %}
                             </td>
-                            <td class="text-center">
-                                <!-- Botón de desactivar removido -->
-                            </td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>

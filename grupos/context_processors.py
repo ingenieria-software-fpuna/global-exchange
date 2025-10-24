@@ -112,6 +112,7 @@ def permissions_context(request):
         context['can_create_transacciones'] = request.user.has_perm('transacciones.add_transaccion')
         context['can_edit_transacciones'] = request.user.has_perm('transacciones.change_transaccion')
         context['can_delete_transacciones'] = request.user.has_perm('transacciones.delete_transaccion')
+        context['can_operate'] = request.user.has_perm('transacciones.can_operate')  # Permiso para comprar/vender
         
         # Permisos específicos para configuración
         context['can_view_configuracion'] = request.user.has_perm('configuracion.change_configuracionsistema')
@@ -190,6 +191,7 @@ def permissions_context(request):
         context['can_create_transacciones'] = False
         context['can_edit_transacciones'] = False
         context['can_delete_transacciones'] = False
+        context['can_operate'] = False
         context['can_view_configuracion'] = False
         context['can_view_tauser'] = False
         context['can_create_tauser'] = False

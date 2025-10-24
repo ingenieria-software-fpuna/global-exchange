@@ -46,6 +46,13 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
 
     is_staff = models.BooleanField(default=False)
     
+    # Preferencias de notificaciones
+    recibir_notificaciones_email = models.BooleanField(
+        default=False, 
+        verbose_name="Recibir notificaciones por email",
+        help_text="Si está activado, recibirás notificaciones de cambios en tasas por correo electrónico"
+    )
+    
     # Campos de auditoría
     fecha_creacion = models.DateTimeField(default=timezone.now, verbose_name="Fecha de creación")
     fecha_actualizacion = models.DateTimeField(auto_now=True, verbose_name="Fecha de actualización")

@@ -85,6 +85,8 @@ urlpatterns = [
     path('configuracion/', include('configuracion.urls', namespace='configuracion')),
     path('transacciones/', include('transacciones.urls', namespace='transacciones')),
     path('tauser/', include('tauser.urls', namespace='tauser')),
+    path('pagos/', include('pagos.urls', namespace='pagos')),
+    path('notificaciones/', include('notificaciones.urls', namespace='notificaciones')),
     path('docs/', docs_view, name='docs_index'),
     path('docs/<path:path>', docs_view, name='docs'),
 ]

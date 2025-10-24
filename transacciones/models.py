@@ -311,6 +311,9 @@ class Transaccion(models.Model):
             models.Index(fields=['fecha_expiracion']),
             models.Index(fields=['tipo_operacion', '-fecha_creacion']),
         ]
+        permissions = [
+            ('can_operate', 'Puede realizar operaciones de compra y venta'),
+        ]
 
     def __str__(self):
         return f"Transacción {self.id_transaccion} - {self.tipo_operacion.nombre}"
