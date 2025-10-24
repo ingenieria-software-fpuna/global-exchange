@@ -66,7 +66,8 @@ def crear_metodos_cobro():
             'nombre': 'Tarjeta de crédito',
             'descripcion': 'Pago con tarjeta de crédito',
             'comision': Decimal('3.00'),
-            'monedas': [pyg, usd]
+            'monedas': [pyg, usd],
+            'requiere_retiro_fisico': False  # Tarjeta = No requiere retiro físico
         },
         {
             'nombre': 'Tarjeta de crédito local',
