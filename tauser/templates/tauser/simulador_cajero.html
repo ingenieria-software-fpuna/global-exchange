@@ -100,6 +100,50 @@
         </div>
       </div>
 
+      <!-- Verificación por email -->
+      <div id="verificacion-email" class="card shadow-sm mb-4" style="display: none;">
+        <div class="card-header">
+          <h5 class="mb-0"><i class="fas fa-envelope me-2"></i>Verificación por Correo</h5>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Se ha enviado un código de verificación a tu correo electrónico.</strong><br>
+            Por favor, revisa tu bandeja de entrada y también la carpeta de spam.
+          </div>
+          <form id="form-verificar-codigo">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label for="codigo_email" class="form-label">
+                <i class="fas fa-key me-1"></i>
+                Código de Verificación
+              </label>
+              <input type="text" 
+                     class="form-control form-control-lg text-center" 
+                     id="codigo_email" 
+                     name="codigo_email" 
+                     placeholder="123456"
+                     maxlength="6"
+                     pattern="[0-9]{6}"
+                     required>
+              <div class="form-text">Ingrese el código de 6 dígitos que recibió por correo</div>
+            </div>
+            <div class="d-grid">
+              <button type="submit" class="btn btn-success btn-lg" id="btn-verificar-codigo">
+                <i class="fas fa-check me-2"></i>
+                Verificar Código
+              </button>
+            </div>
+          </form>
+          <div class="mt-3 text-center">
+            <button type="button" class="btn btn-outline-secondary" id="btn-reenviar-codigo">
+              <i class="fas fa-redo me-2"></i>
+              Reenviar Código
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Botón de retiro -->
       <div id="boton-retiro" class="card shadow-sm mb-4" style="display: none;">
         <div class="card-body text-center">
@@ -170,6 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const resultadoValidacion = document.getElementById('resultado-validacion');
     const contenidoValidacion = document.getElementById('contenido-validacion');
+    const verificacionEmail = document.getElementById('verificacion-email');
     const botonRetiro = document.getElementById('boton-retiro');
     const resultadoRetiro = document.getElementById('resultado-retiro');
     const contenidoRetiro = document.getElementById('contenido-retiro');
@@ -205,8 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 datosTransaccion = data;
-                mostrarResultadoValidacion(data);
-                botonRetiro.style.display = 'block';
+                verificacionEmail.style.display = 'block';
             } else {
                 mostrarError(data.error);
             }
@@ -218,6 +262,86 @@ document.addEventListener('DOMContentLoaded', function() {
         .finally(() => {
             btnValidar.disabled = false;
             btnValidar.innerHTML = '<i class="fas fa-search me-2"></i>Validar Transacción';
+        });
+    });
+    
+    // Verificar código de email
+    const formVerificarCodigo = document.getElementById('form-verificar-codigo');
+    const btnVerificarCodigo = document.getElementById('btn-verificar-codigo');
+    const btnReenviarCodigo = document.getElementById('btn-reenviar-codigo');
+    
+    formVerificarCodigo.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const codigoEmail = document.getElementById('codigo_email').value.trim();
+        
+        if (!codigoEmail || codigoEmail.length !== 6) {
+            mostrarError('Por favor ingrese un código de 6 dígitos');
+            return;
+        }
+        
+        btnVerificarCodigo.disabled = true;
+        btnVerificarCodigo.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Verificando...';
+        
+        // Realizar petición AJAX
+        fetch('{% url "tauser:verificar_codigo_retiro" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `codigo_verificacion=${encodeURIComponent(datosTransaccion.transaccion.codigo_verificacion)}&tauser_id=${encodeURIComponent(datosTransaccion.tauser.id)}&codigo_email=${encodeURIComponent(codigoEmail)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                datosTransaccion = data;
+                mostrarResultadoValidacion(data);
+                verificacionEmail.style.display = 'none';
+                botonRetiro.style.display = 'block';
+            } else {
+                mostrarError(data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            mostrarError('Error de conexión. Intente nuevamente.');
+        })
+        .finally(() => {
+            btnVerificarCodigo.disabled = false;
+            btnVerificarCodigo.innerHTML = '<i class="fas fa-check me-2"></i>Verificar Código';
+        });
+    });
+    
+    // Reenviar código
+    btnReenviarCodigo.addEventListener('click', function() {
+        btnReenviarCodigo.disabled = true;
+        btnReenviarCodigo.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Reenviando...';
+        
+        // Realizar petición AJAX para reenviar código
+        fetch('{% url "tauser:validar_transaccion_retiro" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `codigo_verificacion=${encodeURIComponent(datosTransaccion.transaccion.codigo_verificacion)}&tauser_id=${encodeURIComponent(datosTransaccion.tauser.id)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                mostrarError('Código reenviado exitosamente. Revisa tu correo.');
+            } else {
+                mostrarError(data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            mostrarError('Error de conexión. Intente nuevamente.');
+        })
+        .finally(() => {
+            btnReenviarCodigo.disabled = false;
+            btnReenviarCodigo.innerHTML = '<i class="fas fa-redo me-2"></i>Reenviar Código';
         });
     });
     
@@ -271,6 +395,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Limpiar formulario
         formValidar.reset();
         resultadoValidacion.style.display = 'none';
+        verificacionEmail.style.display = 'none';
         botonRetiro.style.display = 'none';
         resultadoRetiro.style.display = 'none';
         nuevaTransaccion.style.display = 'none';
@@ -283,7 +408,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function mostrarResultadoValidacion(data) {
         const transaccion = data.transaccion;
         const tauser = data.tauser;
-        const stock = data.stock_disponible;
         
         // Determinar el tipo de operación y mostrar información específica
         let tipoOperacion = '';
@@ -319,11 +443,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 <i class="fas fa-exclamation-triangle me-2"></i>
                 <strong>Instrucciones:</strong> ${instrucciones}
             </div>
-            <div class="alert alert-info mt-3">
-                <i class="fas fa-info-circle me-2"></i>
-                <strong>Stock Disponible:</strong> ${stock.cantidad_formateada}
-                ${stock.esta_bajo_stock ? '<span class="text-warning"> (Stock bajo)</span>' : ''}
-            </div>
         `;
         
         resultadoValidacion.style.display = 'block';
@@ -331,7 +450,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function mostrarResultadoRetiro(data) {
         const transaccion = data.transaccion;
-        const stock = data.stock_actualizado;
         
         contenidoRetiro.innerHTML = `
             <div class="alert alert-success">
@@ -352,11 +470,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     <p><strong>Monto Retirado:</strong> <span class="fw-bold text-success">${transaccion.monto_retirado_formateado}</span></p>
                     <p><strong>Punto de Retiro:</strong> ${transaccion.tauser}</p>
                 </div>
-            </div>
-            <div class="alert alert-info mt-3">
-                <i class="fas fa-info-circle me-2"></i>
-                <strong>Stock Restante:</strong> ${stock.cantidad_restante_formateada}
-                ${stock.esta_bajo_stock ? '<span class="text-warning"> (Stock bajo)</span>' : ''}
             </div>
             <div class="alert alert-warning mt-3">
                 <i class="fas fa-exclamation-triangle me-2"></i>

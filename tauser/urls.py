@@ -21,5 +21,6 @@ urlpatterns = [
     # URLs para Simulador de Cajero Automático
     path('simulador/', views.simulador_cajero, name='simulador_cajero'),
     path('validar-transaccion/', views.validar_transaccion_retiro, name='validar_transaccion_retiro'),
+    path('verificar-codigo/', views.verificar_codigo_retiro, name='verificar_codigo_retiro'),
     path('procesar-retiro/', views.procesar_retiro, name='procesar_retiro'),
 ]

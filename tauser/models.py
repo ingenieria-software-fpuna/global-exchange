@@ -477,3 +477,107 @@ class HistorialStock(models.Model):
     def formatear_cantidad_posterior(self):
         """Formatea la cantidad posterior según los decimales de la moneda"""
         return self.stock.moneda.formatear_monto(self.cantidad_posterior)
+
+
+class CodigoVerificacionRetiro(models.Model):
+    """Modelo para almacenar códigos de verificación para retiros en Tauser"""
+    
+    TIPO_CHOICES = [
+        ('retiro', 'Retiro de Efectivo'),
+    ]
+    
+    transaccion = models.ForeignKey(
+        'transacciones.Transaccion',
+        on_delete=models.CASCADE,
+        verbose_name="Transacción",
+        related_name='codigos_verificacion_retiro'
+    )
+    codigo = models.CharField(
+        max_length=6,
+        verbose_name="Código de Verificación"
+    )
+    tipo = models.CharField(
+        max_length=20,
+        choices=TIPO_CHOICES,
+        default='retiro',
+        verbose_name="Tipo de Verificación"
+    )
+    fecha_creacion = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de Creación"
+    )
+    fecha_expiracion = models.DateTimeField(
+        verbose_name="Fecha de Expiración"
+    )
+    usado = models.BooleanField(
+        default=False,
+        verbose_name="Usado"
+    )
+    ip_address = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        verbose_name="Dirección IP"
+    )
+    user_agent = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="User Agent"
+    )
+    
+    class Meta:
+        verbose_name = "Código de Verificación de Retiro"
+        verbose_name_plural = "Códigos de Verificación de Retiro"
+        ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['codigo', 'tipo']),
+            models.Index(fields=['transaccion', 'tipo']),
+            models.Index(fields=['fecha_expiracion']),
+        ]
+    
+    def __str__(self):
+        return f"Código {self.codigo} para retiro de {self.transaccion.id_transaccion}"
+    
+    @classmethod
+    def generar_codigo(cls):
+        """Genera un código de verificación de 6 dígitos"""
+        import random
+        return ''.join([str(random.randint(0, 9)) for _ in range(6)])
+    
+    @classmethod
+    def crear_codigo(cls, transaccion, request=None, minutos_expiracion=5):
+        """Crea un nuevo código de verificación para retiro"""
+        from datetime import timedelta
+        
+        # Limpiar códigos expirados existentes para esta transacción
+        cls.objects.filter(
+            transaccion=transaccion,
+            tipo='retiro',
+            usado=False,
+            fecha_expiracion__lt=timezone.now()
+        ).delete()
+        
+        # Crear nuevo código
+        codigo = cls.generar_codigo()
+        fecha_expiracion = timezone.now() + timedelta(minutes=minutos_expiracion)
+        
+        codigo_obj = cls.objects.create(
+            transaccion=transaccion,
+            codigo=codigo,
+            tipo='retiro',
+            fecha_expiracion=fecha_expiracion,
+            ip_address=request.META.get('REMOTE_ADDR') if request else None,
+            user_agent=request.META.get('HTTP_USER_AGENT') if request else None
+        )
+        
+        return codigo_obj
+    
+    def es_valido(self):
+        """Verifica si el código es válido (no usado y no expirado)"""
+        return not self.usado and timezone.now() <= self.fecha_expiracion
+    
+    @classmethod
+    def limpiar_codigos_expirados(cls):
+        """Limpia códigos expirados"""
+        cls.objects.filter(
+            fecha_expiracion__lt=timezone.now()
+        ).delete()

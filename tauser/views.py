@@ -488,11 +488,37 @@ def validar_transaccion_retiro(request):
                 'error': f'Stock insuficiente. Disponible: {stock.mostrar_cantidad()}, Requerido: {transaccion.moneda_destino.mostrar_monto(transaccion.monto_destino)}'
             })
         
+        # Crear código de verificación para retiro
+        from .models import CodigoVerificacionRetiro
+        from .services import EmailServiceRetiro
+        
+        # Limpiar códigos expirados
+        CodigoVerificacionRetiro.limpiar_codigos_expirados()
+        
+        # Crear nuevo código de verificación
+        codigo_verificacion = CodigoVerificacionRetiro.crear_codigo(
+            transaccion=transaccion,
+            request=request,
+            minutos_expiracion=5
+        )
+        
+        # Enviar email con código de verificación
+        exito, mensaje = EmailServiceRetiro.enviar_codigo_verificacion_retiro(
+            transaccion, codigo_verificacion, request
+        )
+        
+        if not exito:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error al enviar código de verificación: {mensaje}'
+            })
+        
         # Preparar datos de la transacción para mostrar
         resumen_detallado = transaccion.get_resumen_detallado()
         
         return JsonResponse({
             'success': True,
+            'message': 'Código de verificación enviado por correo',
             'transaccion': {
                 'id': transaccion.id_transaccion,
                 'codigo_verificacion': transaccion.codigo_verificacion,
@@ -715,3 +741,133 @@ def historial_stock(request, pk):
     }
     
     return render(request, 'tauser/historial_stock.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def verificar_codigo_retiro(request):
+    """
+    Verifica el código de verificación enviado por email antes de proceder con el retiro.
+    """
+    try:
+        codigo_verificacion = request.POST.get('codigo_verificacion')
+        tauser_id = request.POST.get('tauser_id')
+        
+        if not codigo_verificacion or not tauser_id:
+            return JsonResponse({
+                'success': False,
+                'error': 'Código de verificación y Tauser son requeridos'
+            })
+        
+        # Obtener la transacción por código de verificación
+        try:
+            from transacciones.models import Transaccion, EstadoTransaccion
+            transaccion = Transaccion.objects.select_related(
+                'cliente', 'tipo_operacion', 'estado', 'moneda_destino', 'metodo_cobro'
+            ).get(codigo_verificacion=codigo_verificacion)
+        except Transaccion.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Transacción no encontrada'
+            })
+        
+        # Verificar que esté pagada
+        if transaccion.estado.codigo != EstadoTransaccion.PAGADA:
+            return JsonResponse({
+                'success': False,
+                'error': f'La transacción no está pagada. Estado actual: {transaccion.estado.nombre}'
+            })
+        
+        # Verificar el código de verificación de retiro
+        from .models import CodigoVerificacionRetiro
+        try:
+            codigo_obj = CodigoVerificacionRetiro.objects.get(
+                transaccion=transaccion,
+                codigo=request.POST.get('codigo_email'),
+                tipo='retiro',
+                usado=False
+            )
+        except CodigoVerificacionRetiro.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Código de verificación incorrecto o ya utilizado'
+            })
+        
+        # Verificar que el código no haya expirado
+        if not codigo_obj.es_valido():
+            return JsonResponse({
+                'success': False,
+                'error': 'El código de verificación ha expirado. Solicita un nuevo código.'
+            })
+        
+        # Marcar el código como usado
+        codigo_obj.usado = True
+        codigo_obj.save()
+        
+        # Obtener el tauser
+        try:
+            tauser = Tauser.objects.get(id=tauser_id, es_activo=True)
+        except Tauser.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Tauser no válido o inactivo'
+            })
+        
+        # Verificar que el tauser tenga stock de la moneda destino
+        try:
+            stock = Stock.objects.get(
+                tauser=tauser,
+                moneda=transaccion.moneda_destino,
+                es_activo=True
+            )
+        except Stock.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': f'No hay stock de {transaccion.moneda_destino.nombre} en {tauser.nombre}'
+            })
+        
+        # Verificar que hay suficiente stock
+        if stock.cantidad < transaccion.monto_destino:
+            return JsonResponse({
+                'success': False,
+                'error': f'Stock insuficiente. Disponible: {stock.mostrar_cantidad()}, Requerido: {transaccion.moneda_destino.mostrar_monto(transaccion.monto_destino)}'
+            })
+        
+        # Preparar datos de la transacción para mostrar
+        resumen_detallado = transaccion.get_resumen_detallado()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Código de verificación válido. Puede proceder con el retiro.',
+            'transaccion': {
+                'id': transaccion.id_transaccion,
+                'codigo_verificacion': transaccion.codigo_verificacion,
+                'tipo': transaccion.tipo_operacion.nombre,
+                'cliente': transaccion.cliente.nombre_comercial if transaccion.cliente else 'Casual',
+                'moneda_destino': {
+                    'codigo': transaccion.moneda_destino.codigo,
+                    'nombre': transaccion.moneda_destino.nombre,
+                    'simbolo': transaccion.moneda_destino.simbolo
+                },
+                'monto_a_retirar': float(transaccion.monto_destino),
+                'monto_a_retirar_formateado': resumen_detallado['monto_recibe_formateado'],
+                'fecha_creacion': transaccion.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+                'fecha_pago': transaccion.fecha_pago.strftime('%d/%m/%Y %H:%M') if transaccion.fecha_pago else None,
+            },
+            'tauser': {
+                'id': tauser.id,
+                'nombre': tauser.nombre,
+                'direccion': tauser.direccion,
+            },
+            'stock_disponible': {
+                'cantidad': float(stock.cantidad),
+                'cantidad_formateada': stock.mostrar_cantidad(),
+                'esta_bajo_stock': stock.esta_bajo_stock()
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error interno: {str(e)}'
+        })
