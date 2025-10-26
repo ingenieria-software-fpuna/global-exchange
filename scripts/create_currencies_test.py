@@ -36,9 +36,6 @@ def crear_monedas_ejemplo():
                 {'valor': 10000, 'tipo': 'BILLETE'},
                 {'valor': 5000, 'tipo': 'BILLETE'},
                 {'valor': 2000, 'tipo': 'BILLETE'},
-                {'valor': 500, 'tipo': 'MONEDA'},
-                {'valor': 100, 'tipo': 'MONEDA'},
-                {'valor': 50, 'tipo': 'MONEDA'},
             ]
         },
         {
@@ -55,13 +52,6 @@ def crear_monedas_ejemplo():
                 {'valor': 20, 'tipo': 'BILLETE'},
                 {'valor': 10, 'tipo': 'BILLETE'},
                 {'valor': 5, 'tipo': 'BILLETE'},
-                {'valor': 2, 'tipo': 'BILLETE'},
-                {'valor': 1, 'tipo': 'BILLETE'},
-                {'valor': 0.50, 'tipo': 'MONEDA'},
-                {'valor': 0.25, 'tipo': 'MONEDA'},
-                {'valor': 0.10, 'tipo': 'MONEDA'},
-                {'valor': 0.05, 'tipo': 'MONEDA'},
-                {'valor': 0.01, 'tipo': 'MONEDA'},
             ]
         },
         {
@@ -80,14 +70,6 @@ def crear_monedas_ejemplo():
                 {'valor': 20, 'tipo': 'BILLETE'},
                 {'valor': 10, 'tipo': 'BILLETE'},
                 {'valor': 5, 'tipo': 'BILLETE'},
-                {'valor': 2, 'tipo': 'MONEDA'},
-                {'valor': 1, 'tipo': 'MONEDA'},
-                {'valor': 0.50, 'tipo': 'MONEDA'},
-                {'valor': 0.20, 'tipo': 'MONEDA'},
-                {'valor': 0.10, 'tipo': 'MONEDA'},
-                {'valor': 0.05, 'tipo': 'MONEDA'},
-                {'valor': 0.02, 'tipo': 'MONEDA'},
-                {'valor': 0.01, 'tipo': 'MONEDA'},
             ]
         },
         {
@@ -106,12 +88,6 @@ def crear_monedas_ejemplo():
                 {'valor': 10, 'tipo': 'BILLETE'},
                 {'valor': 5, 'tipo': 'BILLETE'},
                 {'valor': 2, 'tipo': 'BILLETE'},
-                {'valor': 1, 'tipo': 'MONEDA'},
-                {'valor': 0.50, 'tipo': 'MONEDA'},
-                {'valor': 0.25, 'tipo': 'MONEDA'},
-                {'valor': 0.10, 'tipo': 'MONEDA'},
-                {'valor': 0.05, 'tipo': 'MONEDA'},
-                {'valor': 0.01, 'tipo': 'MONEDA'},
             ]
         },
         {
@@ -133,11 +109,6 @@ def crear_monedas_ejemplo():
                 {'valor': 10, 'tipo': 'BILLETE'},
                 {'valor': 5, 'tipo': 'BILLETE'},
                 {'valor': 2, 'tipo': 'BILLETE'},
-                {'valor': 1, 'tipo': 'MONEDA'},
-                {'valor': 0.50, 'tipo': 'MONEDA'},
-                {'valor': 0.25, 'tipo': 'MONEDA'},
-                {'valor': 0.10, 'tipo': 'MONEDA'},
-                {'valor': 0.05, 'tipo': 'MONEDA'},
             ]
         },
         {
@@ -153,14 +124,6 @@ def crear_monedas_ejemplo():
                 {'valor': 20, 'tipo': 'BILLETE'},
                 {'valor': 10, 'tipo': 'BILLETE'},
                 {'valor': 5, 'tipo': 'BILLETE'},
-                {'valor': 2, 'tipo': 'MONEDA'},
-                {'valor': 1, 'tipo': 'MONEDA'},
-                {'valor': 0.50, 'tipo': 'MONEDA'},
-                {'valor': 0.20, 'tipo': 'MONEDA'},
-                {'valor': 0.10, 'tipo': 'MONEDA'},
-                {'valor': 0.05, 'tipo': 'MONEDA'},
-                {'valor': 0.02, 'tipo': 'MONEDA'},
-                {'valor': 0.01, 'tipo': 'MONEDA'},
             ]
         },
         {
@@ -176,12 +139,6 @@ def crear_monedas_ejemplo():
                 {'valor': 5000, 'tipo': 'BILLETE'},
                 {'valor': 2000, 'tipo': 'BILLETE'},
                 {'valor': 1000, 'tipo': 'BILLETE'},
-                {'valor': 500, 'tipo': 'MONEDA'},
-                {'valor': 100, 'tipo': 'MONEDA'},
-                {'valor': 50, 'tipo': 'MONEDA'},
-                {'valor': 10, 'tipo': 'MONEDA'},
-                {'valor': 5, 'tipo': 'MONEDA'},
-                {'valor': 1, 'tipo': 'MONEDA'},
             ]
         },
         {
@@ -198,12 +155,6 @@ def crear_monedas_ejemplo():
                 {'valor': 20, 'tipo': 'BILLETE'},
                 {'valor': 10, 'tipo': 'BILLETE'},
                 {'valor': 5, 'tipo': 'BILLETE'},
-                {'valor': 2, 'tipo': 'MONEDA'},
-                {'valor': 1, 'tipo': 'MONEDA'},
-                {'valor': 0.50, 'tipo': 'MONEDA'},
-                {'valor': 0.25, 'tipo': 'MONEDA'},
-                {'valor': 0.10, 'tipo': 'MONEDA'},
-                {'valor': 0.05, 'tipo': 'MONEDA'},
             ]
         },
         {
@@ -221,13 +172,6 @@ def crear_monedas_ejemplo():
                 {'valor': 50, 'tipo': 'BILLETE'},
                 {'valor': 20, 'tipo': 'BILLETE'},
                 {'valor': 10, 'tipo': 'BILLETE'},
-                {'valor': 5, 'tipo': 'MONEDA'},
-                {'valor': 2, 'tipo': 'MONEDA'},
-                {'valor': 1, 'tipo': 'MONEDA'},
-                {'valor': 0.50, 'tipo': 'MONEDA'},
-                {'valor': 0.20, 'tipo': 'MONEDA'},
-                {'valor': 0.10, 'tipo': 'MONEDA'},
-                {'valor': 0.05, 'tipo': 'MONEDA'},
             ]
         },
         {
@@ -244,12 +188,6 @@ def crear_monedas_ejemplo():
                 {'valor': 20, 'tipo': 'BILLETE'},
                 {'valor': 10, 'tipo': 'BILLETE'},
                 {'valor': 5, 'tipo': 'BILLETE'},
-                {'valor': 2, 'tipo': 'MONEDA'},
-                {'valor': 1, 'tipo': 'MONEDA'},
-                {'valor': 0.50, 'tipo': 'MONEDA'},
-                {'valor': 0.20, 'tipo': 'MONEDA'},
-                {'valor': 0.10, 'tipo': 'MONEDA'},
-                {'valor': 0.05, 'tipo': 'MONEDA'},
             ]
         },
         {
@@ -266,14 +204,6 @@ def crear_monedas_ejemplo():
                 {'valor': 20, 'tipo': 'BILLETE'},
                 {'valor': 10, 'tipo': 'BILLETE'},
                 {'valor': 5, 'tipo': 'BILLETE'},
-                {'valor': 2, 'tipo': 'BILLETE'},
-                {'valor': 1, 'tipo': 'BILLETE'},
-                {'valor': 0.50, 'tipo': 'MONEDA'},
-                {'valor': 0.20, 'tipo': 'MONEDA'},
-                {'valor': 0.10, 'tipo': 'MONEDA'},
-                {'valor': 0.05, 'tipo': 'MONEDA'},
-                {'valor': 0.02, 'tipo': 'MONEDA'},
-                {'valor': 0.01, 'tipo': 'MONEDA'},
             ]
         }
     ]

@@ -116,7 +116,7 @@ class StockForm(forms.ModelForm):
 
 
 class CargarStockDenominacionForm(forms.Form):
-    """Formulario para cargar stock por denominaciones"""
+    """Formulario para cargar stock por denominaciones de billetes"""
     
     moneda = forms.ModelChoiceField(
         queryset=None,
@@ -125,7 +125,7 @@ class CargarStockDenominacionForm(forms.Form):
             'id': 'moneda_select'
         }),
         label='Moneda',
-        help_text='Selecciona la moneda para cargar stock'
+        help_text='Selecciona la moneda para cargar billetes'
     )
     
     

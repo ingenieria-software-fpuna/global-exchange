@@ -83,7 +83,6 @@
                     <label class="form-label">Tipo</label>
                     <select class="form-select denominacion-tipo" name="denominaciones_tipo[]">
                       <option value="BILLETE" {% if denominacion.tipo == 'BILLETE' %}selected{% endif %}>Billete</option>
-                      <option value="MONEDA" {% if denominacion.tipo == 'MONEDA' %}selected{% endif %}>Moneda</option>
                     </select>
                   </div>
                   <div class="col-md-3 text-end">
@@ -140,7 +139,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         <label class="form-label">Tipo</label>
                         <select class="form-select denominacion-tipo" name="denominaciones_tipo[]">
                             <option value="BILLETE">Billete</option>
-                            <option value="MONEDA">Moneda</option>
                         </select>
                     </div>
                     <div class="col-md-3 text-end">

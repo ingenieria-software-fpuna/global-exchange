@@ -186,14 +186,15 @@ def cargar_stock(request, pk):
             from monedas.models import Moneda, DenominacionMoneda
             moneda = get_object_or_404(Moneda, pk=moneda_id)
             
-            # Obtener todas las denominaciones de la moneda seleccionada
+            # Obtener solo denominaciones de billetes (no monedas pequeñas)
             denominaciones = DenominacionMoneda.objects.filter(
                 moneda=moneda, 
-                es_activa=True
-            ).order_by('-valor', 'tipo')
+                es_activa=True,
+                tipo='BILLETE'  # Solo billetes
+            ).order_by('-valor')
             
             if not denominaciones.exists():
-                messages.error(request, f'No hay denominaciones configuradas para {moneda.nombre}.')
+                messages.error(request, f'No hay denominaciones de billetes configuradas para {moneda.nombre}.')
                 return redirect('tauser:tauser_detail', pk=tauser.pk)
             
             # Procesar cantidades por denominación
@@ -350,14 +351,15 @@ def cargar_stock(request, pk):
 
 @login_required
 def obtener_denominaciones(request, moneda_id):
-    """Vista AJAX para obtener denominaciones de una moneda"""
+    """Vista AJAX para obtener denominaciones de billetes de una moneda"""
     try:
         from monedas.models import DenominacionMoneda
         
         denominaciones = DenominacionMoneda.objects.filter(
             moneda_id=moneda_id,
-            es_activa=True
-        ).order_by('-valor', 'tipo')
+            es_activa=True,
+            tipo='BILLETE'  # Solo billetes
+        ).order_by('-valor')
         
         denominaciones_data = []
         for denominacion in denominaciones:
