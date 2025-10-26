@@ -16,11 +16,12 @@ urlpatterns = [
     path('<int:pk>/historial-stock/', views.historial_stock, name='historial_stock'),
     
     # URLs para denominaciones
-    path('denominaciones/<int:moneda_id>/', views.obtener_denominaciones, name='obtener_denominaciones'),
+    path('denominaciones/<str:moneda_id>/', views.obtener_denominaciones, name='obtener_denominaciones'),
     
     # URLs para Simulador de Cajero Automático
     path('simulador/', views.simulador_cajero, name='simulador_cajero'),
     path('validar-transaccion/', views.validar_transaccion_retiro, name='validar_transaccion_retiro'),
     path('verificar-codigo/', views.verificar_codigo_retiro, name='verificar_codigo_retiro'),
     path('procesar-retiro/', views.procesar_retiro, name='procesar_retiro'),
+    path('confirmar-recepcion-divisas/', views.confirmar_recepcion_divisas, name='confirmar_recepcion_divisas'),
 ]

@@ -351,12 +351,23 @@ def cargar_stock(request, pk):
 
 @login_required
 def obtener_denominaciones(request, moneda_id):
-    """Vista AJAX para obtener denominaciones de billetes de una moneda"""
+    """Vista AJAX para obtener denominaciones de billetes de una moneda por ID o código"""
     try:
-        from monedas.models import DenominacionMoneda
+        from monedas.models import DenominacionMoneda, Moneda
+        
+        # Intentar obtener la moneda por ID primero, luego por código
+        try:
+            if moneda_id.isdigit():
+                moneda = Moneda.objects.get(id=int(moneda_id))
+            else:
+                moneda = Moneda.objects.get(codigo=moneda_id)
+        except Moneda.DoesNotExist:
+            return JsonResponse({
+                'error': 'Moneda no encontrada'
+            }, status=404)
         
         denominaciones = DenominacionMoneda.objects.filter(
-            moneda_id=moneda_id,
+            moneda=moneda,
             es_activa=True,
             tipo='BILLETE'  # Solo billetes
         ).order_by('-valor')
@@ -437,15 +448,29 @@ def validar_transaccion_retiro(request):
                 'success': False,
                 'error': 'Transacción no encontrada'
             })
+        # Verificar estado de pago según el tipo de transacción
+        es_venta_con_efectivo = (
+            transaccion.tipo_operacion.codigo == 'VENTA' and 
+            transaccion.metodo_cobro and 
+            transaccion.metodo_cobro.nombre.lower().find('efectivo') != -1
+        )
         
-        # Verificar que esté pagada
-        if transaccion.estado.codigo != EstadoTransaccion.PAGADA:
-            return JsonResponse({
-                'success': False,
-                'error': f'La transacción no está pagada. Estado actual: {transaccion.estado.nombre}'
-            })
+        if es_venta_con_efectivo:
+            # Para ventas con cobro en efectivo, solo verificar que esté pendiente
+            if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Esta venta con cobro en efectivo no está en estado pendiente. Estado actual: {transaccion.estado.nombre}'
+                })
+        else:
+            # Para otras transacciones, verificar que esté pagada
+            if transaccion.estado.codigo != EstadoTransaccion.PAGADA:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'La transacción no está pagada. Estado actual: {transaccion.estado.nombre}'
+                })
         
-        # Verificar si la transacción requiere retiro físico en Tauser
+ # Verificar si la transacción requiere retiro físico en Tauser
         requiere_retiro_fisico = False
         if transaccion.tipo_operacion.codigo == 'VENTA':
             # Para ventas, verificar si el método de cobro requiere retiro físico
@@ -470,25 +495,29 @@ def validar_transaccion_retiro(request):
                 'error': 'Tauser no válido o inactivo'
             })
         
-        # Verificar que el tauser tenga stock de la moneda destino
-        try:
-            stock = Stock.objects.get(
-                tauser=tauser,
-                moneda=transaccion.moneda_destino,
-                es_activo=True
-            )
-        except Stock.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'error': f'No hay stock de {transaccion.moneda_destino.nombre} en {tauser.nombre}'
-            })
-        
-        # Verificar que hay suficiente stock
-        if stock.cantidad < transaccion.monto_destino:
-            return JsonResponse({
-                'success': False,
-                'error': f'Stock insuficiente. Disponible: {stock.mostrar_cantidad()}, Requerido: {transaccion.moneda_destino.mostrar_monto(transaccion.monto_destino)}'
-            })
+        # Verificar que el tauser tenga stock de la moneda destino (excepto PYG)
+        if transaccion.moneda_destino.codigo != 'PYG':
+            try:
+                stock = Stock.objects.get(
+                    tauser=tauser,
+                    moneda=transaccion.moneda_destino,
+                    es_activo=True
+                )
+            except Stock.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'No hay stock de {transaccion.moneda_destino.nombre} en {tauser.nombre}'
+                })
+            
+            # Verificar que hay suficiente stock
+            if stock.cantidad < transaccion.monto_destino:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Stock insuficiente. Disponible: {stock.mostrar_cantidad()}, Requerido: {transaccion.moneda_destino.mostrar_monto(transaccion.monto_destino)}'
+                })
+        else:
+            # Para PYG, no validar stock ya que no se maneja en efectivo
+            stock = None
         
         # Crear código de verificación para retiro
         from .models import CodigoVerificacionRetiro
@@ -542,9 +571,9 @@ def validar_transaccion_retiro(request):
                 'direccion': tauser.direccion,
             },
             'stock_disponible': {
-                'cantidad': float(stock.cantidad),
-                'cantidad_formateada': stock.mostrar_cantidad(),
-                'esta_bajo_stock': stock.esta_bajo_stock()
+                'cantidad': float(stock.cantidad) if stock else 0,
+                'cantidad_formateada': stock.mostrar_cantidad() if stock else 'N/A',
+                'esta_bajo_stock': stock.esta_bajo_stock() if stock else False
             }
         })
         
@@ -583,15 +612,29 @@ def procesar_retiro(request):
                 'success': False,
                 'error': 'Transacción no encontrada'
             })
+        # Verificar estado de pago según el tipo de transacción
+        es_venta_con_efectivo = (
+            transaccion.tipo_operacion.codigo == 'VENTA' and 
+            transaccion.metodo_cobro and 
+            transaccion.metodo_cobro.nombre.lower().find('efectivo') != -1
+        )
         
-        # Verificar que esté pagada
-        if transaccion.estado.codigo != EstadoTransaccion.PAGADA:
-            return JsonResponse({
-                'success': False,
-                'error': f'La transacción no está pagada. Estado actual: {transaccion.estado.nombre}'
-            })
+        if es_venta_con_efectivo:
+            # Para ventas con cobro en efectivo, solo verificar que esté pendiente
+            if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Esta venta con cobro en efectivo no está en estado pendiente. Estado actual: {transaccion.estado.nombre}'
+                })
+        else:
+            # Para otras transacciones, verificar que esté pagada
+            if transaccion.estado.codigo != EstadoTransaccion.PAGADA:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'La transacción no está pagada. Estado actual: {transaccion.estado.nombre}'
+                })
         
-        # Verificar si la transacción requiere retiro físico en Tauser
+ # Verificar si la transacción requiere retiro físico en Tauser
         requiere_retiro_fisico = False
         if transaccion.tipo_operacion.codigo == 'VENTA':
             # Para ventas, verificar si el método de cobro requiere retiro físico
@@ -618,41 +661,60 @@ def procesar_retiro(request):
         
         # Procesar el retiro con transacción atómica
         with transaction.atomic():
-            # Verificar stock nuevamente (por si cambió entre validación y procesamiento)
-            try:
-                stock = Stock.objects.select_for_update().get(
-                    tauser=tauser,
-                    moneda=transaccion.moneda_destino,
-                    es_activo=True
-                )
-            except Stock.DoesNotExist:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'No hay stock de {transaccion.moneda_destino.nombre} en {tauser.nombre}'
-                })
-            
-            # Verificar stock suficiente
-            if stock.cantidad < transaccion.monto_destino:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Stock insuficiente. Disponible: {stock.mostrar_cantidad()}, Requerido: {transaccion.moneda_destino.mostrar_monto(transaccion.monto_destino)}'
-                })
-            
-            # Reducir el stock
-            if not stock.reducir_cantidad(
-                transaccion.monto_destino,
-                usuario=request.user,
-                transaccion=transaccion,
-                observaciones=f'Retiro por transacción {transaccion.id_transaccion}'
-            ):
-                return JsonResponse({
-                    'success': False,
-                    'error': 'No se pudo reducir el stock'
-                })
+            # Solo procesar stock si no es PYG
+            if transaccion.moneda_destino.codigo != 'PYG':
+                # Verificar stock nuevamente (por si cambió entre validación y procesamiento)
+                try:
+                    stock = Stock.objects.select_for_update().get(
+                        tauser=tauser,
+                        moneda=transaccion.moneda_destino,
+                        es_activo=True
+                    )
+                except Stock.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'No hay stock de {transaccion.moneda_destino.nombre} en {tauser.nombre}'
+                    })
+                
+                # Verificar stock suficiente
+                if stock.cantidad < transaccion.monto_destino:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Stock insuficiente. Disponible: {stock.mostrar_cantidad()}, Requerido: {transaccion.moneda_destino.mostrar_monto(transaccion.monto_destino)}'
+                    })
+                
+                # Reducir el stock
+                if not stock.reducir_cantidad(
+                    transaccion.monto_destino,
+                    usuario=request.user,
+                    transaccion=transaccion,
+                    observaciones=f'Retiro por transacción {transaccion.id_transaccion}'
+                ):
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'No se pudo reducir el stock'
+                    })
+            else:
+                # Para PYG, no hay stock físico que reducir
+                stock = None
             
             # Actualizar la transacción con el tauser y agregar observación
             transaccion.tauser = tauser
             transaccion.observaciones += f"\nRetirado en {tauser.nombre} el {timezone.now()} por {request.user.email}"
+            
+            # Si es una venta con cobro en efectivo, marcar como pagada
+            es_venta_con_efectivo = (
+                transaccion.tipo_operacion.codigo == 'VENTA' and 
+                transaccion.metodo_cobro and 
+                transaccion.metodo_cobro.nombre.lower().find('efectivo') != -1
+            )
+            
+            if es_venta_con_efectivo:
+                # Marcar como pagada ya que el cliente entregó las divisas en efectivo
+                transaccion.estado = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
+                transaccion.fecha_pago = timezone.now()
+                transaccion.observaciones += f"\nMarcada como pagada por entrega de divisas en efectivo en {tauser.nombre}"
+            
             transaccion.save()
         
         # Preparar respuesta exitosa
@@ -672,9 +734,9 @@ def procesar_retiro(request):
                 'fecha_retiro': timezone.now().strftime('%d/%m/%Y %H:%M'),
             },
             'stock_actualizado': {
-                'cantidad_restante': float(stock.cantidad),
-                'cantidad_restante_formateada': stock.mostrar_cantidad(),
-                'esta_bajo_stock': stock.esta_bajo_stock()
+                'cantidad_restante': float(stock.cantidad) if stock else 0,
+                'cantidad_restante_formateada': stock.mostrar_cantidad() if stock else 'N/A',
+                'esta_bajo_stock': stock.esta_bajo_stock() if stock else False
             }
         })
         
@@ -751,11 +813,20 @@ def verificar_codigo_retiro(request):
     """
     Verifica el código de verificación enviado por email antes de proceder con el retiro.
     """
+    print("=== INICIO verificar_codigo_retiro ===")
+    print(f"Request POST data: {request.POST}")
+    
     try:
         codigo_verificacion = request.POST.get('codigo_verificacion')
         tauser_id = request.POST.get('tauser_id')
+        codigo_email = request.POST.get('codigo_email')
+        
+        print(f"Código verificación: {codigo_verificacion}")
+        print(f"Tauser ID: {tauser_id}")
+        print(f"Código email: {codigo_email}")
         
         if not codigo_verificacion or not tauser_id:
+            print("ERROR: Faltan parámetros requeridos")
             return JsonResponse({
                 'success': False,
                 'error': 'Código de verificación y Tauser son requeridos'
@@ -767,18 +838,38 @@ def verificar_codigo_retiro(request):
             transaccion = Transaccion.objects.select_related(
                 'cliente', 'tipo_operacion', 'estado', 'moneda_destino', 'metodo_cobro'
             ).get(codigo_verificacion=codigo_verificacion)
+            print(f"Transacción encontrada: {transaccion.id_transaccion}")
+            print(f"Tipo operación: {transaccion.tipo_operacion.nombre}")
+            print(f"Estado: {transaccion.estado.nombre}")
+            print(f"Método cobro: {transaccion.metodo_cobro.nombre if transaccion.metodo_cobro else 'None'}")
         except Transaccion.DoesNotExist:
+            print("ERROR: Transacción no encontrada")
             return JsonResponse({
                 'success': False,
                 'error': 'Transacción no encontrada'
             })
         
-        # Verificar que esté pagada
-        if transaccion.estado.codigo != EstadoTransaccion.PAGADA:
-            return JsonResponse({
-                'success': False,
-                'error': f'La transacción no está pagada. Estado actual: {transaccion.estado.nombre}'
-            })
+        # Verificar estado de pago según el tipo de transacción
+        es_venta_con_efectivo = (
+            transaccion.tipo_operacion.codigo == 'VENTA' and 
+            transaccion.metodo_cobro and 
+            transaccion.metodo_cobro.nombre.lower().find('efectivo') != -1
+        )
+        
+        if es_venta_con_efectivo:
+            # Para ventas con cobro en efectivo, solo verificar que esté pendiente
+            if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Esta venta con cobro en efectivo no está en estado pendiente. Estado actual: {transaccion.estado.nombre}'
+                })
+        else:
+            # Para otras transacciones, verificar que esté pagada
+            if transaccion.estado.codigo != EstadoTransaccion.PAGADA:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'La transacción no está pagada. Estado actual: {transaccion.estado.nombre}'
+                })
         
         # Verificar el código de verificación de retiro
         from .models import CodigoVerificacionRetiro
@@ -789,7 +880,9 @@ def verificar_codigo_retiro(request):
                 tipo='retiro',
                 usado=False
             )
+            print(f"Código de verificación encontrado: {codigo_obj.codigo}")
         except CodigoVerificacionRetiro.DoesNotExist:
+            print("ERROR: Código de verificación no encontrado o ya usado")
             return JsonResponse({
                 'success': False,
                 'error': 'Código de verificación incorrecto o ya utilizado'
@@ -815,28 +908,54 @@ def verificar_codigo_retiro(request):
                 'error': 'Tauser no válido o inactivo'
             })
         
-        # Verificar que el tauser tenga stock de la moneda destino
-        try:
-            stock = Stock.objects.get(
-                tauser=tauser,
-                moneda=transaccion.moneda_destino,
-                es_activo=True
-            )
-        except Stock.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'error': f'No hay stock de {transaccion.moneda_destino.nombre} en {tauser.nombre}'
-            })
-        
-        # Verificar que hay suficiente stock
-        if stock.cantidad < transaccion.monto_destino:
-            return JsonResponse({
-                'success': False,
-                'error': f'Stock insuficiente. Disponible: {stock.mostrar_cantidad()}, Requerido: {transaccion.moneda_destino.mostrar_monto(transaccion.monto_destino)}'
-            })
+        # Verificar que el tauser tenga stock de la moneda destino (excepto PYG)
+        if transaccion.moneda_destino.codigo != 'PYG':
+            try:
+                stock = Stock.objects.get(
+                    tauser=tauser,
+                    moneda=transaccion.moneda_destino,
+                    es_activo=True
+                )
+            except Stock.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'No hay stock de {transaccion.moneda_destino.nombre} en {tauser.nombre}'
+                })
+            
+            # Verificar que hay suficiente stock
+            if stock.cantidad < transaccion.monto_destino:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Stock insuficiente. Disponible: {stock.mostrar_cantidad()}, Requerido: {transaccion.moneda_destino.mostrar_monto(transaccion.monto_destino)}'
+                })
+        else:
+            # Para PYG, no validar stock ya que no se maneja en efectivo
+            stock = None
         
         # Preparar datos de la transacción para mostrar
         resumen_detallado = transaccion.get_resumen_detallado()
+        
+        # Preparar datos adicionales para ventas con cobro en efectivo
+        datos_adicionales = {
+            'metodo_cobro': transaccion.metodo_cobro.nombre if transaccion.metodo_cobro else None,
+            'metodo_pago': transaccion.metodo_pago.nombre if transaccion.metodo_pago else None,
+        }
+        
+        if es_venta_con_efectivo:
+            datos_adicionales.update({
+                'moneda_origen': {
+                    'codigo': transaccion.moneda_origen.codigo,
+                    'nombre': transaccion.moneda_origen.nombre,
+                    'simbolo': transaccion.moneda_origen.simbolo
+                } if transaccion.moneda_origen else None,
+                'monto_a_entregar': float(transaccion.monto_origen),
+                'monto_a_entregar_formateado': f"{transaccion.moneda_origen.simbolo}{transaccion.monto_origen:.{transaccion.moneda_origen.decimales}f}" if transaccion.moneda_origen else None,
+                'monto_a_recibir': float(transaccion.monto_destino),
+                'monto_a_recibir_formateado': f"{transaccion.moneda_destino.simbolo}{transaccion.monto_destino:.{transaccion.moneda_destino.decimales}f}" if transaccion.moneda_destino else None,
+            })
+        
+        print("=== FIN verificar_codigo_retiro - ÉXITO ===")
+        print(f"Datos adicionales: {datos_adicionales}")
         
         return JsonResponse({
             'success': True,
@@ -852,9 +971,10 @@ def verificar_codigo_retiro(request):
                     'simbolo': transaccion.moneda_destino.simbolo
                 },
                 'monto_a_retirar': float(transaccion.monto_destino),
-                'monto_a_retirar_formateado': resumen_detallado['monto_recibe_formateado'],
+                'monto_a_retirar_formateado': f"{transaccion.moneda_destino.simbolo}{transaccion.monto_destino:.{transaccion.moneda_destino.decimales}f}",
                 'fecha_creacion': transaccion.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
                 'fecha_pago': transaccion.fecha_pago.strftime('%d/%m/%Y %H:%M') if transaccion.fecha_pago else None,
+                **datos_adicionales
             },
             'tauser': {
                 'id': tauser.id,
@@ -862,13 +982,134 @@ def verificar_codigo_retiro(request):
                 'direccion': tauser.direccion,
             },
             'stock_disponible': {
-                'cantidad': float(stock.cantidad),
-                'cantidad_formateada': stock.mostrar_cantidad(),
-                'esta_bajo_stock': stock.esta_bajo_stock()
+                'cantidad': float(stock.cantidad) if stock else 0,
+                'cantidad_formateada': stock.mostrar_cantidad() if stock else 'N/A',
+                'esta_bajo_stock': stock.esta_bajo_stock() if stock else False
             }
         })
         
     except Exception as e:
+        print(f"=== ERROR en verificar_codigo_retiro: {str(e)} ===")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Error interno: {str(e)}'
+        })
+
+
+@login_required
+@require_http_methods(["POST"])
+def confirmar_recepcion_divisas(request):
+    """
+    Confirma la recepción de divisas extranjeras en una venta con cobro en efectivo
+    y cambia el estado de la transacción a PAGADA.
+    """
+    print("=== INICIO confirmar_recepcion_divisas ===")
+    print(f"Request POST data: {request.POST}")
+    
+    try:
+        codigo_verificacion = request.POST.get('codigo_verificacion')
+        tauser_id = request.POST.get('tauser_id')
+        total_recibido = request.POST.get('total_recibido')
+        denominaciones_json = request.POST.get('denominaciones')
+        
+        print(f"Código verificación: {codigo_verificacion}")
+        print(f"Tauser ID: {tauser_id}")
+        print(f"Total recibido: {total_recibido}")
+        print(f"Denominaciones: {denominaciones_json}")
+        
+        if not all([codigo_verificacion, tauser_id, total_recibido, denominaciones_json]):
+            print("ERROR: Faltan parámetros requeridos")
+            return JsonResponse({
+                'success': False,
+                'error': 'Faltan parámetros requeridos'
+            })
+        
+        # Obtener la transacción
+        from transacciones.models import Transaccion, EstadoTransaccion
+        try:
+            transaccion = Transaccion.objects.select_related(
+                'cliente', 'tipo_operacion', 'estado', 'moneda_origen', 'metodo_cobro'
+            ).get(codigo_verificacion=codigo_verificacion)
+            print(f"Transacción encontrada: {transaccion.id_transaccion}")
+        except Transaccion.DoesNotExist:
+            print("ERROR: Transacción no encontrada")
+            return JsonResponse({
+                'success': False,
+                'error': 'Transacción no encontrada'
+            })
+        
+        # Verificar que es una venta con cobro en efectivo
+        es_venta_con_efectivo = (
+            transaccion.tipo_operacion.codigo == 'VENTA' and 
+            transaccion.metodo_cobro and 
+            transaccion.metodo_cobro.nombre.lower().find('efectivo') != -1
+        )
+        
+        if not es_venta_con_efectivo:
+            print("ERROR: No es una venta con cobro en efectivo")
+            return JsonResponse({
+                'success': False,
+                'error': 'Esta función solo es válida para ventas con cobro en efectivo'
+            })
+        
+        # Verificar que esté en estado pendiente
+        if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
+            print(f"ERROR: Estado incorrecto: {transaccion.estado.nombre}")
+            return JsonResponse({
+                'success': False,
+                'error': f'La transacción no está en estado pendiente. Estado actual: {transaccion.estado.nombre}'
+            })
+        
+        # Verificar el monto recibido
+        import json
+        try:
+            denominaciones = json.loads(denominaciones_json)
+            total_calculado = sum(item['cantidad'] * item['valor'] for item in denominaciones)
+            monto_esperado = float(transaccion.monto_origen)
+            
+            print(f"Total calculado: {total_calculado}")
+            print(f"Monto esperado: {monto_esperado}")
+            
+            # Verificar que el monto sea exactamente igual (con tolerancia de 1 centavo)
+            if abs(total_calculado - monto_esperado) > 0.01:
+                print("ERROR: Monto no coincide")
+                return JsonResponse({
+                    'success': False,
+                    'error': f'El monto recibido ({total_calculado:.2f}) no coincide con el esperado ({monto_esperado:.2f})'
+                })
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            print(f"ERROR: Error al procesar denominaciones: {e}")
+            return JsonResponse({
+                'success': False,
+                'error': 'Error al procesar las denominaciones recibidas'
+            })
+        
+        # Cambiar estado a PAGADA
+        from transacciones.models import EstadoTransaccion
+        estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
+        transaccion.estado = estado_pagada
+        transaccion.fecha_pago = timezone.now()
+        transaccion.save()
+        
+        print("=== FIN confirmar_recepcion_divisas - ÉXITO ===")
+        print(f"Transacción {transaccion.id_transaccion} marcada como PAGADA")
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Recepción de divisas confirmada exitosamente',
+            'transaccion': {
+                'id': transaccion.id_transaccion,
+                'estado': transaccion.estado.nombre,
+                'fecha_pago': transaccion.fecha_pago.strftime('%d/%m/%Y %H:%M') if transaccion.fecha_pago else None,
+                'total_recibido': total_calculado,
+                'denominaciones_recibidas': len(denominaciones)
+            }
+        })
+        
+    except Exception as e:
+        print(f"Error en confirmar_recepcion_divisas: {e}")
         return JsonResponse({
             'success': False,
             'error': f'Error interno: {str(e)}'

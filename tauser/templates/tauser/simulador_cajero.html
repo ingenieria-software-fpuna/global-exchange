@@ -15,15 +15,6 @@
             Simulador de Cajero Automático
           </h1>
           <p class="text-muted mb-0">Ingrese el código de verificación para retirar su efectivo</p>
-          <div class="alert alert-info mt-3 mb-0">
-            <i class="fas fa-info-circle me-2"></i>
-            <strong>Tipos de transacciones:</strong>
-            <ul class="mb-0 mt-2">
-              <li><strong>Compra de divisas:</strong> Retire las divisas compradas en efectivo</li>
-              <li><strong>Venta con cobro en efectivo:</strong> Entregue su moneda extranjera y retire guaraníes</li>
-              <li><strong>Venta con transferencia:</strong> No requiere retiro físico</li>
-            </ul>
-          </div>
           {% if tauser_seleccionado %}
           <div class="alert alert-info mt-3 mb-0">
             <i class="fas fa-info-circle me-2"></i>
@@ -144,6 +135,60 @@
         </div>
       </div>
 
+      <!-- Ingreso de divisas extranjeras (solo para ventas con cobro en efectivo) -->
+      <div id="ingreso-divisas" class="card shadow-sm mb-4" style="display: none;">
+        <div class="card-header">
+          <h5 class="mb-0"><i class="fas fa-coins me-2"></i>Entrega de Divisas Extranjeras</h5>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Instrucciones:</strong> El cliente entregará las divisas extranjeras indicadas. Complete los campos siguientes para registrar la entrega.
+          </div>
+          <form id="form-ingreso-divisas">
+            {% csrf_token %}
+            <div class="row">
+              <div class="col-md-4">
+                <div class="mb-3">
+                  <label for="cantidad_entregada" class="form-label">
+                    <i class="fas fa-calculator me-1"></i>
+                    Cantidad Exacta de Divisas Extranjeras
+                  </label>
+                  <input type="number" 
+                         class="form-control form-control-lg" 
+                         id="cantidad_entregada" 
+                         name="cantidad_entregada" 
+                         step="0.01"
+                         min="0.01"
+                         readonly>
+                  <div class="form-text">Se calcula automáticamente según las denominaciones ingresadas</div>
+                  <div id="validacion-monto" class="mt-2" style="display: none;">
+                    <span class="badge" id="estado-monto"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-8">
+                <div class="mb-3">
+                  <label class="form-label">
+                    <i class="fas fa-cash-register me-1"></i>
+                    Billetes Recibidos por Denominación
+                  </label>
+                  <div id="denominaciones-recibidas" class="row">
+                    <!-- Se llenará dinámicamente con las denominaciones de la moneda origen -->
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="d-grid">
+              <button type="submit" class="btn btn-warning btn-lg" id="btn-confirmar-entrega">
+                <i class="fas fa-hand-holding-usd me-2"></i>
+                Confirmar Recepción de Divisas
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <!-- Botón de retiro -->
       <div id="boton-retiro" class="card shadow-sm mb-4" style="display: none;">
         <div class="card-body text-center">
@@ -215,12 +260,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultadoValidacion = document.getElementById('resultado-validacion');
     const contenidoValidacion = document.getElementById('contenido-validacion');
     const verificacionEmail = document.getElementById('verificacion-email');
+    const ingresoDivisas = document.getElementById('ingreso-divisas');
     const botonRetiro = document.getElementById('boton-retiro');
     const resultadoRetiro = document.getElementById('resultado-retiro');
     const contenidoRetiro = document.getElementById('contenido-retiro');
     const nuevaTransaccion = document.getElementById('nueva-transaccion');
     
     let datosTransaccion = null;
+    let esVentaConEfectivo = false;
 
     // Validar transacción
     formValidar.addEventListener('submit', function(e) {
@@ -228,6 +275,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const codigoVerificacion = document.getElementById('codigo_verificacion').value.trim();
         const tauserId = document.getElementById('tauser_id').value;
+        
+        // Guardar valores globalmente para uso posterior
+        window.codigoVerificacionActual = codigoVerificacion;
+        window.tauserIdActual = tauserId;
         
         if (!codigoVerificacion || !tauserId) {
             mostrarError('Por favor complete todos los campos');
@@ -256,7 +307,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Error detallado:', error); // Debug log más detallado
+            console.error('Error stack:', error.stack); // Debug log del stack
             mostrarError('Error de conexión. Intente nuevamente.');
         })
         .finally(() => {
@@ -294,22 +346,70 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
+            console.log('Respuesta del servidor:', data); // Debug log
             if (data.success) {
                 datosTransaccion = data;
-                mostrarResultadoValidacion(data);
-                verificacionEmail.style.display = 'none';
-                botonRetiro.style.display = 'block';
+                
+                // Detectar si es una venta con cobro en efectivo - VERSIÓN SIMPLIFICADA
+                console.log('Tipo:', data.transaccion.tipo); // Debug log
+                console.log('Método de cobro:', data.transaccion.metodo_cobro); // Debug log
+                console.log('Tipo de método de cobro:', typeof data.transaccion.metodo_cobro); // Debug log
+                
+                // Lógica simplificada para detectar venta con efectivo
+                esVentaConEfectivo = false;
+                let esVenta = false;
+                try {
+                    if (data.transaccion.tipo && data.transaccion.tipo.toLowerCase().includes('venta')) {
+                        esVenta = true;
+                        if (data.transaccion.metodo_cobro && typeof data.transaccion.metodo_cobro === 'string') {
+                            if (data.transaccion.metodo_cobro.toLowerCase().includes('efectivo')) {
+                                esVentaConEfectivo = true;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error en detección de venta con efectivo:', error);
+                    esVentaConEfectivo = false;
+                    esVenta = false;
+                }
+                
+                console.log('Es venta:', esVenta);
+                console.log('Es venta con efectivo:', esVentaConEfectivo);
+                
+                if (esVentaConEfectivo) {
+                    console.log('Ejecutando flujo de venta con efectivo');
+                    // Para ventas con cobro en efectivo: mostrar formulario de ingreso de divisas
+                    mostrarFormularioIngresoDivisas(data);
+                    ingresoDivisas.style.display = 'block';
+                    verificacionEmail.style.display = 'none';
+                    // NO mostrar botón de retiro para ventas
+                    botonRetiro.style.display = 'none';
+                } else if (esVenta) {
+                    console.log('Ejecutando flujo de venta (sin efectivo)');
+                    // Para ventas sin efectivo: mostrar información pero NO botón de retiro
+                    mostrarResultadoValidacion(data);
+                    verificacionEmail.style.display = 'none';
+                    // NO mostrar botón de retiro para ventas
+                    botonRetiro.style.display = 'none';
+                } else {
+                    console.log('Ejecutando flujo normal de compra');
+                    // Para compras: mostrar información y botón de retiro
+                    mostrarResultadoValidacion(data);
+                    verificacionEmail.style.display = 'none';
+                    botonRetiro.style.display = 'block';
+                }
             } else {
                 mostrarError(data.error);
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Error detallado:', error); // Debug log más detallado
+            console.error('Error stack:', error.stack); // Debug log del stack
             mostrarError('Error de conexión. Intente nuevamente.');
         })
         .finally(() => {
             btnVerificarCodigo.disabled = false;
-            btnVerificarCodigo.innerHTML = '<i class="fas fa-check me-2"></i>Verificar Código';
+            btnVerificarCodigo.innerHTML = '<i class="fas fa-check me-2"></i>Verificarss Código';
         });
     });
     
@@ -336,7 +436,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Error detallado:', error); // Debug log más detallado
+            console.error('Error stack:', error.stack); // Debug log del stack
             mostrarError('Error de conexión. Intente nuevamente.');
         })
         .finally(() => {
@@ -344,6 +445,114 @@ document.addEventListener('DOMContentLoaded', function() {
             btnReenviarCodigo.innerHTML = '<i class="fas fa-redo me-2"></i>Reenviar Código';
         });
     });
+    
+    // Formulario de ingreso de divisas (solo para ventas con cobro en efectivo)
+    const formIngresoDivisas = document.getElementById('form-ingreso-divisas');
+    const btnConfirmarEntrega = document.getElementById('btn-confirmar-entrega');
+    
+    formIngresoDivisas.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const cantidadEntregada = document.getElementById('cantidad_entregada').value;
+        
+        if (!cantidadEntregada || parseFloat(cantidadEntregada) <= 0) {
+            mostrarError('Por favor ingrese una cantidad válida');
+            return;
+        }
+        
+        // Validar que al menos una denominación tenga cantidad
+        const denominacionesRecibidas = document.querySelectorAll('.denominacion-cantidad-recibida');
+        let totalDenominaciones = 0;
+        let denominacionesConCantidad = [];
+        
+        denominacionesRecibidas.forEach(input => {
+            const cantidad = parseInt(input.value) || 0;
+            if (cantidad > 0) {
+                const denominacionId = input.getAttribute('data-denominacion-id');
+                const valor = parseFloat(input.getAttribute('data-valor'));
+                denominacionesConCantidad.push({
+                    denominacion_id: denominacionId,
+                    cantidad: cantidad,
+                    valor: valor
+                });
+                totalDenominaciones += cantidad * valor;
+            }
+        });
+        
+        if (denominacionesConCantidad.length === 0) {
+            mostrarError('Por favor ingrese al menos una denominación recibida');
+            return;
+        }
+        
+        // Validar que el monto sea exactamente igual al esperado
+        const montoEsperado = window.montoEsperadoTransaccion;
+        const diferencia = Math.abs(totalDenominaciones - montoEsperado);
+        const tolerancia = 0.01; // Tolerancia de 1 centavo
+        
+        if (diferencia > tolerancia) {
+            if (totalDenominaciones > montoEsperado) {
+                const exceso = (totalDenominaciones - montoEsperado).toFixed(2);
+                mostrarError(`El monto ingresado excede el esperado en ${exceso}. Debe ser exactamente ${montoEsperado.toFixed(2)}`);
+            } else {
+                const faltante = (montoEsperado - totalDenominaciones).toFixed(2);
+                mostrarError(`El monto ingresado es menor al esperado por ${faltante}. Debe ser exactamente ${montoEsperado.toFixed(2)}`);
+            }
+            return;
+        }
+        
+        btnConfirmarEntrega.disabled = true;
+        btnConfirmarEntrega.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Procesando...';
+        
+        // Log de datos capturados para el Tauser
+        console.log('Datos de entrega de divisas:', {
+            cantidadEntregada: cantidadEntregada,
+            denominacionesRecibidas: denominacionesConCantidad,
+            totalCalculado: totalDenominaciones
+        });
+        
+        // Procesar confirmación de recepción de divisas
+        procesarConfirmacionRecepcion(denominacionesConCantidad, totalDenominaciones);
+    });
+    
+    // Función para procesar la confirmación de recepción de divisas
+    function procesarConfirmacionRecepcion(denominacionesRecibidas, totalCalculado) {
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+        formData.append('codigo_verificacion', window.codigoVerificacionActual);
+        formData.append('tauser_id', window.tauserIdActual);
+        formData.append('total_recibido', totalCalculado);
+        formData.append('denominaciones', JSON.stringify(denominacionesRecibidas));
+        
+        fetch('/tauser/confirmar-recepcion-divisas/', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Mostrar información de la transacción y mensaje de envío de Guaraníes
+                mostrarResultadoValidacionConEnvio(datosTransaccion);
+                ingresoDivisas.style.display = 'none';
+                verificacionEmail.style.display = 'none';
+                botonRetiro.style.display = 'none'; // No mostrar para ventas
+                
+                btnConfirmarEntrega.disabled = false;
+                btnConfirmarEntrega.innerHTML = '<i class="fas fa-hand-holding-usd me-2"></i>Confirmar Recepción de Divisas';
+                
+                console.log('Recepción de divisas confirmada exitosamente:', data);
+            } else {
+                mostrarError(data.error || 'Error al confirmar la recepción de divisas');
+                btnConfirmarEntrega.disabled = false;
+                btnConfirmarEntrega.innerHTML = '<i class="fas fa-hand-holding-usd me-2"></i>Confirmar Recepción de Divisas';
+            }
+        })
+        .catch(error => {
+            console.error('Error al procesar confirmación:', error);
+            mostrarError('Error de conexión. Intente nuevamente.');
+            btnConfirmarEntrega.disabled = false;
+            btnConfirmarEntrega.innerHTML = '<i class="fas fa-hand-holding-usd me-2"></i>Confirmar Recepción de Divisas';
+        });
+    }
     
     // Procesar retiro
     btnProcesar.addEventListener('click', function() {
@@ -379,7 +588,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Error detallado:', error); // Debug log más detallado
+            console.error('Error stack:', error.stack); // Debug log del stack
             mostrarError('Error de conexión. Intente nuevamente.');
         })
         .finally(() => {
@@ -394,54 +604,278 @@ document.addEventListener('DOMContentLoaded', function() {
     btnNueva.addEventListener('click', function() {
         // Limpiar formulario
         formValidar.reset();
+        formIngresoDivisas.reset();
         resultadoValidacion.style.display = 'none';
         verificacionEmail.style.display = 'none';
+        ingresoDivisas.style.display = 'none';
         botonRetiro.style.display = 'none';
         resultadoRetiro.style.display = 'none';
         nuevaTransaccion.style.display = 'none';
         datosTransaccion = null;
+        esVentaConEfectivo = false;
         
         // Enfocar en el primer campo
         document.getElementById('codigo_verificacion').focus();
     });
     
+    // Función para cargar denominaciones de la moneda origen
+    function cargarDenominacionesRecibidas(monedaOrigen) {
+        const container = document.getElementById('denominaciones-recibidas');
+        if (!container || !monedaOrigen) return;
+        
+        // Hacer petición AJAX para obtener denominaciones de la moneda origen
+        fetch(`/tauser/denominaciones/${monedaOrigen.codigo}/`)
+            .then(response => response.json())
+            .then(data => {
+                mostrarDenominacionesRecibidas(data.denominaciones, monedaOrigen.simbolo);
+            })
+            .catch(error => {
+                console.error('Error al cargar denominaciones:', error);
+                container.innerHTML = '<div class="col-12"><div class="alert alert-warning">Error al cargar denominaciones</div></div>';
+            });
+    }
+    
+    // Función para mostrar denominaciones recibidas
+    function mostrarDenominacionesRecibidas(denominaciones, simbolo) {
+        const container = document.getElementById('denominaciones-recibidas');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        if (denominaciones.length === 0) {
+            container.innerHTML = '<div class="col-12"><div class="alert alert-warning">No hay billetes configurados para esta moneda.</div></div>';
+            return;
+        }
+        
+        denominaciones.forEach(denominacion => {
+            const col = document.createElement('div');
+            col.className = 'col-md-6 col-lg-4 mb-3';
+            
+            const card = document.createElement('div');
+            card.className = 'card h-100';
+            
+            const cardBody = document.createElement('div');
+            cardBody.className = 'card-body';
+            
+            cardBody.innerHTML = `
+                <div class="d-flex align-items-center mb-2">
+                    <i class="fas fa-money-bill text-success me-2"></i>
+                    <h6 class="card-title mb-0">${denominacion.mostrar_denominacion}</h6>
+                </div>
+                <div class="row">
+                    <div class="col-6">
+                        <label class="form-label small">Cantidad</label>
+                        <input type="number" 
+                               class="form-control denominacion-cantidad-recibida" 
+                               name="cantidad_${denominacion.id}"
+                               data-denominacion-id="${denominacion.id}"
+                               data-valor="${denominacion.valor}"
+                               min="0" 
+                               placeholder="0">
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted denominacion-total-recibida" data-denominacion-id="${denominacion.id}">
+                        Total: ${simbolo}0.00
+                    </small>
+                </div>
+            `;
+            
+            card.appendChild(cardBody);
+            col.appendChild(card);
+            container.appendChild(col);
+        });
+        
+        // Agregar event listeners para calcular totales
+        container.querySelectorAll('.denominacion-cantidad-recibida').forEach(input => {
+            input.addEventListener('input', calcularTotalRecibido);
+        });
+    }
+    
+    // Función para calcular total recibido y validar monto
+    function calcularTotalRecibido() {
+        const container = document.getElementById('denominaciones-recibidas');
+        if (!container) return;
+        
+        let totalGeneral = 0;
+        
+        container.querySelectorAll('.denominacion-cantidad-recibida').forEach(input => {
+            const cantidad = parseInt(input.value) || 0;
+            const valor = parseFloat(input.getAttribute('data-valor'));
+            const total = cantidad * valor;
+            
+            const totalElement = container.querySelector(`.denominacion-total-recibida[data-denominacion-id="${input.getAttribute('data-denominacion-id')}"]`);
+            if (totalElement) {
+                const simbolo = totalElement.textContent.split('Total: ')[0] + 'Total: ';
+                totalElement.textContent = `${simbolo}${total.toFixed(2)}`;
+            }
+            
+            totalGeneral += total;
+        });
+        
+        // Actualizar el campo de cantidad total
+        const cantidadEntregada = document.getElementById('cantidad_entregada');
+        if (cantidadEntregada) {
+            cantidadEntregada.value = totalGeneral.toFixed(2);
+        }
+        
+        // Validar que el monto sea exactamente igual al esperado
+        validarMontoExacto(totalGeneral);
+    }
+    
+    // Función para validar que el monto sea exactamente igual al esperado
+    function validarMontoExacto(totalCalculado) {
+        const validacionMonto = document.getElementById('validacion-monto');
+        const estadoMonto = document.getElementById('estado-monto');
+        
+        if (!validacionMonto || !estadoMonto || !window.montoEsperadoTransaccion) return;
+        
+        const montoEsperado = window.montoEsperadoTransaccion;
+        const diferencia = Math.abs(totalCalculado - montoEsperado);
+        const tolerancia = 0.01; // Tolerancia de 1 centavo
+        
+        if (diferencia <= tolerancia) {
+            // Monto exacto
+            estadoMonto.textContent = '✓ Monto exacto';
+            estadoMonto.className = 'badge bg-success';
+            validacionMonto.style.display = 'block';
+        } else if (totalCalculado > montoEsperado) {
+            // Monto mayor al esperado
+            const exceso = (totalCalculado - montoEsperado).toFixed(2);
+            estadoMonto.textContent = `⚠ Exceso: ${exceso}`;
+            estadoMonto.className = 'badge bg-warning';
+            validacionMonto.style.display = 'block';
+        } else if (totalCalculado < montoEsperado) {
+            // Monto menor al esperado
+            const faltante = (montoEsperado - totalCalculado).toFixed(2);
+            estadoMonto.textContent = `⚠ Faltante: ${faltante}`;
+            estadoMonto.className = 'badge bg-danger';
+            validacionMonto.style.display = 'block';
+        } else {
+            // Sin denominaciones ingresadas
+            validacionMonto.style.display = 'none';
+        }
+    }
+    
+    function mostrarFormularioIngresoDivisas(data) {
+        console.log('Ejecutando mostrarFormularioIngresoDivisas con data:', data);
+        const transaccion = data.transaccion;
+        
+        // Obtener el monto esperado de la transacción
+        const montoEsperado = parseFloat(transaccion.monto_a_entregar || transaccion.monto);
+        
+        // Establecer el campo en 0 inicialmente
+        document.getElementById('cantidad_entregada').value = '0.00';
+        
+        // Guardar el monto esperado para validación
+        window.montoEsperadoTransaccion = montoEsperado;
+        
+        // Cargar denominaciones de la moneda origen
+        cargarDenominacionesRecibidas(transaccion.moneda_origen);
+        
+        // Mostrar información de la transacción
+        contenidoValidacion.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-muted">Información de la Transacción</h6>
+                    <p><strong>ID:</strong> ${transaccion.id}</p>
+                    <p><strong>Tipo:</strong> Venta de Divisas</p>
+                    <p><strong>Cliente:</strong> ${transaccion.cliente}</p>
+                    <p><strong>Fecha de Creación:</strong> ${transaccion.fecha_creacion}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted">Divisas a Entregar</h6>
+                    <p><strong>Moneda:</strong> ${transaccion.moneda_origen.nombre} (${transaccion.moneda_origen.simbolo})</p>
+                    <p><strong>Cantidad Esperada:</strong> <span class="fw-bold text-warning">${transaccion.monto_a_entregar_formateado || transaccion.monto_formateado}</span></p>
+                    <p><strong>Guaraníes a Recibir:</strong> <span class="fw-bold text-success">${transaccion.monto_a_recibir_formateado || '₲' + transaccion.monto_a_recibir}</span></p>
+                    <p><strong>Punto de Entrega:</strong> ${data.tauser.nombre}</p>
+                    <p><strong>Dirección:</strong> ${data.tauser.direccion}</p>
+                    <div class="alert alert-info mt-2">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Importante:</strong> El monto total de las denominaciones debe ser exactamente <strong>${transaccion.monto_a_entregar_formateado || transaccion.monto_formateado}</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Instrucciones:</strong> Entregue las divisas extranjeras indicadas en el formulario siguiente.
+            </div>
+            <div class="alert alert-info mt-2">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Depósito de Guaraníes:</strong> Sus Guaraníes serán depositados vía <strong>${transaccion.metodo_pago || 'el método seleccionado'}</strong> según su configuración.
+            </div>
+        `;
+        
+        resultadoValidacion.style.display = 'block';
+    }
+    
     function mostrarResultadoValidacion(data) {
+        // FIX: Función agregada para resolver error ReferenceError - 2025-10-26
+        console.log('Ejecutando mostrarResultadoValidacion con data:', data);
         const transaccion = data.transaccion;
         const tauser = data.tauser;
-        
-        // Determinar el tipo de operación y mostrar información específica
-        let tipoOperacion = '';
-        let instrucciones = '';
-        
-        if (transaccion.tipo.includes('Compra')) {
-            tipoOperacion = 'Compra de Divisas';
-            instrucciones = 'Retire las divisas que compró en efectivo';
-        } else if (transaccion.tipo.includes('Venta')) {
-            tipoOperacion = 'Venta de Divisas';
-            instrucciones = 'Entregue su moneda extranjera y retire guaraníes';
-        }
         
         contenidoValidacion.innerHTML = `
             <div class="row">
                 <div class="col-md-6">
                     <h6 class="text-muted">Información de la Transacción</h6>
                     <p><strong>ID:</strong> ${transaccion.id}</p>
-                    <p><strong>Tipo:</strong> ${tipoOperacion}</p>
+                    <p><strong>Tipo:</strong> ${transaccion.tipo}</p>
                     <p><strong>Cliente:</strong> ${transaccion.cliente}</p>
                     <p><strong>Fecha de Creación:</strong> ${transaccion.fecha_creacion}</p>
                     <p><strong>Fecha de Pago:</strong> ${transaccion.fecha_pago || 'No disponible'}</p>
                 </div>
                 <div class="col-md-6">
                     <h6 class="text-muted">Detalles del Retiro</h6>
-                    <p><strong>Moneda:</strong> ${transaccion.moneda_destino.nombre} (${transaccion.moneda_destino.simbolo})</p>
+                    <p><strong>Moneda:</strong> ${transaccion.moneda_destino.nombre} (${transaccion.moneda_destino.codigo})</p>
                     <p><strong>Monto a Retirar:</strong> <span class="fw-bold text-success">${transaccion.monto_a_retirar_formateado}</span></p>
                     <p><strong>Punto de Retiro:</strong> ${tauser.nombre}</p>
                     <p><strong>Dirección:</strong> ${tauser.direccion}</p>
                 </div>
             </div>
-            <div class="alert alert-warning mt-3">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                <strong>Instrucciones:</strong> ${instrucciones}
+            <div class="alert alert-success mt-3">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>¡Transacción verificada exitosamente!</strong> Puede proceder con el retiro.
+            </div>
+        `;
+        
+        resultadoValidacion.style.display = 'block';
+    }
+    
+    function mostrarResultadoValidacionConEnvio(data) {
+        const transaccion = data.transaccion;
+        const tauser = data.tauser;
+        
+        // Obtener información del método de pago para mostrar dónde recibirá los Guaraníes
+        const metodoPago = transaccion.metodo_pago || 'el método seleccionado';
+        
+        contenidoValidacion.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-muted">Información de la Transacción</h6>
+                    <p><strong>ID:</strong> ${transaccion.id}</p>
+                    <p><strong>Tipo:</strong> Venta de Divisas</p>
+                    <p><strong>Cliente:</strong> ${transaccion.cliente}</p>
+                    <p><strong>Fecha de Creación:</strong> ${transaccion.fecha_creacion}</p>
+                    <p><strong>Fecha de Pago:</strong> ${transaccion.fecha_pago || 'No disponible'}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted">Detalles de la Venta</h6>
+                    <p><strong>Divisas Entregadas:</strong> ${transaccion.moneda_origen.nombre} (${transaccion.moneda_origen.simbolo})</p>
+                    <p><strong>Cantidad Entregada:</strong> <span class="fw-bold text-warning">${transaccion.monto_a_entregar_formateado || transaccion.monto_formateado}</span></p>
+                    <p><strong>Guaraníes a Recibir:</strong> <span class="fw-bold text-success">${transaccion.monto_a_recibir_formateado || transaccion.resultado_formateado}</span></p>
+                    <p><strong>Punto de Entrega:</strong> ${tauser.nombre}</p>
+                    <p><strong>Dirección:</strong> ${tauser.direccion}</p>
+                </div>
+            </div>
+            <div class="alert alert-success mt-3">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>¡Divisas recibidas exitosamente!</strong> Sus Guaraníes serán enviados vía <strong>${metodoPago}</strong> según su selección.
+            </div>
+            <div class="alert alert-info mt-2">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Proceso completado:</strong> Usted ha entregado sus divisas extranjeras en este punto de atención. 
+                Sus Guaraníes serán procesados y enviados según el método de pago seleccionado.
             </div>
         `;
         
