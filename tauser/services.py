@@ -11,6 +11,43 @@ class EmailServiceRetiro:
     """Servicio para envío de emails de verificación de retiro"""
     
     @staticmethod
+    def _obtener_destinatarios(transaccion):
+        """
+        Determina la lista de destinatarios para el correo de verificación.
+
+        Prioriza el correo electrónico del cliente, luego los usuarios asociados
+        y finalmente el usuario que procesa la transacción. Para clientes casuales
+        mantiene el correo por defecto.
+        """
+        destinatarios = []
+        cliente = getattr(transaccion, 'cliente', None)
+
+        if cliente:
+            correo_cliente = getattr(cliente, 'correo_electronico', None)
+            if correo_cliente:
+                destinatarios.append(correo_cliente)
+            else:
+                asociados = cliente.usuarios_asociados.filter(email__isnull=False).values_list('email', flat=True)
+                destinatarios.extend(email for email in asociados if email)
+
+            if not destinatarios:
+                usuario_procesa = getattr(transaccion, 'usuario', None)
+                correo_usuario = getattr(usuario_procesa, 'email', None)
+                if correo_usuario:
+                    destinatarios.append(correo_usuario)
+        else:
+            destinatarios.append('casual@example.com')
+
+        deduplicados = []
+        vistos = set()
+        for email in destinatarios:
+            if email and email not in vistos:
+                vistos.add(email)
+                deduplicados.append(email)
+
+        return deduplicados
+
+    @staticmethod
     def enviar_codigo_verificacion_retiro(transaccion, codigo_obj, request=None):
         """
         Envía email con código de verificación para retiro usando template HTML
@@ -83,11 +120,20 @@ Equipo de {context['sitio_web']}
             """.strip()
             
             # Crear el mensaje
+            destinatarios = EmailServiceRetiro._obtener_destinatarios(transaccion)
+
+            if not destinatarios:
+                logger.warning(
+                    "No se encontró correo electrónico para enviar código de retiro",
+                    extra={'transaccion_id': transaccion.id_transaccion}
+                )
+                return False, "Cliente sin correo electrónico configurado"
+
             msg = EmailMultiAlternatives(
                 subject=subject,
                 body=text_content,
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[transaccion.cliente.email if transaccion.cliente else 'casual@example.com'],
+                to=destinatarios,
             )
             
             # Adjuntar versión HTML
