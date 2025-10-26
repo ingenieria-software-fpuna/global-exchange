@@ -181,7 +181,11 @@ stripe-up:
 	@echo "Iniciando Stripe CLI en Docker..."
 	docker compose -f docker-compose-dev.yml up -d stripe-cli
 	@echo "Esperando que Stripe CLI se inicie..."
+ifeq ($(OS),Windows_NT)
+	@timeout /t 3 /nobreak > nul
+else
 	@sleep 3
+endif
 	@echo ""
 	@echo "✅ Stripe CLI iniciado"
 	@echo ""
