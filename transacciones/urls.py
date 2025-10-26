@@ -10,6 +10,7 @@ urlpatterns = [
     path('vender/', views.vender_divisas, name='vender_divisas'),
     path('iniciar-venta/', views.iniciar_venta, name='iniciar_venta'),
     path('api/validar-limites/', views.api_validar_limites, name='api_validar_limites'),
+    path('api/validar-stock-tauser/', views.api_validar_stock_tauser, name='api_validar_stock_tauser'),
     path('api/calcular-compra-completa/', views.api_calcular_compra_completa, name='api_calcular_compra_completa'),
     path('api/calcular-venta-completa/', views.api_calcular_venta_completa, name='api_calcular_venta_completa'),
     path('api/metodos-cobro-por-moneda/', views.api_metodos_cobro_por_moneda, name='api_metodos_cobro_por_moneda'),

@@ -758,6 +758,10 @@ def comprar_divisas(request):
     # Métodos de pago activos (para entregar divisas al cliente)
     metodos_pago = MetodoPago.objects.filter(es_activo=True).order_by('nombre')
     
+    # Tausers activos para selección
+    from tauser.models import Tauser
+    tausers = Tauser.objects.filter(es_activo=True).order_by('nombre')
+    
     # Obtener parámetros de URL para pre-poblar el formulario (desde el simulador)
     moneda_origen_id = request.GET.get('moneda_origen')
     moneda_destino_id = request.GET.get('moneda_destino')
@@ -770,6 +774,7 @@ def comprar_divisas(request):
         'clientes': clientes_usuario,
         'metodos_cobro': metodos_cobro,
         'metodos_pago': metodos_pago,
+        'tausers': tausers,
         'moneda_origen_preseleccionada': moneda_origen_id,
         'moneda_destino_preseleccionada': moneda_destino_id,
         'cantidad_preseleccionada': cantidad,
@@ -1254,6 +1259,10 @@ def vender_divisas(request):
         monedas_permitidas__codigo='PYG'
     ).distinct().order_by('nombre')
     
+    # Tausers activos para selección
+    from tauser.models import Tauser
+    tausers = Tauser.objects.filter(es_activo=True).order_by('nombre')
+    
     context = {
         'titulo': 'Vender Divisas',
         'monedas_origen': monedas_origen,
@@ -1263,6 +1272,7 @@ def vender_divisas(request):
         'clientes': clientes,
         'metodos_cobro': metodos_cobro,
         'metodos_pago': metodos_pago,
+        'tausers': tausers,
     }
     
     return render(request, 'transacciones/vender_divisas.html', context)
@@ -1788,6 +1798,77 @@ class MisTransaccionesListView(LoginRequiredMixin, ListView):
         })
 
         return context
+
+
+@login_required
+def api_validar_stock_tauser(request):
+    """
+    API endpoint para validar si hay stock suficiente en un Tauser para una transacción
+    """
+    if request.method == 'GET':
+        try:
+            tauser_id = request.GET.get('tauser_id')
+            moneda_codigo = request.GET.get('moneda_codigo')
+            cantidad_requerida = Decimal(request.GET.get('cantidad', '0'))
+            
+            # Validaciones básicas
+            if not tauser_id or not moneda_codigo or cantidad_requerida <= 0:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Parámetros inválidos'
+                })
+            
+            # Obtener objetos
+            try:
+                from tauser.models import Tauser
+                from monedas.models import Moneda
+                tauser = Tauser.objects.get(id=tauser_id, es_activo=True)
+                moneda = Moneda.objects.get(codigo=moneda_codigo, es_activa=True)
+            except (Tauser.DoesNotExist, Moneda.DoesNotExist):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Tauser o moneda no válidos'
+                })
+            
+            # Verificar stock disponible
+            try:
+                from tauser.models import Stock
+                stock = Stock.objects.get(tauser=tauser, moneda=moneda, es_activo=True)
+                stock_disponible = stock.cantidad
+                
+                if stock_disponible >= cantidad_requerida:
+                    return JsonResponse({
+                        'success': True,
+                        'stock_suficiente': True,
+                        'stock_disponible': float(stock_disponible),
+                        'cantidad_requerida': float(cantidad_requerida),
+                        'mensaje': f'Stock suficiente: {stock_disponible} {moneda.codigo} disponibles'
+                    })
+                else:
+                    return JsonResponse({
+                        'success': True,
+                        'stock_suficiente': False,
+                        'stock_disponible': float(stock_disponible),
+                        'cantidad_requerida': float(cantidad_requerida),
+                        'mensaje': f'Stock insuficiente: solo {stock_disponible} {moneda.codigo} disponibles'
+                    })
+                    
+            except Stock.DoesNotExist:
+                return JsonResponse({
+                    'success': True,
+                    'stock_suficiente': False,
+                    'stock_disponible': 0,
+                    'cantidad_requerida': float(cantidad_requerida),
+                    'mensaje': f'No hay stock de {moneda.codigo} en este punto de atención'
+                })
+                
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error interno: {str(e)}'
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido'})
 
 
 # ============================================================================
