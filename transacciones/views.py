@@ -15,6 +15,7 @@ from datetime import datetime, date
 
 from .models import Transaccion, TipoOperacion, EstadoTransaccion
 from monedas.models import Moneda
+from monedas.templatetags.moneda_extras import moneda_format
 from metodo_pago.models import MetodoPago
 from metodo_cobro.models import MetodoCobro
 from clientes.models import Cliente
@@ -22,6 +23,11 @@ from tasa_cambio.models import TasaCambio
 from configuracion.models import ConfiguracionSistema
 from django.db.models import Sum
 from datetime import datetime, timedelta
+
+
+def formatear_guaranies_view(valor):
+    """Helper para formatear guaraníes en vistas"""
+    return moneda_format(valor, 'PYG')
 
 
 def validar_limites_transaccion(monto_origen, moneda_origen, cliente=None, usuario=None):
@@ -44,14 +50,18 @@ def validar_limites_transaccion(monto_origen, moneda_origen, cliente=None, usuar
     # 1. Validar límite por transacción del cliente
     if cliente and cliente.monto_limite_transaccion:
         if monto_origen > cliente.monto_limite_transaccion:
-            errores.append(f'El monto excede el límite por transacción del cliente: {cliente.monto_limite_transaccion}')
-        limites_aplicados.append(f'Cliente: máx. {cliente.monto_limite_transaccion} PYG')
+            limite_formateado = moneda_format(cliente.monto_limite_transaccion, 'PYG')
+            errores.append(f'El monto excede el límite por transacción del cliente: {limite_formateado}')
+        limite_formateado = moneda_format(cliente.monto_limite_transaccion, 'PYG')
+        limites_aplicados.append(f'Cliente: máx. {limite_formateado}')
     
     # 2. Validar límite por transacción de la moneda
     if moneda_origen.monto_limite_transaccion:
         if monto_origen > moneda_origen.monto_limite_transaccion:
-            errores.append(f'El monto excede el límite por transacción de la moneda {moneda_origen.codigo}: {moneda_origen.monto_limite_transaccion}')
-        limites_aplicados.append(f'Moneda {moneda_origen.codigo}: máx. {moneda_origen.monto_limite_transaccion}')
+            limite_formateado = moneda_format(moneda_origen.monto_limite_transaccion, 'PYG')
+            errores.append(f'El monto excede el límite por transacción de la moneda {moneda_origen.codigo}: {limite_formateado}')
+        limite_formateado = moneda_format(moneda_origen.monto_limite_transaccion, 'PYG')
+        limites_aplicados.append(f'Moneda {moneda_origen.codigo}: máx. {limite_formateado}')
     
     # 3. Validar límites diarios y mensuales
     config = ConfiguracionSistema.get_configuracion()
@@ -90,18 +100,28 @@ def validar_limites_transaccion(monto_origen, moneda_origen, cliente=None, usuar
             total_dia_con_nueva = transacciones_hoy + monto_origen
             if total_dia_con_nueva > config.limite_diario_transacciones:
                 disponible_hoy = config.limite_diario_transacciones - transacciones_hoy
-                errores.append(f'Excede el límite diario para {cliente.nombre_comercial}: {config.limite_diario_transacciones} (ya usado: {transacciones_hoy}, disponible: {disponible_hoy})')
+                limite_fmt = moneda_format(config.limite_diario_transacciones, 'PYG')
+                usado_fmt = moneda_format(transacciones_hoy, 'PYG')
+                disponible_fmt = moneda_format(disponible_hoy, 'PYG')
+                errores.append(f'Excede el límite diario para {cliente.nombre_comercial}: {limite_fmt} (ya usado: {usado_fmt}, disponible: {disponible_fmt})')
             
-            limites_aplicados.append(f'Límite diario ({cliente.nombre_comercial}): {config.limite_diario_transacciones} (usado: {transacciones_hoy})')
+            limite_fmt = moneda_format(config.limite_diario_transacciones, 'PYG')
+            usado_fmt = moneda_format(transacciones_hoy, 'PYG')
+            limites_aplicados.append(f'Límite diario ({cliente.nombre_comercial}): {limite_fmt} (usado: {usado_fmt})')
         
         # Validar límite mensual
         if config.limite_mensual_transacciones > 0:
             total_mes_con_nueva = transacciones_mes + monto_origen
             if total_mes_con_nueva > config.limite_mensual_transacciones:
                 disponible_mes = config.limite_mensual_transacciones - transacciones_mes
-                errores.append(f'Excede el límite mensual para {cliente.nombre_comercial}: {config.limite_mensual_transacciones} (ya usado: {transacciones_mes}, disponible: {disponible_mes})')
+                limite_fmt = moneda_format(config.limite_mensual_transacciones, 'PYG')
+                usado_fmt = moneda_format(transacciones_mes, 'PYG')
+                disponible_fmt = moneda_format(disponible_mes, 'PYG')
+                errores.append(f'Excede el límite mensual para {cliente.nombre_comercial}: {limite_fmt} (ya usado: {usado_fmt}, disponible: {disponible_fmt})')
             
-            limites_aplicados.append(f'Límite mensual ({cliente.nombre_comercial}): {config.limite_mensual_transacciones} (usado: {transacciones_mes})')
+            limite_fmt = moneda_format(config.limite_mensual_transacciones, 'PYG')
+            usado_fmt = moneda_format(transacciones_mes, 'PYG')
+            limites_aplicados.append(f'Límite mensual ({cliente.nombre_comercial}): {limite_fmt} (usado: {usado_fmt})')
     
     elif usuario and not cliente:
         # Sin cliente: no validar límites diarios/mensuales, pero informar que se requiere cliente
@@ -736,8 +756,15 @@ def comprar_divisas(request):
     Vista para la pantalla dedicada de compra de divisas.
     Muestra un formulario específico para compras con métodos de cobro.
     """
-    # Monedas activas para el selector
-    monedas_activas = Moneda.objects.filter(es_activa=True).order_by('nombre')
+    # Monedas activas que tienen tasa de cambio (excluye PYG que es la moneda base)
+    monedas_con_tasa = TasaCambio.objects.filter(
+        es_activa=True
+    ).values_list('moneda_id', flat=True)
+    
+    monedas_activas = Moneda.objects.filter(
+        es_activa=True,
+        id__in=monedas_con_tasa
+    ).order_by('nombre')
     
     # Clientes asociados al usuario
     clientes_usuario = Cliente.objects.filter(

@@ -25,10 +25,8 @@ def crear_monedas_ejemplo():
             'nombre': 'Guaraní',
             'codigo': 'PYG',
             'simbolo': '₲',
-            'decimales': 0,
-            'precio_base': Decimal('1.00'),
-            'comision_compra': Decimal('0.00'),
-            'comision_venta': Decimal('0.00')
+            'decimales': 0
+            # NO tiene precio_base, comision_compra, comision_venta porque es la moneda base
         },
         {
             'nombre': 'Dólar Estadounidense',
@@ -144,6 +142,11 @@ def crear_monedas_ejemplo():
             monedas_creadas += 1
         else:
             print(f"  ℹ️  Moneda ya existe: {moneda.nombre} ({moneda.codigo})")
+        
+        # NO crear tasa de cambio para el Guaraní (es la moneda base)
+        if moneda.codigo == 'PYG':
+            print(f"    ⚠️  Guaraní es la moneda base - NO se crea tasa de cambio")
+            continue
         
         # Crear tasa de cambio si no existe una activa
         tasa_existente = TasaCambio.objects.filter(

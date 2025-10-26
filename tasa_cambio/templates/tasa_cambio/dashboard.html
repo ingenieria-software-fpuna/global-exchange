@@ -34,7 +34,7 @@
               </label>
             </div>
             <div class="form-text" id="operacionAyuda">
-              Comprando: Selecciona qué moneda quieres comprar y paga en Guaraníes
+              Comprando: Ingresa cuánta divisa quieres comprar y te calculamos cuánto pagarás en Guaraníes
             </div>
           </div>
 
@@ -42,24 +42,13 @@
           <div class="col-md-6">
             <label class="form-label">Cliente</label>
             <select id="cliente" class="form-select">
-              <option value="">Sin cliente (sin descuento)</option>
+              <option value="">Sin cliente</option>
               {% for c in clientes %}
-                <option value="{{ c.id }}">{{ c.nombre_comercial }} — {{ c.tipo_cliente.nombre }} ({{ c.tipo_cliente.descuento }}%)</option>
+                <option value="{{ c.id }}">{{ c.nombre_comercial }} — {{ c.tipo_cliente.nombre }}</option>
               {% empty %}
                 <option value="" disabled>No tiene clientes asociados</option>
               {% endfor %}
             </select>
-          </div>
-
-          <!-- Monto -->
-          <div class="col-md-3">
-            <label class="form-label" id="labelMonto">
-              <span id="textoMonto">Monto a pagar (en Guaraníes)</span>
-            </label>
-            <div class="input-group">
-              <span class="input-group-text" id="simboloMonto">₲</span>
-              <input id="monto" type="number" class="form-control" placeholder="0" step="any" min="0" value="1000000">
-            </div>
           </div>
 
           <!-- Moneda -->
@@ -74,6 +63,17 @@
                 {% endif %}
               {% endfor %}
             </select>
+          </div>
+
+          <!-- Monto -->
+          <div class="col-md-3">
+            <label class="form-label" id="labelMonto">
+              <span id="textoMonto">Cantidad que quiero comprar</span>
+            </label>
+            <div class="input-group">
+              <span class="input-group-text" id="simboloMonto">$</span>
+              <input id="monto" type="number" class="form-control" placeholder="100" step="any" min="0" value="100">
+            </div>
           </div>
 
           <!-- Resultado -->
@@ -160,15 +160,17 @@
       const esCompra = $operacionComprar.checked;
       
       if (esCompra) {
-        // QUIERO COMPRAR: Pagar en PYG, recibir otra moneda
-        $textoMonto.textContent = 'Monto a pagar (en Guaraníes)';
+        // QUIERO COMPRAR: Ingreso cantidad de divisa, calcula cuánto pagar en PYG
         $textoMoneda.textContent = 'Moneda que quiero comprar';
-        $simboloMonto.textContent = '₲';
-        $operacionAyuda.textContent = 'Comprando: Selecciona qué moneda quieres comprar y paga en Guaraníes';
-        $monto.placeholder = '1000000';
+        $textoMonto.textContent = 'Cantidad que quiero comprar';
+        const monedaSeleccionada = MONEDAS.find(m => m.codigo === $monedaOperacion.value);
+        const simboloMoneda = monedaSeleccionada ? getSimboloMoneda(monedaSeleccionada.codigo) : '$';
+        $simboloMonto.textContent = simboloMoneda;
+        $operacionAyuda.textContent = 'Comprando: Ingresa cuánta divisa quieres comprar y te calculamos cuánto pagarás en Guaraníes';
+        $monto.placeholder = '100';
       } else {
         // QUIERO VENDER: Entregar otra moneda, recibir PYG
-        $textoMonto.textContent = 'Monto que quiero vender';
+        $textoMonto.textContent = 'Cantidad que quiero vender';
         $textoMoneda.textContent = 'Moneda que quiero vender';
         const monedaSeleccionada = MONEDAS.find(m => m.codigo === $monedaOperacion.value);
         const simboloMoneda = monedaSeleccionada ? getSimboloMoneda(monedaSeleccionada.codigo) : '$';
@@ -204,19 +206,23 @@
       }
 
       // Determinar origen y destino según el tipo de operación
-      let origen, destino;
+      let origen, destino, montoEnviar;
       if (esCompra) {
-        // COMPRAR: PYG -> Otra moneda
-        origen = 'PYG';
-        destino = monedaOperacion;
+        // COMPRAR: Usuario ingresa cantidad de divisa que quiere
+        // Necesitamos invertir: preguntar cuánto PYG necesito para X divisa
+        // Solución: usar un monto base en PYG y calcular la tasa, luego invertir
+        origen = monedaOperacion;  // Invertimos: consultamos desde la divisa
+        destino = 'PYG';            // hacia PYG
+        montoEnviar = monto;        // Cantidad de divisa que quiere
       } else {
-        // VENDER: Otra moneda -> PYG
+        // VENDER: Otra moneda -> PYG (ya está correcto)
         origen = monedaOperacion;
         destino = 'PYG';
+        montoEnviar = monto;
       }
 
       const params = new URLSearchParams({
-        monto: String(monto),
+        monto: String(montoEnviar),
         origen: String(origen),
         destino: String(destino),
       });
@@ -233,8 +239,16 @@
             return;
           }
           const d = data.data;
-          $resValor.textContent = formatDisplayWithDots(d.resultado_formateado);
-          $resDetalle.textContent = d.detalle;
+          
+          // Si es compra, mostramos el resultado como "Debes pagar X PYG"
+          if (esCompra) {
+            $resValor.textContent = formatDisplayWithDots(d.resultado_formateado);
+            $resDetalle.textContent = `Para comprar ${monto} ${monedaOperacion}, debes pagar:`;
+          } else {
+            // Si es venta, mostramos normal
+            $resValor.textContent = formatDisplayWithDots(d.resultado_formateado);
+            $resDetalle.textContent = d.detalle;
+          }
           const $resSubtotal = document.getElementById('resultado_subtotal');
           const $resComision = document.getElementById('resultado_comision');
           if (d.subtotal_formateado) {
@@ -248,19 +262,19 @@
           const parts = [t1, t2].filter(Boolean);
           $resTasas.textContent = parts.length ? `Tasas usadas: ${parts.join(' · ')}` : '';
           if (d.cliente && d.cliente.descuento > 0) {
-            $resDesc.textContent = `Cliente: ${d.cliente.nombre} — ${d.cliente.tipo} (descuento ${d.cliente.descuento}%)`;
+            $resDesc.textContent = `Cliente: ${d.cliente.nombre} — ${d.cliente.tipo}`;
           } else {
             $resDesc.textContent = '';
           }
           
           // Mostrar botón apropiado según el tipo de operación
-          const esCompra = $operacionComprar.checked;
           document.getElementById('enlace_compra_container').style.display = esCompra ? 'block' : 'none';
           document.getElementById('enlace_venta_container').style.display = !esCompra ? 'block' : 'none';
         })
-        .catch(() => {
+        .catch((error) => {
+          console.error('Error en simulación:', error);
           $resValor.textContent = '—';
-          $resDetalle.textContent = 'No se pudo simular.';
+          $resDetalle.textContent = 'No se pudo simular. Error: ' + (error.message || 'Desconocido');
           $resTasas.textContent = '';
           $resDesc.textContent = '';
           const $resSubtotal = document.getElementById('resultado_subtotal');
