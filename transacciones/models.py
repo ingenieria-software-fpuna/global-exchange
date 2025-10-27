@@ -327,9 +327,9 @@ class Transaccion(models.Model):
         if not self.codigo_verificacion:
             self.codigo_verificacion = self.generar_codigo_verificacion()
         
-        # Establecer fecha de expiración si no existe (30 minutos por defecto)
+        # Establecer fecha de expiración si no existe (5 minutos por defecto)
         if not self.fecha_expiracion:
-            self.fecha_expiracion = timezone.now() + timezone.timedelta(minutes=30)
+            self.fecha_expiracion = timezone.now() + timezone.timedelta(minutes=5)
         
         super().save(*args, **kwargs)
 
