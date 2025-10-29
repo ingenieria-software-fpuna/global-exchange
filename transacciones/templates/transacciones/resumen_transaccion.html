@@ -234,23 +234,48 @@
       <div class="card shadow-sm">
         <div class="card-body text-center">
           {% if puede_pagar %}
-            <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-              <form id="form-procesar-pago" method="post" action="{% url 'transacciones:procesar_pago' transaccion.id_transaccion %}" class="me-md-2">
-                {% csrf_token %}
-                <button type="button" class="btn btn-success btn-lg" id="btn-procesar-pago">
-                  <i class="fas fa-credit-card me-2"></i>
-                  Procesar Pago
-                </button>
-              </form>
-              
-              <form method="post" action="{% url 'transacciones:cancelar_transaccion' transaccion.id_transaccion %}">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-outline-danger btn-lg" onclick="return confirm('¿Está seguro que desea cancelar esta transacción?')">
-                  <i class="fas fa-times me-2"></i>
-                  Cancelar
-                </button>
-              </form>
-            </div>
+            {% comment %}Detectar si es venta con cobro en efectivo{% endcomment %}
+            {% if transaccion.tipo_operacion.codigo == 'VENTA' and transaccion.metodo_cobro and 'efectivo' in transaccion.metodo_cobro.nombre|lower %}
+              <!-- Mensaje para ventas con cobro en efectivo -->
+              <div class="alert alert-info mb-4">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Venta con cobro en efectivo</strong>
+                <p class="mb-2 mt-2">Para completar esta transacción, debe entregar las divisas extranjeras en el punto de atención.</p>
+                <p class="mb-0">Presente este código de verificación al personal del punto de atención: <strong>{{ transaccion.codigo_verificacion }}</strong></p>
+              </div>
+              <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                <a href="{% url 'tauser:simulador_cajero' %}" class="btn btn-primary btn-lg">
+                  <i class="fas fa-cash-register me-2"></i>
+                  Ir al Simulador de Cajero
+                </a>
+                <form method="post" action="{% url 'transacciones:cancelar_transaccion' transaccion.id_transaccion %}" class="ms-md-2">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline-danger btn-lg" onclick="return confirm('¿Está seguro que desea cancelar esta transacción?')">
+                    <i class="fas fa-times me-2"></i>
+                    Cancelar
+                  </button>
+                </form>
+              </div>
+            {% else %}
+              <!-- Botones normales para otras transacciones -->
+              <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                <form id="form-procesar-pago" method="post" action="{% url 'transacciones:procesar_pago' transaccion.id_transaccion %}" class="me-md-2">
+                  {% csrf_token %}
+                  <button type="button" class="btn btn-success btn-lg" id="btn-procesar-pago">
+                    <i class="fas fa-credit-card me-2"></i>
+                    Procesar Pago
+                  </button>
+                </form>
+                
+                <form method="post" action="{% url 'transacciones:cancelar_transaccion' transaccion.id_transaccion %}">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline-danger btn-lg" onclick="return confirm('¿Está seguro que desea cancelar esta transacción?')">
+                    <i class="fas fa-times me-2"></i>
+                    Cancelar
+                  </button>
+                </form>
+              </div>
+            {% endif %}
           {% else %}
             <div class="text-muted">
               {% if transaccion.estado.codigo == 'PAGADA' %}
