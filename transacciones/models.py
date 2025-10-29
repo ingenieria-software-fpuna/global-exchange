@@ -329,7 +329,7 @@ class Transaccion(models.Model):
         
         # Establecer fecha de expiración si no existe (5 minutos por defecto)
         if not self.fecha_expiracion:
-            self.fecha_expiracion = timezone.now() + timezone.timedelta(minutes=5)
+            self.fecha_expiracion = timezone.now() + timezone.timedelta(minutes=60)
         
         super().save(*args, **kwargs)
 

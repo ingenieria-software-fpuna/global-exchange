@@ -249,6 +249,70 @@
   </div>
 </div>
 
+<!-- Modal de cambio de cotización -->
+<div class="modal fade" id="modalCambioCotizacion" tabindex="-1" aria-labelledby="modalCambioCotizacionLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="modalCambioCotizacionLabel">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          Cambio de Cotización Detectado
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning">
+          <h6><i class="fas fa-info-circle me-2"></i>La cotización ha cambiado</h6>
+          <p class="mb-0">La cotización de <strong id="modal-moneda"></strong> ha sido actualizada desde que se creó esta transacción.</p>
+        </div>
+
+        <div class="row">
+          <div class="col-md-6">
+            <div class="card border-danger">
+              <div class="card-header bg-danger text-white">
+                <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Cotización Original</h6>
+              </div>
+              <div class="card-body">
+                <p class="mb-1"><strong>Tasa:</strong> <span id="modal-tasa-original"></span></p>
+                <p class="mb-1"><strong>Monto a pagar:</strong> <span id="modal-monto-origen-original"></span></p>
+                <p class="mb-0"><strong>Monto a recibir:</strong> <span id="modal-monto-destino-original"></span></p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card border-success">
+              <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Nueva Cotización</h6>
+              </div>
+              <div class="card-body">
+                <p class="mb-1"><strong>Tasa:</strong> <span id="modal-tasa-nueva"></span></p>
+                <p class="mb-1"><strong>Monto a pagar:</strong> <span id="modal-monto-origen-nuevo"></span></p>
+                <p class="mb-0"><strong>Monto a recibir:</strong> <span id="modal-monto-destino-nuevo"></span></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <p><strong>¿Qué deseas hacer?</strong></p>
+          <ul>
+            <li><strong>Continuar:</strong> Se creará una nueva transacción con la cotización actualizada</li>
+            <li><strong>Cancelar:</strong> Se cancelará la transacción actual</li>
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn-cancelar-transaccion-modal">
+          <i class="fas fa-times me-2"></i>Cancelar Transacción
+        </button>
+        <button type="button" class="btn btn-success" id="btn-continuar-nueva-cotizacion">
+          <i class="fas fa-check me-2"></i>Continuar con Nueva Cotización
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const formValidar = document.getElementById('form-validar-transaccion');
@@ -256,6 +320,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnProcesar = document.getElementById('btn-procesar-retiro');
     const btnConfirmar = document.getElementById('btn-confirmar-retiro');
     const btnNueva = document.getElementById('btn-nueva-transaccion');
+    
+    // Variables para cambio de cotización
+    const modalCambioCotizacion = new bootstrap.Modal(document.getElementById('modalCambioCotizacion'));
+    const btnContinuarNuevaCotizacion = document.getElementById('btn-continuar-nueva-cotizacion');
+    const btnCancelarTransaccionModal = document.getElementById('btn-cancelar-transaccion-modal');
+    
+    // Variable para almacenar datos de la transacción actual
+    let datosTransaccionActual = null;
+    let transaccionIdActual = null; // ID de la transacción original
     
     const resultadoValidacion = document.getElementById('resultado-validacion');
     const contenidoValidacion = document.getElementById('contenido-validacion');
@@ -269,7 +342,276 @@ document.addEventListener('DOMContentLoaded', function() {
     let datosTransaccion = null;
     let esVentaConEfectivo = false;
 
-    // Validar transacción
+    // Event listeners para cambio de cotización
+    if (btnContinuarNuevaCotizacion) {
+        btnContinuarNuevaCotizacion.addEventListener('click', function() {
+            crearNuevaTransaccionConCotizacion();
+        });
+    }
+    
+    if (btnCancelarTransaccionModal) {
+        btnCancelarTransaccionModal.addEventListener('click', function() {
+            cancelarTransaccionDesdeModal();
+        });
+    }
+    
+    // Función para verificar cambio de cotización
+    function verificarCambioCotizacion(transaccionId) {
+        console.log('Verificando cambio de cotización para transacción:', transaccionId);
+        
+        const url = `/transacciones/verificar-cambio-cotizacion/${transaccionId}/`;
+        
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Respuesta verificación cotización:', data);
+            if (data.success) {
+                if (data.hay_cambio) {
+                    // Hay cambio de cotización, mostrar modal
+                    mostrarModalCambioCotizacion(data);
+                } else {
+                    // No hay cambio, continuar con el flujo normal
+                    continuarFlujoNormal();
+                }
+            } else {
+                mostrarError(data.error || 'Error al verificar la cotización');
+            }
+        })
+        .catch(error => {
+            console.error('Error al verificar cambio de cotización:', error);
+            mostrarError('Error de conexión al verificar la cotización');
+        });
+    }
+    
+    // Función para mostrar el modal de cambio de cotización
+    function mostrarModalCambioCotizacion(data) {
+        // Rellenar los datos del modal
+        document.getElementById('modal-moneda').textContent = data.moneda_nombre;
+        document.getElementById('modal-tasa-original').textContent = data.tasa_original + ' Gs.';
+        document.getElementById('modal-monto-origen-original').textContent = data.monto_origen_original + ' Gs.';
+        document.getElementById('modal-monto-destino-original').textContent = data.monto_destino_original + ' ' + data.moneda_simbolo;
+        
+        document.getElementById('modal-tasa-nueva').textContent = data.tasa_nueva + ' Gs.';
+        document.getElementById('modal-monto-origen-nuevo').textContent = data.monto_origen_nuevo + ' Gs.';
+        document.getElementById('modal-monto-destino-nuevo').textContent = data.monto_destino_nuevo + ' ' + data.moneda_simbolo;
+        
+        // Guardar datos para crear nueva transacción
+        datosTransaccionActual = data.nueva_transaccion_datos;
+        
+        modalCambioCotizacion.show();
+    }
+    
+    // Función para crear nueva transacción con cotización actualizada
+    function crearNuevaTransaccionConCotizacion() {
+        if (!datosTransaccionActual) {
+            mostrarError('No hay datos de transacción disponibles');
+            return;
+        }
+        
+        console.log('Creando nueva transacción con datos:', datosTransaccionActual);
+        
+        // Mostrar loading en el botón
+        btnContinuarNuevaCotizacion.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creando nueva transacción...';
+        btnContinuarNuevaCotizacion.disabled = true;
+        
+        // Usar el ID de la transacción guardado o el de datosTransaccionActual
+        const transaccionId = transaccionIdActual || (datosTransaccionActual && datosTransaccionActual.transaccion_original_id);
+        
+        if (!transaccionId) {
+            mostrarError('No se encontró el ID de la transacción original');
+            btnContinuarNuevaCotizacion.disabled = false;
+            btnContinuarNuevaCotizacion.innerHTML = '<i class="fas fa-check me-2"></i>Continuar con Nueva Cotización';
+            return;
+        }
+        
+        const url = `/transacciones/crear-con-nueva-cotizacion/${transaccionId}/`;
+        
+        // Preparar datos incluyendo tauser_id para que el servidor sepa que es desde el simulador
+        const datosParaEnviar = {
+            ...datosTransaccionActual,
+            tauser_id: window.tauserIdActual
+        };
+        
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(datosParaEnviar)
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Respuesta crear nueva transacción:', data);
+            if (data.success) {
+                // La respuesta puede tener diferentes estructuras dependiendo de si viene del simulador o no
+                if (data.transaccion) {
+                    // Si viene con datos completos (desde simulador)
+                    window.codigoVerificacionActual = data.transaccion.codigo_verificacion;
+                    datosTransaccion = data;
+                    // Actualizar también el ID de la transacción actual
+                    transaccionIdActual = data.transaccion.id;
+                    
+                    // Continuar con el flujo normal con la nueva transacción
+                    continuarFlujoNormal();
+                    
+                    // Cerrar modal
+                    modalCambioCotizacion.hide();
+                    
+                    // Mostrar mensaje de éxito
+                    mostrarExito('Nueva transacción creada con cotización actualizada');
+                } else if (data.nueva_transaccion_id) {
+                    // Si solo viene el ID, necesitamos obtener los datos de la nueva transacción
+                    // Esto requeriría hacer otra llamada, pero por ahora asumimos que el redirect_url tiene el ID
+                    // En este caso, mostrar error porque necesitamos los datos completos
+                    mostrarError('Transacción creada pero no se pudieron obtener los datos. Por favor, valide nuevamente con el código de verificación.');
+                    modalCambioCotizacion.hide();
+                    limpiarFormulario();
+                } else {
+                    // Respuesta inesperada
+                    mostrarError('Respuesta del servidor no reconocida');
+                }
+            } else {
+                mostrarError(data.error || 'Error al crear la nueva transacción');
+            }
+        })
+        .catch(error => {
+            console.error('Error al crear nueva transacción:', error);
+            mostrarError('Error de conexión al crear nueva transacción');
+        })
+        .finally(() => {
+            btnContinuarNuevaCotizacion.innerHTML = '<i class="fas fa-check me-2"></i>Continuar con Nueva Cotización';
+            btnContinuarNuevaCotizacion.disabled = false;
+        });
+    }
+    
+    // Función para cancelar transacción desde modal
+    function cancelarTransaccionDesdeModal() {
+        // Usar el ID de la transacción guardado o el de datosTransaccionActual
+        const transaccionId = transaccionIdActual || (datosTransaccionActual && datosTransaccionActual.transaccion_original_id);
+        
+        if (transaccionId) {
+            // Mostrar loading en el botón
+            btnCancelarTransaccionModal.disabled = true;
+            btnCancelarTransaccionModal.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Cancelando...';
+            
+            const url = `/transacciones/cancelar-por-cambio-cotizacion/${transaccionId}/`;
+            
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    mostrarExito('Transacción cancelada por cambio de cotización');
+                    modalCambioCotizacion.hide();
+                    limpiarFormulario();
+                } else {
+                    mostrarError(data.error || 'Error al cancelar la transacción');
+                }
+            })
+            .catch(error => {
+                console.error('Error al cancelar transacción:', error);
+                mostrarError('Error de conexión al cancelar la transacción');
+            })
+            .finally(() => {
+                btnCancelarTransaccionModal.disabled = false;
+                btnCancelarTransaccionModal.innerHTML = '<i class="fas fa-times me-2"></i>Cancelar Transacción';
+            });
+        } else {
+            // Si no hay ID, solo cerrar modal y limpiar
+            modalCambioCotizacion.hide();
+            limpiarFormulario();
+        }
+    }
+    
+    // Función auxiliar para limpiar formulario
+    function limpiarFormulario() {
+        formValidar.reset();
+        resultadoValidacion.style.display = 'none';
+        verificacionEmail.style.display = 'none';
+        ingresoDivisas.style.display = 'none';
+        botonRetiro.style.display = 'none';
+        resultadoRetiro.style.display = 'none';
+        nuevaTransaccion.style.display = 'none';
+        datosTransaccion = null;
+        datosTransaccionActual = null;
+        transaccionIdActual = null;
+        window.codigoVerificacionActual = null;
+        window.tauserIdActual = null;
+    }
+    
+    // Función para continuar con el flujo normal después de verificar cotización
+    function continuarFlujoNormal() {
+        // Esta función se llamará después de verificar que no hay cambio de cotización
+        // o después de crear una nueva transacción con cotización actualizada
+        console.log('Continuando con flujo normal');
+        
+        // Aquí se ejecutará la lógica que estaba en verificar_codigo_retiro
+        // pero ahora con la transacción actualizada
+        if (datosTransaccion) {
+            procesarRespuestaVerificacion(datosTransaccion);
+        }
+    }
+    
+    // Función para procesar la respuesta de verificación (extraída de la lógica existente)
+    function procesarRespuestaVerificacion(data) {
+        console.log('Procesando respuesta de verificación:', data);
+        
+        // Detectar si es una venta con cobro en efectivo
+        let esVentaConEfectivo = false;
+        let esVenta = false;
+        try {
+            if (data.transaccion.tipo && data.transaccion.tipo.toLowerCase().includes('venta')) {
+                esVenta = true;
+                if (data.transaccion.metodo_cobro && typeof data.transaccion.metodo_cobro === 'string') {
+                    if (data.transaccion.metodo_cobro.toLowerCase().includes('efectivo')) {
+                        esVentaConEfectivo = true;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error en detección de venta con efectivo:', error);
+            esVentaConEfectivo = false;
+            esVenta = false;
+        }
+        
+        console.log('Es venta:', esVenta);
+        console.log('Es venta con efectivo:', esVentaConEfectivo);
+        
+        if (esVentaConEfectivo) {
+            console.log('Ejecutando flujo de venta con efectivo');
+            // Para ventas con cobro en efectivo: mostrar formulario de ingreso de divisas
+            mostrarFormularioIngresoDivisas(data);
+            ingresoDivisas.style.display = 'block';
+            verificacionEmail.style.display = 'none';
+            // NO mostrar botón de retiro para ventas
+            botonRetiro.style.display = 'none';
+        } else if (esVenta) {
+            console.log('Ejecutando flujo de venta (sin efectivo)');
+            // Para ventas sin efectivo: mostrar información pero NO botón de retiro
+            mostrarResultadoValidacion(data);
+            verificacionEmail.style.display = 'none';
+            // NO mostrar botón de retiro para ventas
+            botonRetiro.style.display = 'none';
+        } else {
+            console.log('Ejecutando flujo normal de compra');
+            // Para compras: mostrar información y botón de retiro
+            mostrarResultadoValidacion(data);
+            verificacionEmail.style.display = 'none';
+            botonRetiro.style.display = 'block';
+        }
+    }
     formValidar.addEventListener('submit', function(e) {
         e.preventDefault();
         
@@ -349,55 +691,12 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Respuesta del servidor:', data); // Debug log
             if (data.success) {
                 datosTransaccion = data;
+                // Guardar el ID de la transacción actual para uso posterior
+                transaccionIdActual = data.transaccion.id;
                 
-                // Detectar si es una venta con cobro en efectivo - VERSIÓN SIMPLIFICADA
-                console.log('Tipo:', data.transaccion.tipo); // Debug log
-                console.log('Método de cobro:', data.transaccion.metodo_cobro); // Debug log
-                console.log('Tipo de método de cobro:', typeof data.transaccion.metodo_cobro); // Debug log
-                
-                // Lógica simplificada para detectar venta con efectivo
-                esVentaConEfectivo = false;
-                let esVenta = false;
-                try {
-                    if (data.transaccion.tipo && data.transaccion.tipo.toLowerCase().includes('venta')) {
-                        esVenta = true;
-                        if (data.transaccion.metodo_cobro && typeof data.transaccion.metodo_cobro === 'string') {
-                            if (data.transaccion.metodo_cobro.toLowerCase().includes('efectivo')) {
-                                esVentaConEfectivo = true;
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error en detección de venta con efectivo:', error);
-                    esVentaConEfectivo = false;
-                    esVenta = false;
-                }
-                
-                console.log('Es venta:', esVenta);
-                console.log('Es venta con efectivo:', esVentaConEfectivo);
-                
-                if (esVentaConEfectivo) {
-                    console.log('Ejecutando flujo de venta con efectivo');
-                    // Para ventas con cobro en efectivo: mostrar formulario de ingreso de divisas
-                    mostrarFormularioIngresoDivisas(data);
-                    ingresoDivisas.style.display = 'block';
-                    verificacionEmail.style.display = 'none';
-                    // NO mostrar botón de retiro para ventas
-                    botonRetiro.style.display = 'none';
-                } else if (esVenta) {
-                    console.log('Ejecutando flujo de venta (sin efectivo)');
-                    // Para ventas sin efectivo: mostrar información pero NO botón de retiro
-                    mostrarResultadoValidacion(data);
-                    verificacionEmail.style.display = 'none';
-                    // NO mostrar botón de retiro para ventas
-                    botonRetiro.style.display = 'none';
-                } else {
-                    console.log('Ejecutando flujo normal de compra');
-                    // Para compras: mostrar información y botón de retiro
-                    mostrarResultadoValidacion(data);
-                    verificacionEmail.style.display = 'none';
-                    botonRetiro.style.display = 'block';
-                }
+                // Después de verificar el código de email exitosamente,
+                // verificar si hay cambio de cotización antes de continuar
+                verificarCambioCotizacion(data.transaccion.id);
             } else {
                 mostrarError(data.error);
             }
@@ -409,7 +708,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .finally(() => {
             btnVerificarCodigo.disabled = false;
-            btnVerificarCodigo.innerHTML = '<i class="fas fa-check me-2"></i>Verificarss Código';
+            btnVerificarCodigo.innerHTML = '<i class="fas fa-check me-2"></i>Verificar Código';
         });
     });
     
@@ -602,16 +901,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Nueva transacción
     btnNueva.addEventListener('click', function() {
-        // Limpiar formulario
-        formValidar.reset();
+        // Limpiar formulario usando la función auxiliar
+        limpiarFormulario();
         formIngresoDivisas.reset();
-        resultadoValidacion.style.display = 'none';
-        verificacionEmail.style.display = 'none';
-        ingresoDivisas.style.display = 'none';
-        botonRetiro.style.display = 'none';
-        resultadoRetiro.style.display = 'none';
-        nuevaTransaccion.style.display = 'none';
-        datosTransaccion = null;
         esVentaConEfectivo = false;
         
         // Enfocar en el primer campo
@@ -921,6 +1213,27 @@ document.addEventListener('DOMContentLoaded', function() {
         alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
         alertDiv.innerHTML = `
             <i class="fas fa-exclamation-triangle me-2"></i>
+            ${mensaje}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        // Remover después de 5 segundos
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.parentNode.removeChild(alertDiv);
+            }
+        }, 5000);
+    }
+    
+    function mostrarExito(mensaje) {
+        // Crear alerta temporal
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        alertDiv.innerHTML = `
+            <i class="fas fa-check-circle me-2"></i>
             ${mensaje}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;

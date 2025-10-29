@@ -633,6 +633,103 @@ def crear_con_nueva_cotizacion(request, transaccion_id):
             
             print(f"DEBUG: Nueva transacción creada con ID: {nueva_transaccion.id_transaccion}")
             
+            # Detectar si se está llamando desde el simulador (tauser_id presente)
+            es_desde_simulador = datos.get('tauser_id') is not None
+            
+            # Si es desde el simulador, devolver datos completos similar a verificar_codigo_retiro
+            if es_desde_simulador:
+                tauser_id = datos.get('tauser_id')
+                from tauser.models import Tauser, Stock
+                
+                try:
+                    tauser = Tauser.objects.get(id=tauser_id, es_activo=True)
+                except Tauser.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Tauser no válido o inactivo'
+                    })
+                
+                # Verificar stock si es necesario
+                stock = None
+                if nueva_transaccion.moneda_destino.codigo != 'PYG':
+                    try:
+                        stock = Stock.objects.get(
+                            tauser=tauser,
+                            moneda=nueva_transaccion.moneda_destino,
+                            es_activo=True
+                        )
+                        if stock.cantidad < nueva_transaccion.monto_destino:
+                            return JsonResponse({
+                                'success': False,
+                                'error': f'Stock insuficiente. Disponible: {stock.mostrar_cantidad()}, Requerido: {nueva_transaccion.moneda_destino.mostrar_monto(nueva_transaccion.monto_destino)}'
+                            })
+                    except Stock.DoesNotExist:
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'No hay stock de {nueva_transaccion.moneda_destino.nombre} en {tauser.nombre}'
+                        })
+                
+                # Preparar datos de la transacción para mostrar (similar a verificar_codigo_retiro)
+                resumen_detallado = nueva_transaccion.get_resumen_detallado()
+                
+                # Detectar si es venta con cobro en efectivo
+                es_venta_con_efectivo = (
+                    nueva_transaccion.tipo_operacion.codigo == 'VENTA' and 
+                    nueva_transaccion.metodo_cobro and 
+                    nueva_transaccion.metodo_cobro.nombre.lower().find('efectivo') != -1
+                )
+                
+                # Preparar datos adicionales para ventas con cobro en efectivo
+                datos_adicionales = {
+                    'metodo_cobro': nueva_transaccion.metodo_cobro.nombre if nueva_transaccion.metodo_cobro else None,
+                    'metodo_pago': nueva_transaccion.metodo_pago.nombre if nueva_transaccion.metodo_pago else None,
+                }
+                
+                if es_venta_con_efectivo:
+                    datos_adicionales.update({
+                        'moneda_origen': {
+                            'codigo': nueva_transaccion.moneda_origen.codigo,
+                            'nombre': nueva_transaccion.moneda_origen.nombre,
+                            'simbolo': nueva_transaccion.moneda_origen.simbolo
+                        } if nueva_transaccion.moneda_origen else None,
+                        'monto_a_entregar': float(nueva_transaccion.monto_origen),
+                        'monto_a_entregar_formateado': f"{nueva_transaccion.moneda_origen.simbolo}{nueva_transaccion.monto_origen:.{nueva_transaccion.moneda_origen.decimales}f}" if nueva_transaccion.moneda_origen else None,
+                        'monto_a_recibir': float(nueva_transaccion.monto_destino),
+                        'monto_a_recibir_formateado': f"{nueva_transaccion.moneda_destino.simbolo}{nueva_transaccion.monto_destino:.{nueva_transaccion.moneda_destino.decimales}f}" if nueva_transaccion.moneda_destino else None,
+                    })
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Nueva transacción creada exitosamente con cotización actualizada',
+                    'transaccion': {
+                        'id': nueva_transaccion.id_transaccion,
+                        'codigo_verificacion': nueva_transaccion.codigo_verificacion,
+                        'tipo': nueva_transaccion.tipo_operacion.nombre,
+                        'cliente': nueva_transaccion.cliente.nombre_comercial if nueva_transaccion.cliente else 'Casual',
+                        'moneda_destino': {
+                            'codigo': nueva_transaccion.moneda_destino.codigo,
+                            'nombre': nueva_transaccion.moneda_destino.nombre,
+                            'simbolo': nueva_transaccion.moneda_destino.simbolo
+                        },
+                        'monto_a_retirar': float(nueva_transaccion.monto_destino),
+                        'monto_a_retirar_formateado': f"{nueva_transaccion.moneda_destino.simbolo}{nueva_transaccion.monto_destino:.{nueva_transaccion.moneda_destino.decimales}f}",
+                        'fecha_creacion': nueva_transaccion.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+                        'fecha_pago': nueva_transaccion.fecha_pago.strftime('%d/%m/%Y %H:%M') if nueva_transaccion.fecha_pago else None,
+                        **datos_adicionales
+                    },
+                    'tauser': {
+                        'id': tauser.id,
+                        'nombre': tauser.nombre,
+                        'direccion': tauser.direccion,
+                    },
+                    'stock_disponible': {
+                        'cantidad': float(stock.cantidad) if stock else 0,
+                        'cantidad_formateada': stock.mostrar_cantidad() if stock else 'N/A',
+                        'esta_bajo_stock': stock.esta_bajo_stock() if stock else False
+                    }
+                })
+            
+            # Si no es desde el simulador, devolver respuesta estándar
             return JsonResponse({
                 'success': True,
                 'message': 'Nueva transacción creada exitosamente',
