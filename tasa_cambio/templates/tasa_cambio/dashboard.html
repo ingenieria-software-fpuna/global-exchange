@@ -205,28 +205,25 @@
         return;
       }
 
-      // Determinar origen y destino según el tipo de operación
-      let origen, destino, montoEnviar;
       if (esCompra) {
-        // COMPRAR: Usuario ingresa cantidad de divisa que quiere
-        // Necesitamos invertir: preguntar cuánto PYG necesito para X divisa
-        // Solución: usar un monto base en PYG y calcular la tasa, luego invertir
-        origen = monedaOperacion;  // Invertimos: consultamos desde la divisa
-        destino = 'PYG';            // hacia PYG
-        montoEnviar = monto;        // Cantidad de divisa que quiere
+        // COMPRAR: Usuario especifica cuánta divisa quiere, calculamos PYG a pagar
+        // Necesitamos la tasa de VENTA
+        simularCompra(monto, monedaOperacion, cliente);
       } else {
-        // VENDER: Otra moneda -> PYG (ya está correcto)
-        origen = monedaOperacion;
-        destino = 'PYG';
-        montoEnviar = monto;
+        // VENDER: Usuario especifica cuánta divisa vende, calculamos PYG a recibir  
+        // Necesitamos la tasa de COMPRA
+        simularVenta(monto, monedaOperacion, cliente);
       }
-
+    }
+    
+    function simularCompra(cantidadDivisa, codigoMoneda, clienteId) {
+      // Para compra: consultamos PYG -> Moneda para obtener la tasa de venta
       const params = new URLSearchParams({
-        monto: String(montoEnviar),
-        origen: String(origen),
-        destino: String(destino),
+        monto: '1',  // Consultamos 1 PYG para obtener el precio unitario
+        origen: 'PYG',
+        destino: codigoMoneda,
       });
-      if (cliente) params.append('cliente_id', cliente);
+      if (clienteId) params.append('cliente_id', clienteId);
 
       fetch(`{% url 'tasa_cambio:simular_cambio_api' %}?${params.toString()}`)
         .then(r => r.json())
@@ -236,19 +233,77 @@
             $resDetalle.textContent = data.message || 'Error en la simulación.';
             $resTasas.textContent = '';
             $resDesc.textContent = '';
+            document.getElementById('enlace_compra_container').style.display = 'none';
             return;
           }
+          
+          const d = data.data;
+          // Obtener el precio de venta desde la respuesta
+          const tasaVenta = d.tasa_destino ? parseFloat(d.tasa_destino.valor) : 0;
+          
+          if (tasaVenta <= 0) {
+            $resValor.textContent = '—';
+            $resDetalle.textContent = 'No se pudo obtener la tasa de venta.';
+            return;
+          }
+          
+          // Calcular PYG necesarios: cantidad_divisa × tasa_venta
+          const cantidad = parseFloat(cantidadDivisa);
+          const pygNecesarios = Math.round(cantidad * tasaVenta);
+          
+          // Mostrar resultado
+          $resValor.textContent = `₲ ${formatNumberWithDots(pygNecesarios)}`;
+          $resDetalle.textContent = `Para comprar ${cantidadDivisa} ${codigoMoneda}, debes pagar:`;
+          
+          // Mostrar tasa usada
+          $resTasas.textContent = `Tasa usada: ${codigoMoneda} (${d.tasa_destino.tipo}): ${formatNumberWithDots(tasaVenta)}`;
+          
+          // Mostrar descuento si aplica
+          if (d.cliente && d.cliente.descuento > 0) {
+            $resDesc.textContent = `Cliente: ${d.cliente.nombre} — ${d.cliente.tipo} `;
+          } else {
+            $resDesc.textContent = '';
+          }
+          
+          // Limpiar campos no usados en compra
+          const $resSubtotal = document.getElementById('resultado_subtotal');
+          const $resComision = document.getElementById('resultado_comision');
+          if ($resSubtotal) $resSubtotal.textContent = '';
+          if ($resComision) $resComision.textContent = '';
+          
+          // Mostrar solo el botón de compra
+          document.getElementById('enlace_compra_container').style.display = 'block';
+          document.getElementById('enlace_venta_container').style.display = 'none';
+        })
+        .catch((error) => {
+          console.error('Error en simulación de compra:', error);
+          mostrarError('No se pudo simular. Error: ' + (error.message || 'Desconocido'));
+        });
+    }
+    
+    function simularVenta(cantidadDivisa, codigoMoneda, clienteId) {
+      // Para venta: consultamos Moneda -> PYG para usar tasa de compra
+      const params = new URLSearchParams({
+        monto: String(cantidadDivisa),
+        origen: codigoMoneda,
+        destino: 'PYG',
+      });
+      if (clienteId) params.append('cliente_id', clienteId);
+
+      fetch(`{% url 'tasa_cambio:simular_cambio_api' %}?${params.toString()}`)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success) {
+            mostrarError(data.message || 'Error en la simulación.');
+            return;
+          }
+          
           const d = data.data;
           
-          // Si es compra, mostramos el resultado como "Debes pagar X PYG"
-          if (esCompra) {
-            $resValor.textContent = formatDisplayWithDots(d.resultado_formateado);
-            $resDetalle.textContent = `Para comprar ${monto} ${monedaOperacion}, debes pagar:`;
-          } else {
-            // Si es venta, mostramos normal
-            $resValor.textContent = formatDisplayWithDots(d.resultado_formateado);
-            $resDetalle.textContent = d.detalle;
-          }
+          // Mostrar resultado
+          $resValor.textContent = formatDisplayWithDots(d.resultado_formateado);
+          $resDetalle.textContent = d.detalle;
+          
           const $resSubtotal = document.getElementById('resultado_subtotal');
           const $resComision = document.getElementById('resultado_comision');
           if (d.subtotal_formateado) {
@@ -257,35 +312,42 @@
           if (d.comision_pct && d.comision_monto_formateado) {
             $resComision.textContent = `Comisión (${d.comision_pct}%): ${formatDisplayWithDots(d.comision_monto_formateado)}`;
           } else { $resComision.textContent = ''; }
+          
           const t1 = d.tasa_origen ? `${d.tasa_origen.moneda} (${d.tasa_origen.tipo}): ${d.tasa_origen.valor}` : null;
-          const t2 = d.tasa_destino ? `${d.tasa_destino.moneda} (${d.tasa_destino.tipo}): ${d.tasa_destino.valor}` : null;
-          const parts = [t1, t2].filter(Boolean);
+          const parts = [t1].filter(Boolean);
           $resTasas.textContent = parts.length ? `Tasas usadas: ${parts.join(' · ')}` : '';
+          
           if (d.cliente && d.cliente.descuento > 0) {
             $resDesc.textContent = `Cliente: ${d.cliente.nombre} — ${d.cliente.tipo}`;
           } else {
             $resDesc.textContent = '';
           }
           
-          // Mostrar botón apropiado según el tipo de operación
-          document.getElementById('enlace_compra_container').style.display = esCompra ? 'block' : 'none';
-          document.getElementById('enlace_venta_container').style.display = !esCompra ? 'block' : 'none';
+          // Mostrar solo el botón de venta
+          document.getElementById('enlace_compra_container').style.display = 'none';
+          document.getElementById('enlace_venta_container').style.display = 'block';
         })
         .catch((error) => {
-          console.error('Error en simulación:', error);
-          $resValor.textContent = '—';
-          $resDetalle.textContent = 'No se pudo simular. Error: ' + (error.message || 'Desconocido');
-          $resTasas.textContent = '';
-          $resDesc.textContent = '';
-          const $resSubtotal = document.getElementById('resultado_subtotal');
-          const $resComision = document.getElementById('resultado_comision');
-          if ($resSubtotal) $resSubtotal.textContent = '';
-          if ($resComision) $resComision.textContent = '';
-          
-          // Ocultar botones si hay error
-          document.getElementById('enlace_compra_container').style.display = 'none';
-          document.getElementById('enlace_venta_container').style.display = 'none';
+          console.error('Error en simulación de venta:', error);
+          mostrarError('No se pudo simular. Error: ' + (error.message || 'Desconocido'));
         });
+    }
+    
+    function mostrarError(mensaje) {
+      $resValor.textContent = '—';
+      $resDetalle.textContent = mensaje;
+      $resTasas.textContent = '';
+      $resDesc.textContent = '';
+      const $resSubtotal = document.getElementById('resultado_subtotal');
+      const $resComision = document.getElementById('resultado_comision');
+      if ($resSubtotal) $resSubtotal.textContent = '';
+      if ($resComision) $resComision.textContent = '';
+      document.getElementById('enlace_compra_container').style.display = 'none';
+      document.getElementById('enlace_venta_container').style.display = 'none';
+    }
+    
+    function formatNumberWithDots(num) {
+      return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     }
     
     function limpiarResultados() {
