@@ -213,24 +213,7 @@ def iniciar_compra(request):
                 messages.error(request, 'El método de pago seleccionado no es válido.')
                 return redirect('tasa_cambio:dashboard')
         
-        # Validar límites de transacción
-        # Para compras: validar el monto que el cliente va a pagar contra el límite de la moneda que se compra
-        validacion_limites = validar_limites_transaccion(
-            monto_origen=monto,
-            moneda_origen=moneda_destino,  # Moneda que se compra (AUD) para validar su límite
-            cliente=cliente,
-            usuario=request.user
-        )
-        
-        if not validacion_limites['valido']:
-            messages.error(request, f'Transacción rechazada: {validacion_limites["mensaje"]}')
-            # Redirigir según desde donde vino
-            if metodo_cobro_id:
-                return redirect('transacciones:comprar_divisas')
-            else:
-                return redirect('tasa_cambio:dashboard')
-        
-        # Calcular la transacción usando la NUEVA lógica (igual que la vista previa)
+        # Calcular la transacción primero para saber cuánto pagará en PYG
         resultado = calcular_transaccion_completa(
             monto=monto,
             moneda_origen=moneda_origen,
@@ -245,6 +228,26 @@ def iniciar_compra(request):
             messages.error(request, f'Error en el cálculo: {error_msg}')
             return redirect('tasa_cambio:dashboard')
         
+        # Obtener el total a pagar en PYG para validar límites
+        data = resultado['data']
+        total_a_pagar_pyg = Decimal(str(data['total']))
+        
+        # Validar límites de transacción usando el monto en PYG que va a pagar
+        validacion_limites = validar_limites_transaccion(
+            monto_origen=total_a_pagar_pyg,
+            moneda_origen=moneda_origen,  # PYG
+            cliente=cliente,
+            usuario=request.user
+        )
+        
+        if not validacion_limites['valido']:
+            messages.error(request, f'Transacción rechazada: {validacion_limites["mensaje"]}')
+            # Redirigir según desde donde vino
+            if metodo_cobro_id:
+                return redirect('transacciones:comprar_divisas')
+            else:
+                return redirect('tasa_cambio:dashboard')
+        
         # Crear la transacción
         with transaction.atomic():
             tipo_compra = TipoOperacion.objects.get(codigo=TipoOperacion.COMPRA)
@@ -254,9 +257,11 @@ def iniciar_compra(request):
             data = resultado['data']
             
             # Calcular porcentajes de comisión correctos
+            # El porcentaje se calcula sobre el SUBTOTAL (antes de comisiones)
+            subtotal_pyg = Decimal(str(data.get('subtotal', 0)))
             porcentaje_comision_total = Decimal('0')
-            if monto > 0:
-                porcentaje_comision_total = (Decimal(str(data.get('comision_total', 0))) / monto * Decimal('100')).quantize(Decimal('0.0001'))
+            if subtotal_pyg > 0:
+                porcentaje_comision_total = (Decimal(str(data.get('comision_total', 0))) / subtotal_pyg * Decimal('100')).quantize(Decimal('0.0001'))
             
             nueva_transaccion = Transaccion(
                 cliente=cliente,
@@ -264,7 +269,7 @@ def iniciar_compra(request):
                 tipo_operacion=tipo_compra,
                 moneda_origen=moneda_origen,
                 moneda_destino=moneda_destino,
-                monto_origen=monto,  # Lo que el cliente pagará
+                monto_origen=total_a_pagar_pyg,  # Lo que el cliente pagará en PYG
                 monto_destino=Decimal(str(data['resultado'])),  # Lo que recibirá
                 metodo_cobro=metodo_cobro,  # Para compras, usamos método de cobro
                 metodo_pago=metodo_pago,    # Para compatibilidad con dashboard antiguo
@@ -919,46 +924,51 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
         tipo_operacion = 'venta' + (' (ajustada)' if descuento_pct > 0 else '')
         
         # LÓGICA DE CÁLCULO PARA COMPRAS:
-        # 1. El monto ingresado es lo que el cliente quiere PAGAR (en PYG)
-        monto_a_pagar = monto
+        # 1. El monto ingresado es lo que el cliente quiere RECIBIR (en divisa extranjera)
+        cantidad_divisa_deseada = monto
         
-        # 2. Calcular comisiones de métodos SOBRE el monto que va a pagar
-        comision_cobro = Decimal('0')
-        comision_pago = Decimal('0')
+        # 2. Calcular el subtotal en PYG necesario para obtener esa cantidad de divisa
+        # subtotal = cantidad_deseada × tasa_ajustada
+        subtotal_pyg = cantidad_divisa_deseada * precio_usado
+        
+        # 3. Calcular comisiones de métodos SOBRE el subtotal
+        comision_cobro_pct = Decimal('0')
+        comision_pago_pct = Decimal('0')
         
         if metodo_cobro and metodo_cobro.comision > 0:
-            comision_cobro = monto_a_pagar * (Decimal(str(metodo_cobro.comision)) / Decimal('100'))
+            comision_cobro_pct = Decimal(str(metodo_cobro.comision)) / Decimal('100')
         
         if metodo_pago and metodo_pago.comision > 0:
-            comision_pago = monto_a_pagar * (Decimal(str(metodo_pago.comision)) / Decimal('100'))
+            comision_pago_pct = Decimal(str(metodo_pago.comision)) / Decimal('100')
         
+        comision_total_pct = comision_cobro_pct + comision_pago_pct
+        
+        comision_cobro = subtotal_pyg * comision_cobro_pct
+        comision_pago = subtotal_pyg * comision_pago_pct
         comision_total = comision_cobro + comision_pago
         
-        # 3. Calcular el monto neto disponible para la conversión (después de comisiones)
-        monto_neto_conversion = monto_a_pagar - comision_total
+        # 4. Total a pagar = subtotal + comisiones
+        total_a_pagar = subtotal_pyg + comision_total
         
-        # 4. Convertir el monto neto a la divisa destino usando la tasa ajustada
-        resultado_final = (monto_neto_conversion / precio_usado).quantize(
+        # 5. Lo que recibirá es exactamente lo que pidió
+        resultado_final = cantidad_divisa_deseada.quantize(
             Decimal('1.' + '0' * max(moneda_destino.decimales, 0)), 
             rounding=ROUND_HALF_UP
         )
         
-        # 5. Calcular el monto real del descuento aplicado
-        # El descuento es el ahorro en PYG que obtiene el cliente sobre la comisión de cambio
+        # 6. Calcular el monto real del descuento aplicado
+        # El descuento es el ahorro sobre la comisión de venta (por unidad de divisa)
         descuento_aplicado = Decimal('0')
         if descuento_pct > 0:
             # El descuento se aplica sobre la comisión de venta
             comision_original = Decimal(str(tasa_destino.comision_venta))
             comision_con_descuento = comision_venta_ajustada
-            descuento_en_comision = comision_original - comision_con_descuento
-            
-            # El descuento en PYG es: (descuento en comisión) × (cantidad de divisa que obtiene)
-            cantidad_divisa_obtenida = resultado_final
-            descuento_aplicado = descuento_en_comision * cantidad_divisa_obtenida
+            # El descuento aplicado es la diferencia entre la comisión original y la ajustada
+            descuento_aplicado = comision_original - comision_con_descuento
         
-        # 6. Valores para mostrar
-        subtotal = monto_a_pagar  # Lo que ingresó el cliente
-        total_origen = monto_a_pagar  # El cliente paga exactamente lo que ingresó
+        # 7. Valores para mostrar
+        subtotal = subtotal_pyg  # Monto base antes de comisiones de métodos
+        total_origen = total_a_pagar  # Total que debe pagar incluyendo TODO
         
         # Formatear montos
         def formatear_monto(valor, moneda):

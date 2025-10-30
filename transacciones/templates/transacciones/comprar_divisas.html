@@ -522,10 +522,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Enviar a iniciar_compra con el monto calculado en PYG
+        // Enviar a iniciar_compra con la CANTIDAD DE DIVISA que quiere recibir
         const formData = new FormData();
         formData.append('csrfmiddlewaretoken', form.querySelector('[name=csrfmiddlewaretoken]').value);
-        formData.append('monto', form.dataset.totalCalculado); // El total calculado en PYG
+        formData.append('monto', cantidadDivisa.value); // La cantidad de divisa que quiere recibir
         formData.append('moneda_origen', 'PYG');
         formData.append('moneda_destino', monedaDestino.value);
         formData.append('cliente_id', cliente.value);
