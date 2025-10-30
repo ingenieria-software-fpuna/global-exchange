@@ -83,7 +83,7 @@ def formatear_guaranies(valor):
         # Convertir a entero si es necesario
         valor_int = int(valor)
         # Formatear con separadores de miles
-        return f"₲ {valor_int:,}".replace(',', '.')
+        return f" {valor_int:,}".replace(',', '.')
     except (ValueError, TypeError):
         return "N/A"
 
@@ -92,44 +92,40 @@ def formatear_guaranies(valor):
 def moneda_format(valor, codigo_moneda):
     """
     Formatea un valor monetario según el código de moneda.
+    Obtiene el símbolo y decimales desde la tabla Moneda.
     """
     if valor is None:
         return "N/A"
     
     try:
+        from monedas.models import Moneda
+        
         valor_float = float(valor)
         codigo_moneda = codigo_moneda.upper()
         
-        # Definir símbolos y formato por moneda
-        simbolos_monedas = {
-            'USD': '$',
-            'EUR': '€',
-            'BRL': 'R$',
-            'ARS': '$',
-            'GBP': '£',
-            'JPY': '¥',
-            'CAD': 'C$',
-            'CHF': 'CHF',
-            'AUD': 'A$',
-            'CNY': '¥',
-            'MXN': '$',
-            'PYG': '₲',  # Guaraní paraguayo
-        }
+        # Obtener información de la moneda desde la base de datos
+        try:
+            moneda = Moneda.objects.get(codigo=codigo_moneda)
+            codigo_display = moneda.codigo
+            decimales = moneda.decimales
+        except Moneda.DoesNotExist:
+            # Fallback si no se encuentra la moneda
+            codigo_display = codigo_moneda
+            decimales = 2
         
-        simbolo = simbolos_monedas.get(codigo_moneda, codigo_moneda)
-        
-        # Formatear según la moneda
-        if codigo_moneda == 'PYG':
-            # Para guaraníes, sin decimales y con separadores de miles
+        # Formatear según los decimales de la moneda
+        if decimales == 0:
+            # Sin decimales (como PYG, JPY, KRW)
             valor_int = int(valor_float)
-            return f"{simbolo} {valor_int:,}".replace(',', '.')
-        elif codigo_moneda in ['JPY', 'KRW']:
-            # Para yenes y wons, sin decimales
-            valor_int = int(valor_float)
-            return f"{simbolo} {valor_int:,}"
+            if codigo_moneda == 'PYG':
+                # Para guaraníes usar punto como separador de miles
+                return f"{codigo_display} {valor_int:,}".replace(',', '.')
+            else:
+                # Para otras monedas sin decimales usar coma
+                return f"{codigo_display} {valor_int:,}"
         else:
-            # Para otras monedas, 2 decimales
-            return f"{simbolo} {valor_float:,.2f}"
+            # Con decimales (2 decimales para la mayoría)
+            return f"{codigo_display} {valor_float:,.{decimales}f}"
             
     except (ValueError, TypeError):
         return "N/A"

@@ -19,14 +19,56 @@
     </div>
     <div class="card-body">
       <!-- Información -->
-      <div class="alert alert-info mb-4">
+      <div class="alert alert-info mb-3">
         <i class="fas fa-info-circle me-2"></i>
-        <strong>¿Cómo funciona?</strong> Ingrese el monto total que desea pagar y el sistema calculará cuánta divisa extranjera recibirá después de aplicar comisiones y descuentos.
+        Ingrese cuánta divisa extranjera necesita y calculamos cuánto debe pagar en Guaraníes.
       </div>
 
       <form id="formCompra" novalidate>
         {% csrf_token %}
         <div class="row g-3">
+          <!-- Sección Principal: ¿Qué quiero comprar? -->
+          <div class="col-12">
+            <div class="card border-primary">
+              <div class="card-header bg-primary text-white py-2">
+                <h6 class="mb-0"><i class="fas fa-money-bill-wave me-2"></i>¿Qué divisa quiere comprar?</h6>
+              </div>
+              <div class="card-body">
+                <div class="row g-3">
+                  <!-- Moneda Destino -->
+                  <div class="col-md-6">
+                    <label for="moneda_destino" class="form-label">Quiero comprar <span class="text-danger">*</span></label>
+                    <select id="moneda_destino" name="moneda_destino" class="form-select" required>
+                      {% for moneda in monedas %}
+                        <option value="{{ moneda.codigo }}" 
+                          data-simbolo="{{ moneda.simbolo }}"
+                          {% if moneda_destino_preseleccionada == moneda.codigo %}selected
+                          {% elif not moneda_destino_preseleccionada and moneda.codigo == 'USD' %}selected
+                          {% endif %}>
+                          {{ moneda.simbolo }} {{ moneda.nombre }} ({{ moneda.codigo }})
+                        </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+
+                  <!-- Cantidad -->
+                  <div class="col-md-6">
+                    <label for="cantidad_divisa" class="form-label">Cantidad <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                      <span class="input-group-text" id="simbolo-moneda">$</span>
+                      <input id="cantidad_divisa" name="cantidad_divisa" type="number" 
+                             class="form-control" placeholder="100.00" step="any" min="0.01" required
+                             {% if cantidad_preseleccionada %}value="{{ cantidad_preseleccionada }}"{% endif %}>
+                    </div>
+                    <div class="form-text">
+                      Ingrese cuánta divisa necesita
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Cliente -->
           <div class="col-md-12">
             <label for="cliente" class="form-label">Cliente <span class="text-danger">*</span></label>
@@ -35,134 +77,105 @@
               {% for cliente in clientes %}
                 <option value="{{ cliente.id }}" data-descuento="{{ cliente.tipo_cliente.descuento }}" 
                         {% if cliente_preseleccionado and cliente.id|stringformat:"s" == cliente_preseleccionado %}selected{% endif %}>
-                  {{ cliente.nombre_comercial }}{% if cliente.tipo_cliente.activo %} — {{ cliente.tipo_cliente.nombre }} 
-                  ({{ cliente.tipo_cliente.descuento }}% descuento){% endif %}
+                  {{ cliente.nombre_comercial }}{% if cliente.tipo_cliente.activo %} — {{ cliente.tipo_cliente.nombre }}{% endif %}
                 </option>
               {% empty %}
                 <option value="" disabled>No hay clientes asociados</option>
               {% endfor %}
             </select>
             <div class="form-text">
-              Las compras de divisas requieren cliente para aplicar descuentos y controlar límites.
+              Seleccione el cliente para aplicar beneficios
             </div>
           </div>
 
           <!-- Método de Cobro -->
           <div class="col-md-6">
-            <label for="metodo_cobro" class="form-label">Método de Cobro <span class="text-danger">*</span></label>
+            <label for="metodo_cobro" class="form-label">¿Cómo va a pagar? <span class="text-danger">*</span></label>
             <select id="metodo_cobro" name="metodo_cobro_id" class="form-select" required>
-              <option value="">Seleccione un método de cobro</option>
+              <option value="">Seleccione un método de pago</option>
               {% for metodo in metodos_cobro %}
                 <option value="{{ metodo.id }}" data-comision="{{ metodo.comision }}">
-                  {{ metodo.nombre }} 
-                  {% if metodo.comision > 0 %}({{ metodo.comision }}% comisión){% else %}(sin comisión){% endif %}
+                  {{ metodo.nombre }}
                 </option>
               {% empty %}
                 <option value="" disabled>No hay métodos de cobro activos</option>
               {% endfor %}
             </select>
-            <div class="form-text">Seleccione cómo desea pagar por las divisas.</div>
           </div>
 
           <!-- Método de Entrega/Pago -->
           <div class="col-md-6">
-            <label for="metodo_pago" class="form-label">Método de Entrega <span class="text-danger">*</span></label>
+            <label for="metodo_pago" class="form-label">¿Cómo la recibirá? <span class="text-danger">*</span></label>
             <select id="metodo_pago" name="metodo_pago_id" class="form-select" required>
               <option value="">Seleccione cómo recibirá las divisas</option>
               {% for metodo in metodos_pago %}
                 <option value="{{ metodo.id }}" data-comision="{{ metodo.comision }}">
-                  {{ metodo.nombre }} 
-                  {% if metodo.comision > 0 %}({{ metodo.comision }}% comisión){% else %}(sin comisión){% endif %}
+                  {{ metodo.nombre }}
                 </option>
               {% empty %}
                 <option value="" disabled>No hay métodos de entrega activos</option>
               {% endfor %}
             </select>
-            <div class="form-text">Seleccione cómo recibirá las divisas compradas.</div>
           </div>
 
-          <!-- Monto -->
-          <div class="col-md-4">
-            <label for="monto" class="form-label">Monto a Pagar <span class="text-danger">*</span></label>
-            <input id="monto" name="monto" type="number" class="form-control" 
-                   placeholder="100000.00" step="any" min="0.01" required
-                   {% if cantidad_preseleccionada %}value="{{ cantidad_preseleccionada }}"{% endif %}>
-            <div class="form-text">
-              Ingrese cuánto desea pagar en total
-            </div>
-          </div>
-
-          <!-- Moneda Origen -->
-          <div class="col-md-4">
-            <label for="moneda_origen" class="form-label">Pagando con</label>
-            <select id="moneda_origen" name="moneda_origen" class="form-select" required readonly>
-              <option value="PYG" selected>Guaraní (PYG)</option>
-            </select>
-            <div class="form-text">
-              Las compras siempre se pagan en Guaraníes
-            </div>
-          </div>
-
-          <!-- Moneda Destino -->
-          <div class="col-md-4">
-            <label for="moneda_destino" class="form-label">Comprando</label>
-            <select id="moneda_destino" name="moneda_destino" class="form-select" required>
-              {% for moneda in monedas %}
-                <option value="{{ moneda.codigo }}" 
-                  {% if moneda_destino_preseleccionada == moneda.codigo %}selected
-                  {% elif not moneda_destino_preseleccionada and moneda.codigo == 'USD' %}selected
-                  {% endif %}>
-                  {{ moneda.nombre }} ({{ moneda.codigo }})
-                </option>
-              {% endfor %}
-            </select>
+          <!-- Botón Calcular -->
+          <div class="col-12 text-center mt-3">
+            <button type="button" id="btnCalcular" class="btn btn-outline-primary me-2">
+              <i class="fas fa-calculator me-1"></i>
+              Calcular cuánto debo pagar
+            </button>
           </div>
 
           <!-- Preview del Cálculo -->
-          <div class="col-md-12">
-            <div id="preview" class="card bg-light mt-3" style="display: none;">
-              <div class="card-header">
-                <h6 class="mb-0">
-                  <i class="fas fa-calculator me-2"></i>
-                  Vista Previa del Cálculo
-                </h6>
-              </div>
-              <div class="card-body" id="preview-content">
-                <!-- Content will be loaded dynamically -->
+          <div class="col-12">
+            <div id="preview" class="mt-3" style="display: none;">
+              <div class="card border-primary shadow-sm">
+                <div class="card-header bg-light border-primary">
+                  <h6 class="mb-0 text-primary"><i class="fas fa-calculator me-2"></i>Vista Previa del Cálculo</h6>
+                </div>
+                <div class="card-body" id="preview-content">
+                  <!-- Content will be loaded dynamically -->
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Botones de Acción -->
-        <div class="d-flex justify-content-end mt-4">
-          <button type="button" id="btnCalcular" class="btn btn-outline-primary me-2">
-            <i class="fas fa-calculator me-1"></i>
-            Calcular
-          </button>
-          <button type="submit" id="btnComprar" class="btn btn-success" disabled>
-            <i class="fas fa-shopping-cart me-1"></i>
-            Proceder con la Compra
+        <!-- Botón de Compra -->
+        <div class="d-flex justify-content-end mt-3">
+          <button type="submit" id="btnComprar" class="btn btn-success px-4" disabled>
+            <i class="fas fa-shopping-cart me-2"></i>
+            Confirmar Compra
           </button>
         </div>
       </form>
-        </div>
     </div>
   </div>
 
   <!-- Información adicional -->
   <div class="card shadow-sm mt-4">
-    <div class="card-header">
-      <strong><i class="fas fa-info-circle me-2"></i>Información Importante</strong>
+    <div class="card-header bg-info text-white">
+      <strong><i class="fas fa-lightbulb me-2"></i>Beneficios y Condiciones</strong>
     </div>
     <div class="card-body">
-      <ul class="mb-0">
-        <li>Las transacciones tienen un tiempo límite de <strong>5 minutos</strong> para completar el pago.</li>
-        <li>Los tipos de cliente con descuentos mejoran la tasa de cambio y reducen comisiones.</li>
-        <li>El monto ingresado es lo que <strong>pagará en total</strong>, las comisiones se descuentan de ese monto.</li>
-        <li>Una vez iniciada la compra, recibirá un código de verificación único para su transacción.</li>
-        <li>Puede cancelar la transacción antes de realizar el pago sin penalización.</li>
-      </ul>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <h6 class="text-primary"><i class="fas fa-check-circle me-1"></i> Ventajas</h6>
+          <ul class="mb-0">
+            <li><strong>Descuentos exclusivos</strong> según su tipo de cliente</li>
+            <li><strong>Tasas competitivas</strong> actualizadas en tiempo real</li>
+            <li><strong>Cálculo transparente</strong> con detalle completo</li>         
+          </ul>
+        </div>
+        <div class="col-md-6">
+          <h6 class="text-warning"><i class="fas fa-info-circle me-1"></i> Importante</h6>
+          <ul class="mb-0">
+            <li>Tiempo límite de <strong>5 minutos</strong> para completar el pago</li>
+            <li>Recibirá un <strong>código de verificación único</strong></li>
+            <li>Puede cancelar antes del pago sin penalización</li>
+          </ul>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -192,137 +205,194 @@ document.addEventListener('DOMContentLoaded', function() {
     const preview = document.getElementById('preview');
     const previewContent = document.getElementById('preview-content');
     
-    const monto = document.getElementById('monto');
-    const monedaOrigen = document.getElementById('moneda_origen');
+    const cantidadDivisa = document.getElementById('cantidad_divisa');
     const monedaDestino = document.getElementById('moneda_destino');
+    const simboloMoneda = document.getElementById('simbolo-moneda');
     const cliente = document.getElementById('cliente');
     const metodoCobro = document.getElementById('metodo_cobro');
     const metodoPago = document.getElementById('metodo_pago');
+    
+    // Actualizar símbolo de moneda cuando cambie la selección
+    function actualizarSimboloMoneda() {
+        const selectedOption = monedaDestino.options[monedaDestino.selectedIndex];
+        const simbolo = selectedOption.getAttribute('data-simbolo') || '$';
+        simboloMoneda.textContent = simbolo;
+    }
+    
+    monedaDestino.addEventListener('change', actualizarSimboloMoneda);
+    actualizarSimboloMoneda(); // Inicializar
     
     // Función para validar si se puede proceder con la compra
     function validarFormularioCompleto() {
         const esValido = cliente.value && 
                         metodoCobro.value && 
                         metodoPago.value &&
-                        monto.value && 
-                        parseFloat(monto.value) > 0 &&
+                        cantidadDivisa.value && 
+                        parseFloat(cantidadDivisa.value) > 0 &&
                         monedaDestino.value;
         return esValido;
     }
     
     // Función para calcular preview
     async function calcularPreview() {
-        const datos = {
-            monto: monto.value,
-            origen: 'PYG',
-            destino: monedaDestino.value,
-            cliente_id: cliente.value || null,
-            metodo_cobro_id: metodoCobro.value || null,
-            metodo_pago_id: metodoPago.value || null
-        };
+        const cantidadDivisaQuiere = cantidadDivisa.value;
+        const monedaComprar = monedaDestino.value;
         
-        if (!datos.monto || parseFloat(datos.monto) <= 0) {
+        if (!cantidadDivisaQuiere || parseFloat(cantidadDivisaQuiere) <= 0) {
             preview.style.display = 'none';
             btnComprar.disabled = true;
             return;
         }
         
         try {
+            // CÁLCULO INVERSO:
+            // Usuario ingresa cuánta divisa quiere (ej: 100 USD)
+            // Necesitamos calcular cuánto debe pagar en PYG
+            
+            // 1. Primero obtenemos las tasas y comisiones
             const params = new URLSearchParams();
-            params.append('monto', datos.monto);
-            params.append('origen', datos.origen);
-            params.append('destino', datos.destino);
-            if (datos.cliente_id) params.append('cliente_id', datos.cliente_id);
+            params.append('moneda_destino', monedaComprar);
+            if (cliente.value) params.append('cliente_id', cliente.value);
             if (metodoCobro.value) params.append('metodo_cobro_id', metodoCobro.value);
             if (metodoPago.value) params.append('metodo_pago_id', metodoPago.value);
+            
+            // Hacer una llamada inicial para obtener tasas y comisiones
+            // Usamos un monto dummy para obtener las tasas
+            params.append('monto', '1000000'); // 1 millón PYG como base
+            params.append('origen', 'PYG');
+            params.append('destino', monedaComprar);
             
             const response = await fetch(`{% url 'transacciones:api_calcular_compra_completa' %}?${params}`);
             const result = await response.json();
             
             if (result.success) {
                 const data = result.data;
+                
+                // 2. Calcular cuánto debe pagar para obtener la cantidad deseada
+                const cantidadDeseada = parseFloat(cantidadDivisaQuiere);
+                const tasaAjustada = data.tasa_ajustada;
+                
+                // Obtener porcentajes de comisión
+                const comisionCobroPct = data.metodo_cobro ? data.metodo_cobro.comision / 100 : 0;
+                const comisionPagoPct = data.metodo_pago ? data.metodo_pago.comision / 100 : 0;
+                const comisionTotalPct = comisionCobroPct + comisionPagoPct;
+                
+                // Fórmula correcta:
+                // 1. Subtotal (cantidad × tasa) = monto sin comisiones
+                const subtotal = cantidadDeseada * tasaAjustada;
+                
+                // 2. Comisiones se calculan SOBRE el subtotal
+                const comisionCobro = subtotal * comisionCobroPct;
+                const comisionPago = subtotal * comisionPagoPct;
+                const comisionTotal = comisionCobro + comisionPago;
+                
+                // 3. Total = subtotal + comisiones
+                const totalAPagar = subtotal + comisionTotal;
+                
+                const selectedOption = monedaDestino.options[monedaDestino.selectedIndex];
+                const simbolo = selectedOption.getAttribute('data-simbolo') || '$';
+                
+                // Formatear montos
+                const formatearPYG = (valor) => `₲ ${Math.round(valor).toLocaleString('es-PY')}`;
+                const formatearDivisa = (valor) => `${simbolo}${valor.toLocaleString('es-PY', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                
+                // Diseño limpio y profesional con fórmula correcta
                 previewContent.innerHTML = `
-                    <div class="row g-2">
-                        <div class="col-12">
-                            <div class="alert alert-primary alert-sm mb-2">
-                                <i class="fas fa-info-circle me-1"></i>
-                                <strong>Usted pagará:</strong> ${data.total_formateado}
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="p-3 bg-light rounded text-center">
+                                <small class="text-muted d-block mb-1">Usted recibirá</small>
+                                <div class="h2 mb-0 text-success">
+                                    ${formatearDivisa(cantidadDeseada)}
+                                </div>
+                                <small class="text-muted">${monedaDestino.options[monedaDestino.selectedIndex].text}</small>
                             </div>
                         </div>
-                        <div class="col-6">
-                            <small class="text-muted">Monto base:</small><br>
-                            <strong>${data.subtotal_formateado}</strong>
-                        </div>
-                        <div class="col-6">
-                            <small class="text-muted">Tasa base:</small><br>
-                            <strong>₲ ${data.tasa_base.toLocaleString()}</strong>
-                        </div>
-                        <div class="col-6">
-                            <small class="text-muted">Tasa ajustada (con ${data.descuento_pct}% descuento):</small><br>
-                            <strong>₲ ${data.tasa_ajustada.toLocaleString()}</strong>
-                        </div>
-                        ${data.comision_cobro > 0 ? `
-                        <div class="col-6">
-                            <small class="text-muted">Comisión cobro:</small><br>
-                            <span class="text-danger">- ${data.comision_cobro_formateado} (${data.metodo_cobro.comision}%)</span>
-                        </div>
-                        ` : ''}
-                        ${data.comision_pago > 0 ? `
-                        <div class="col-6">
-                            <small class="text-muted">Comisión entrega:</small><br>
-                            <span class="text-danger">- ${data.comision_pago_formateado} (${data.metodo_pago.comision}%)</span>
-                        </div>
-                        ` : ''}
-                        ${data.descuento_pct > 0 ? `
-                        <div class="col-6">
-                            <small class="text-muted">Descuento aplicado por tipo cliente:</small><br>
-                            <span class="text-success">${data.descuento_pct}%</span>
-                        </div>
-                        ` : ''}
-                        <div class="col-12">
-                            <hr class="my-2">
-                            <div class="alert alert-success alert-sm mb-0">
-                                <i class="fas fa-money-bill-wave me-1"></i>
-                                <strong>Usted recibirá:</strong>  <span class="fs-5">${data.resultado_formateado}</span>
+                        <div class="col-md-6">
+                            <div class="p-3 bg-warning bg-opacity-10 rounded border border-warning text-center">
+                                <small class="text-muted d-block mb-1">Total a pagar</small>
+                                <div class="h2 mb-0 text-dark">
+                                    ${formatearPYG(totalAPagar)}
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <hr class="my-2">
-                    <div class="text-center">
-                        <small class="text-muted">${data.detalle}</small>
+                    
+                    <div class="border-top pt-3">
+                        <div class="row g-2 small">
+                            <div class="col-6">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Tasa base:</span>
+                                    <strong>₲ ${data.tasa_base.toLocaleString('es-PY')}</strong>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-success">Tasa aplicada:</span>
+                                    <strong class="text-success">₲ ${tasaAjustada.toLocaleString('es-PY')}</strong>
+                                </div>
+                            </div>
+                            <div class="col-12"><hr class="my-1"></div>
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Subtotal (cantidad × tasa):</span>
+                                    <strong>${formatearPYG(subtotal)}</strong>
+                                </div>
+                            </div>
+                            ${comisionCobro > 0 ? `
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between text-danger">
+                                    <span>+ Comisión cobro (${(comisionCobroPct * 100).toFixed(1)}%):</span>
+                                    <strong>${formatearPYG(comisionCobro)}</strong>
+                                </div>
+                            </div>
+                            ` : ''}
+                            ${comisionPago > 0 ? `
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between text-danger">
+                                    <span>+ Comisión entrega (${(comisionPagoPct * 100).toFixed(1)}%):</span>
+                                    <strong>${formatearPYG(comisionPago)}</strong>
+                                </div>
+                            </div>
+                            ` : ''}
+                            <div class="col-12"><hr class="my-1"></div>
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <strong class="text-primary">Total a pagar:</strong>
+                                    <strong class="text-primary h5 mb-0">${formatearPYG(totalAPagar)}</strong>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 `;
                 
                 // Validar límites antes de habilitar el botón de compra
-                // Para compras: validar el monto que el cliente va a pagar contra el límite de la moneda que se compra
                 try {
                     const limitesParams = new URLSearchParams({
-                        monto: datos.monto, // Monto a pagar
-                        moneda_origen: datos.destino // Moneda que se compra (AUD, USD, etc.)
+                        monto: Math.round(totalAPagar),
+                        moneda_origen: monedaComprar
                     });
-                    if (datos.cliente_id) limitesParams.append('cliente_id', datos.cliente_id);
+                    if (cliente.value) limitesParams.append('cliente_id', cliente.value);
                     
                     const limitesResponse = await fetch(`{% url 'transacciones:api_validar_limites' %}?${limitesParams.toString()}`);
                     const limitesResult = await limitesResponse.json();
                     
                     if (!limitesResult.valido) {
-                        // Agregar alerta de límites excedidos
                         const alertaLimites = `
-                            <div class="alert alert-danger alert-sm mt-2">
-                                <i class="fas fa-exclamation-triangle me-1"></i>
-                                <strong>Límites excedidos:</strong> ${limitesResult.mensaje}
+                            <div class="alert alert-danger mt-3 mb-0 py-2">
+                                <small><i class="fas fa-exclamation-triangle me-1"></i>
+                                ${limitesResult.mensaje}</small>
                             </div>
                         `;
                         previewContent.innerHTML += alertaLimites;
                         btnComprar.disabled = true;
                     } else {
-                        // Mostrar información de límites aplicables
                         if (limitesResult.limites_aplicados && limitesResult.limites_aplicados.length > 0) {
                             const infoLimites = `
-                                <div class="alert alert-info alert-sm mt-2">
-                                    <i class="fas fa-info-circle me-1"></i>
-                                    <strong>Límites aplicables:</strong><br>
-                                    <small>${limitesResult.limites_aplicados.join('<br>')}</small>
+                                <div class="mt-3 text-center">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle"></i> ${limitesResult.limites_aplicados[0]}
+                                    </small>
                                 </div>
                             `;
                             previewContent.innerHTML += infoLimites;
@@ -331,38 +401,51 @@ document.addEventListener('DOMContentLoaded', function() {
                         btnComprar.disabled = !formularioCompleto;
                     }
                 } catch (limitesError) {
+                    console.error('Error validando límites:', limitesError);
                     const formularioCompleto = validarFormularioCompleto();
-                    btnComprar.disabled = !formularioCompleto; // Validar formulario aunque no se puedan validar límites
+                    btnComprar.disabled = !formularioCompleto;
                 }
                 
+                // Guardar el total calculado para usarlo en el envío
+                form.dataset.totalCalculado = Math.round(totalAPagar);
+                form.dataset.cantidadDivisa = cantidadDeseada;
+                
                 preview.style.display = 'block';
+                preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } else {
-                previewContent.innerHTML = `<div class="text-danger">Error: ${result.error || 'Error desconocido'}</div>`;
+                previewContent.innerHTML = `
+                    <div class="alert alert-danger mb-0">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <strong>Error:</strong> ${result.error || 'No se pudo calcular el monto'}
+                    </div>
+                `;
                 preview.style.display = 'block';
                 btnComprar.disabled = true;
             }
         } catch (error) {
-            previewContent.innerHTML = '<div class="text-danger">Error al calcular. Intente nuevamente.</div>';
+            console.error('Error:', error);
+            previewContent.innerHTML = `
+                <div class="alert alert-danger mb-0">
+                    <i class="fas fa-times-circle me-2"></i>
+                    Error de conexión. Por favor, intente nuevamente.
+                </div>
+            `;
             preview.style.display = 'block';
             btnComprar.disabled = true;
         }
     }
     
-    // La información de límites se muestra directamente en el preview después del cálculo
-
     // Función para actualizar métodos de pago según moneda destino
     function actualizarMetodosPago() {
         const monedaDestinoCodigo = monedaDestino.value;
         
-        // Resetear el selector de método de pago
-        metodoPago.innerHTML = '<option value="">Seleccione un método de entrega</option>';
+        metodoPago.innerHTML = '<option value="">Seleccione cómo recibirá las divisas</option>';
         
         if (!monedaDestinoCodigo) {
             metodoPago.disabled = true;
             return;
         }
         
-        // Filtrar métodos de pago que permiten la moneda seleccionada
         const metodosPagoFiltrados = window.metodosPagoData.filter(metodo => {
             return metodo.monedas_permitidas.includes(monedaDestinoCodigo);
         });
@@ -378,11 +461,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const option = document.createElement('option');
             option.value = metodo.id;
             option.textContent = metodo.nombre;
-            if (metodo.comision && metodo.comision > 0) {
-                option.textContent += ` (${metodo.comision}% comisión)`;
-            } else {
-                option.textContent += ' (sin comisión)';
-            }
+            option.setAttribute('data-comision', metodo.comision || 0);
+            
             if (!metodo.activo) {
                 option.textContent += ' (Inactivo)';
                 option.disabled = true;
@@ -394,24 +474,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Event listeners
     btnCalcular.addEventListener('click', calcularPreview);
     
-    // Actualizar métodos de pago cuando cambie la moneda destino
-    monedaDestino.addEventListener('change', actualizarMetodosPago);
-    
-    // Auto-calcular cuando cambien los valores
-    [monto, monedaDestino, cliente, metodoCobro, metodoPago].forEach(element => {
-        element.addEventListener('change', function() {
-            if (monto.value && parseFloat(monto.value) > 0) {
-                calcularPreview();
-            } else {
-                // Si no hay monto válido, deshabilitar botón
-                btnComprar.disabled = true;
-                preview.style.display = 'none';
-            }
-        });
+    monedaDestino.addEventListener('change', function() {
+        actualizarMetodosPago();
+        preview.style.display = 'none';
+        btnComprar.disabled = true;
     });
     
-    // Validar formulario completo cuando cambien campos obligatorios
-    [cliente, metodoCobro, metodoPago].forEach(element => {
+    // Auto-calcular NO está habilitado, el usuario debe hacer clic en Calcular
+    
+    // Validar formulario cuando cambien campos obligatorios
+    [cliente, metodoCobro, metodoPago, cantidadDivisa].forEach(element => {
         element.addEventListener('change', function() {
             if (!validarFormularioCompleto()) {
                 btnComprar.disabled = true;
@@ -424,39 +496,44 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         
         if (!cliente.value) {
-            alert('Por favor seleccione un cliente. Las compras requieren cliente.');
+            alert('Por favor seleccione un cliente.');
             cliente.focus();
             return;
         }
         
         if (!metodoCobro.value) {
-            alert('Por favor seleccione un método de cobro.');
+            alert('Por favor seleccione un método de pago.');
             return;
         }
         
         if (!metodoPago.value) {
-            alert('Por favor seleccione un método de entrega/pago.');
+            alert('Por favor seleccione un método de entrega.');
             return;
         }
         
-        if (!monto.value || parseFloat(monto.value) <= 0) {
-            alert('Por favor ingrese un monto válido.');
+        if (!cantidadDivisa.value || parseFloat(cantidadDivisa.value) <= 0) {
+            alert('Por favor ingrese la cantidad de divisa que desea comprar.');
             return;
         }
         
-        // Enviar a iniciar_compra con metodo_cobro_id
+        // Verificar que se haya calculado el total
+        if (!form.dataset.totalCalculado) {
+            alert('Por favor haga clic en "Calcular" primero.');
+            return;
+        }
+        
+        // Enviar a iniciar_compra con la CANTIDAD DE DIVISA que quiere recibir
         const formData = new FormData();
         formData.append('csrfmiddlewaretoken', form.querySelector('[name=csrfmiddlewaretoken]').value);
-        formData.append('monto', monto.value);
+        formData.append('monto', cantidadDivisa.value); // La cantidad de divisa que quiere recibir
         formData.append('moneda_origen', 'PYG');
         formData.append('moneda_destino', monedaDestino.value);
         formData.append('cliente_id', cliente.value);
-        formData.append('metodo_cobro_id', metodoCobro.value); // Aquí usamos metodo_cobro_id
-        formData.append('metodo_pago_id', metodoPago.value); // Agregar método de pago
+        formData.append('metodo_cobro_id', metodoCobro.value);
+        formData.append('metodo_pago_id', metodoPago.value);
         
-        // Deshabilitar botón mientras se procesa
         btnComprar.disabled = true;
-        btnComprar.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Procesando...';
+        btnComprar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Procesando...';
         
         fetch('{% url "transacciones:iniciar_compra" %}', {
             method: 'POST',
@@ -464,14 +541,11 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => {
             if (response.redirected) {
-                // Si fue redirigido al dashboard, algo salió mal
                 if (response.url.includes('dashboard')) {
-                    // No redirigir automáticamente, mostrar error
                     return response.text().then(text => {
                         throw new Error('La transacción fue rechazada por el servidor');
                     });
                 } else {
-                    // Redirección exitosa (probablemente al resumen)
                     window.location.href = response.url;
                 }
             } else {
@@ -483,18 +557,16 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             alert('Error al procesar la compra: ' + error.message);
             btnComprar.disabled = false;
-            btnComprar.innerHTML = '<i class="fas fa-shopping-cart me-1"></i>Proceder con la Compra';
+            btnComprar.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Confirmar Compra';
         });
     });
     
-    // Configuración inicial de métodos de pago
+    // Configuración inicial
     actualizarMetodosPago();
     
-    // Si hay valores preseleccionados desde el simulador, hacer cálculo inicial
+    // Si hay valores preseleccionados, calcular automáticamente
     {% if cantidad_preseleccionada and moneda_destino_preseleccionada %}
-        // Esperar un momento para que se carguen los elementos
         setTimeout(function() {
-            const btnCalcular = document.getElementById('btnCalcular');
             if (btnCalcular) {
                 btnCalcular.click();
             }
