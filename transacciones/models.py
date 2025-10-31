@@ -428,14 +428,16 @@ class Transaccion(models.Model):
             if self.metodo_pago and self.metodo_pago.comision > 0:
                 comision_pago = monto_pyg_bruto * (Decimal(str(self.metodo_pago.comision)) / Decimal('100'))
         else:
-            # Para COMPRAS: las comisiones se calculan sobre el monto que paga el cliente (PYG)
-            monto_total_pagado = self.monto_origen
+            # Para COMPRAS: recalcular el subtotal desde el total almacenado
+            # monto_origen almacena el TOTAL (subtotal + comisiones)
+            # Necesitamos recalcular el subtotal: cantidad_divisa × tasa
+            subtotal_pyg = self.monto_destino * self.tasa_cambio
             
             if self.metodo_cobro and self.metodo_cobro.comision > 0:
-                comision_cobro = monto_total_pagado * (Decimal(str(self.metodo_cobro.comision)) / Decimal('100'))
+                comision_cobro = subtotal_pyg * (Decimal(str(self.metodo_cobro.comision)) / Decimal('100'))
             
             if self.metodo_pago and self.metodo_pago.comision > 0:
-                comision_pago = monto_total_pagado * (Decimal(str(self.metodo_pago.comision)) / Decimal('100'))
+                comision_pago = subtotal_pyg * (Decimal(str(self.metodo_pago.comision)) / Decimal('100'))
         
         comision_total = comision_cobro + comision_pago
         
@@ -450,11 +452,13 @@ class Transaccion(models.Model):
         if self.tipo_operacion.codigo == 'VENTA':
             # Para ventas: el cliente entrega divisa extranjera
             monto_base = self.monto_origen  # Divisa extranjera que entrega
+            subtotal_display = self.monto_origen  # Divisa que vende
             total_cliente = self.monto_origen  # Lo que entrega el cliente
         else:
-            # Para compras: el cliente paga PYG
-            monto_base = self.monto_origen  # PYG que paga
-            total_cliente = self.monto_origen  # Lo que paga el cliente
+            # Para compras: recalcular subtotal desde la cantidad de divisa × tasa
+            subtotal_display = self.monto_destino * self.tasa_cambio  # Subtotal en PYG antes de comisiones
+            monto_base = subtotal_display  # Monto base para mostrar
+            total_cliente = self.monto_origen  # Total que paga (incluye comisiones)
         
         # Formatear montos
         def formatear_monto(valor, moneda):
@@ -465,8 +469,8 @@ class Transaccion(models.Model):
         
         return {
             # Básicos
-            'subtotal': float(self.monto_origen),
-            'subtotal_formateado': formatear_monto(self.monto_origen, self.moneda_origen),
+            'subtotal': float(subtotal_display),
+            'subtotal_formateado': formatear_monto(subtotal_display, self.moneda_origen),
             
             # Comisiones - formatear según el tipo de operación
             'comision_cobro': float(comision_cobro),

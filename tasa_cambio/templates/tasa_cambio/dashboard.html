@@ -34,7 +34,7 @@
               </label>
             </div>
             <div class="form-text" id="operacionAyuda">
-              Comprando: Selecciona qué moneda quieres comprar y paga en Guaraníes
+              Comprando: Ingresa cuánta divisa quieres comprar y te calculamos cuánto pagarás en Guaraníes
             </div>
           </div>
 
@@ -42,24 +42,13 @@
           <div class="col-md-6">
             <label class="form-label">Cliente</label>
             <select id="cliente" class="form-select">
-              <option value="">Sin cliente (sin descuento)</option>
+              <option value="">Sin cliente</option>
               {% for c in clientes %}
-                <option value="{{ c.id }}">{{ c.nombre_comercial }} — {{ c.tipo_cliente.nombre }} ({{ c.tipo_cliente.descuento }}%)</option>
+                <option value="{{ c.id }}">{{ c.nombre_comercial }} — {{ c.tipo_cliente.nombre }}</option>
               {% empty %}
                 <option value="" disabled>No tiene clientes asociados</option>
               {% endfor %}
             </select>
-          </div>
-
-          <!-- Monto -->
-          <div class="col-md-3">
-            <label class="form-label" id="labelMonto">
-              <span id="textoMonto">Monto a pagar (en Guaraníes)</span>
-            </label>
-            <div class="input-group">
-              <span class="input-group-text" id="simboloMonto">₲</span>
-              <input id="monto" type="number" class="form-control" placeholder="0" step="any" min="0" value="1000000">
-            </div>
           </div>
 
           <!-- Moneda -->
@@ -74,6 +63,17 @@
                 {% endif %}
               {% endfor %}
             </select>
+          </div>
+
+          <!-- Monto -->
+          <div class="col-md-3">
+            <label class="form-label" id="labelMonto">
+              <span id="textoMonto">Cantidad que quiero comprar</span>
+            </label>
+            <div class="input-group">
+              <span class="input-group-text" id="simboloMonto">$</span>
+              <input id="monto" type="number" class="form-control" placeholder="100" step="any" min="0" value="100">
+            </div>
           </div>
 
           <!-- Resultado -->
@@ -160,15 +160,17 @@
       const esCompra = $operacionComprar.checked;
       
       if (esCompra) {
-        // QUIERO COMPRAR: Pagar en PYG, recibir otra moneda
-        $textoMonto.textContent = 'Monto a pagar (en Guaraníes)';
+        // QUIERO COMPRAR: Ingreso cantidad de divisa, calcula cuánto pagar en PYG
         $textoMoneda.textContent = 'Moneda que quiero comprar';
-        $simboloMonto.textContent = '₲';
-        $operacionAyuda.textContent = 'Comprando: Selecciona qué moneda quieres comprar y paga en Guaraníes';
-        $monto.placeholder = '1000000';
+        $textoMonto.textContent = 'Cantidad que quiero comprar';
+        const monedaSeleccionada = MONEDAS.find(m => m.codigo === $monedaOperacion.value);
+        const simboloMoneda = monedaSeleccionada ? getSimboloMoneda(monedaSeleccionada.codigo) : '$';
+        $simboloMonto.textContent = simboloMoneda;
+        $operacionAyuda.textContent = 'Comprando: Ingresa cuánta divisa quieres comprar y te calculamos cuánto pagarás en Guaraníes';
+        $monto.placeholder = '100';
       } else {
         // QUIERO VENDER: Entregar otra moneda, recibir PYG
-        $textoMonto.textContent = 'Monto que quiero vender';
+        $textoMonto.textContent = 'Cantidad que quiero vender';
         $textoMoneda.textContent = 'Moneda que quiero vender';
         const monedaSeleccionada = MONEDAS.find(m => m.codigo === $monedaOperacion.value);
         const simboloMoneda = monedaSeleccionada ? getSimboloMoneda(monedaSeleccionada.codigo) : '$';
@@ -203,24 +205,25 @@
         return;
       }
 
-      // Determinar origen y destino según el tipo de operación
-      let origen, destino;
       if (esCompra) {
-        // COMPRAR: PYG -> Otra moneda
-        origen = 'PYG';
-        destino = monedaOperacion;
+        // COMPRAR: Usuario especifica cuánta divisa quiere, calculamos PYG a pagar
+        // Necesitamos la tasa de VENTA
+        simularCompra(monto, monedaOperacion, cliente);
       } else {
-        // VENDER: Otra moneda -> PYG
-        origen = monedaOperacion;
-        destino = 'PYG';
+        // VENDER: Usuario especifica cuánta divisa vende, calculamos PYG a recibir  
+        // Necesitamos la tasa de COMPRA
+        simularVenta(monto, monedaOperacion, cliente);
       }
-
+    }
+    
+    function simularCompra(cantidadDivisa, codigoMoneda, clienteId) {
+      // Para compra: consultamos PYG -> Moneda para obtener la tasa de venta
       const params = new URLSearchParams({
-        monto: String(monto),
-        origen: String(origen),
-        destino: String(destino),
+        monto: '1',  // Consultamos 1 PYG para obtener el precio unitario
+        origen: 'PYG',
+        destino: codigoMoneda,
       });
-      if (cliente) params.append('cliente_id', cliente);
+      if (clienteId) params.append('cliente_id', clienteId);
 
       fetch(`{% url 'tasa_cambio:simular_cambio_api' %}?${params.toString()}`)
         .then(r => r.json())
@@ -230,11 +233,77 @@
             $resDetalle.textContent = data.message || 'Error en la simulación.';
             $resTasas.textContent = '';
             $resDesc.textContent = '';
+            document.getElementById('enlace_compra_container').style.display = 'none';
             return;
           }
+          
           const d = data.data;
+          // Obtener el precio de venta desde la respuesta
+          const tasaVenta = d.tasa_destino ? parseFloat(d.tasa_destino.valor) : 0;
+          
+          if (tasaVenta <= 0) {
+            $resValor.textContent = '—';
+            $resDetalle.textContent = 'No se pudo obtener la tasa de venta.';
+            return;
+          }
+          
+          // Calcular PYG necesarios: cantidad_divisa × tasa_venta
+          const cantidad = parseFloat(cantidadDivisa);
+          const pygNecesarios = Math.round(cantidad * tasaVenta);
+          
+          // Mostrar resultado
+          $resValor.textContent = `₲ ${formatNumberWithDots(pygNecesarios)}`;
+          $resDetalle.textContent = `Para comprar ${cantidadDivisa} ${codigoMoneda}, debes pagar:`;
+          
+          // Mostrar tasa usada
+          $resTasas.textContent = `Tasa usada: ${codigoMoneda} (${d.tasa_destino.tipo}): ${formatNumberWithDots(tasaVenta)}`;
+          
+          // Mostrar descuento si aplica
+          if (d.cliente && d.cliente.descuento > 0) {
+            $resDesc.textContent = `Cliente: ${d.cliente.nombre} — ${d.cliente.tipo} `;
+          } else {
+            $resDesc.textContent = '';
+          }
+          
+          // Limpiar campos no usados en compra
+          const $resSubtotal = document.getElementById('resultado_subtotal');
+          const $resComision = document.getElementById('resultado_comision');
+          if ($resSubtotal) $resSubtotal.textContent = '';
+          if ($resComision) $resComision.textContent = '';
+          
+          // Mostrar solo el botón de compra
+          document.getElementById('enlace_compra_container').style.display = 'block';
+          document.getElementById('enlace_venta_container').style.display = 'none';
+        })
+        .catch((error) => {
+          console.error('Error en simulación de compra:', error);
+          mostrarError('No se pudo simular. Error: ' + (error.message || 'Desconocido'));
+        });
+    }
+    
+    function simularVenta(cantidadDivisa, codigoMoneda, clienteId) {
+      // Para venta: consultamos Moneda -> PYG para usar tasa de compra
+      const params = new URLSearchParams({
+        monto: String(cantidadDivisa),
+        origen: codigoMoneda,
+        destino: 'PYG',
+      });
+      if (clienteId) params.append('cliente_id', clienteId);
+
+      fetch(`{% url 'tasa_cambio:simular_cambio_api' %}?${params.toString()}`)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success) {
+            mostrarError(data.message || 'Error en la simulación.');
+            return;
+          }
+          
+          const d = data.data;
+          
+          // Mostrar resultado
           $resValor.textContent = formatDisplayWithDots(d.resultado_formateado);
           $resDetalle.textContent = d.detalle;
+          
           const $resSubtotal = document.getElementById('resultado_subtotal');
           const $resComision = document.getElementById('resultado_comision');
           if (d.subtotal_formateado) {
@@ -243,35 +312,42 @@
           if (d.comision_pct && d.comision_monto_formateado) {
             $resComision.textContent = `Comisión (${d.comision_pct}%): ${formatDisplayWithDots(d.comision_monto_formateado)}`;
           } else { $resComision.textContent = ''; }
+          
           const t1 = d.tasa_origen ? `${d.tasa_origen.moneda} (${d.tasa_origen.tipo}): ${d.tasa_origen.valor}` : null;
-          const t2 = d.tasa_destino ? `${d.tasa_destino.moneda} (${d.tasa_destino.tipo}): ${d.tasa_destino.valor}` : null;
-          const parts = [t1, t2].filter(Boolean);
+          const parts = [t1].filter(Boolean);
           $resTasas.textContent = parts.length ? `Tasas usadas: ${parts.join(' · ')}` : '';
+          
           if (d.cliente && d.cliente.descuento > 0) {
-            $resDesc.textContent = `Cliente: ${d.cliente.nombre} — ${d.cliente.tipo} (descuento ${d.cliente.descuento}%)`;
+            $resDesc.textContent = `Cliente: ${d.cliente.nombre} — ${d.cliente.tipo}`;
           } else {
             $resDesc.textContent = '';
           }
           
-          // Mostrar botón apropiado según el tipo de operación
-          const esCompra = $operacionComprar.checked;
-          document.getElementById('enlace_compra_container').style.display = esCompra ? 'block' : 'none';
-          document.getElementById('enlace_venta_container').style.display = !esCompra ? 'block' : 'none';
-        })
-        .catch(() => {
-          $resValor.textContent = '—';
-          $resDetalle.textContent = 'No se pudo simular.';
-          $resTasas.textContent = '';
-          $resDesc.textContent = '';
-          const $resSubtotal = document.getElementById('resultado_subtotal');
-          const $resComision = document.getElementById('resultado_comision');
-          if ($resSubtotal) $resSubtotal.textContent = '';
-          if ($resComision) $resComision.textContent = '';
-          
-          // Ocultar botones si hay error
+          // Mostrar solo el botón de venta
           document.getElementById('enlace_compra_container').style.display = 'none';
-          document.getElementById('enlace_venta_container').style.display = 'none';
+          document.getElementById('enlace_venta_container').style.display = 'block';
+        })
+        .catch((error) => {
+          console.error('Error en simulación de venta:', error);
+          mostrarError('No se pudo simular. Error: ' + (error.message || 'Desconocido'));
         });
+    }
+    
+    function mostrarError(mensaje) {
+      $resValor.textContent = '—';
+      $resDetalle.textContent = mensaje;
+      $resTasas.textContent = '';
+      $resDesc.textContent = '';
+      const $resSubtotal = document.getElementById('resultado_subtotal');
+      const $resComision = document.getElementById('resultado_comision');
+      if ($resSubtotal) $resSubtotal.textContent = '';
+      if ($resComision) $resComision.textContent = '';
+      document.getElementById('enlace_compra_container').style.display = 'none';
+      document.getElementById('enlace_venta_container').style.display = 'none';
+    }
+    
+    function formatNumberWithDots(num) {
+      return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     }
     
     function limpiarResultados() {
