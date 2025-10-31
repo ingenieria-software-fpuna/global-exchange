@@ -40,8 +40,9 @@
                         <i class="fas fa-info-circle me-2"></i>
                         <strong>Sobre las notificaciones:</strong>
                         <ul class="mb-0 mt-2">
-                            <li>Siempre recibirás notificaciones dentro del sistema (popup y página de notificaciones)</li>
-                            <li>Opcionalmente, puedes activar el envío de notificaciones por correo electrónico</li>
+                            <li>Las notificaciones de cambio de tasa siempre se muestran dentro del sistema</li>
+                            <li>Puedes recibir notificaciones de tasas de cambio por correo electrónico</li>
+                            <li>Puedes recibir notificaciones de pagos exitosos por correo electrónico</li>
                             <li>Los correos se enviarán a: <strong>{{ user.email }}</strong></li>
                         </ul>
                     </div>
@@ -55,8 +56,40 @@
                                 <div class="d-flex align-items-center justify-content-between">
                                     <div>
                                         <h5 class="mb-1">
+                                            <i class="fas fa-check-circle me-2 text-success"></i>
+                                            Notificaciones de Pagos Exitosos (Email)
+                                        </h5>
+                                        <p class="text-muted mb-0">
+                                            Recibe un correo electrónico cada vez que realices un pago exitoso
+                                        </p>
+                                    </div>
+                                    <div class="form-check form-switch ms-3">
+                                        {{ form.recibir_notificaciones_pago }}
+                                        <label class="form-check-label" for="{{ form.recibir_notificaciones_pago.id_for_label }}">
+                                            {% if form.recibir_notificaciones_pago.value %}
+                                                <span class="badge bg-success">Activado</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Desactivado</span>
+                                            {% endif %}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% if form.recibir_notificaciones_pago.help_text %}
+                                    <small class="form-text text-muted d-block mt-2">
+                                        <i class="fas fa-lightbulb me-1"></i>
+                                        {{ form.recibir_notificaciones_pago.help_text }}
+                                    </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <h5 class="mb-1">
                                             <i class="fas fa-envelope me-2 text-primary"></i>
-                                            Notificaciones por Email
+                                            Notificaciones de Tasas de Cambio (Email)
                                         </h5>
                                         <p class="text-muted mb-0">
                                             Recibe un correo electrónico cada vez que cambie una tasa de cambio
@@ -108,36 +141,50 @@
                         <div class="accordion-item">
                             <h2 class="accordion-header">
                                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
-                                    ¿Cuándo recibiré los correos?
+                                    ¿Cuándo recibiré emails de pagos exitosos?
                                 </button>
                             </h2>
                             <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                                 <div class="accordion-body">
-                                    Recibirás un correo inmediatamente después de que se registre un cambio en cualquier tasa de cambio del sistema.
+                                    Recibirás un correo electrónico inmediatamente después de completar un pago exitoso. El email incluirá el monto, método de pago y detalles completos de la transacción.
                                 </div>
                             </div>
                         </div>
                         <div class="accordion-item">
                             <h2 class="accordion-header">
                                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
-                                    ¿Puedo desactivar los correos en cualquier momento?
+                                    ¿Cuándo recibiré los correos de cambio de tasa?
                                 </button>
                             </h2>
                             <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                                 <div class="accordion-body">
-                                    Sí, puedes activar o desactivar esta función en cualquier momento desde esta página. Los cambios son inmediatos.
+                                    Si activas esta opción, recibirás un correo inmediatamente después de que se registre un cambio en cualquier tasa de cambio del sistema. Las notificaciones en el sistema siempre estarán activas.
                                 </div>
                             </div>
                         </div>
                         <div class="accordion-item">
                             <h2 class="accordion-header">
                                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
-                                    ¿Seguiré viendo notificaciones en el sistema si desactivo los correos?
+                                    ¿Puedo desactivar los correos en cualquier momento?
                                 </button>
                             </h2>
                             <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                                 <div class="accordion-body">
-                                    Sí, las notificaciones dentro del sistema (popup y página de notificaciones) siempre estarán activas. Esta opción solo controla el envío por correo electrónico.
+                                    Sí, puedes activar o desactivar estas funciones en cualquier momento desde esta página. Los cambios son inmediatos y cada tipo de notificación (pagos y tasas) se puede configurar independientemente.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                                    ¿Qué correos recibiré?
+                                </button>
+                            </h2>
+                            <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    <strong>Pagos Exitosos:</strong> Confirmación inmediata por email cuando completes un pago (activado por defecto).<br>
+                                    <strong>Tasas de Cambio:</strong> Notificación cuando cambie cualquier tasa de cambio del sistema (opcional).<br><br>
+                                    Ambas opciones se pueden activar/desactivar independientemente.
                                 </div>
                             </div>
                         </div>

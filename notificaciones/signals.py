@@ -197,3 +197,77 @@ def enviar_emails_notificacion(usuarios_con_email, moneda, precio_anterior, prec
         except Exception as e:
             # Log del error (en producción usar logging)
             print(f"Error enviando email a {usuario.email}: {e}")
+
+
+def notificar_pago_exitoso(transaccion, monto_pago, moneda_pago, metodo_pago):
+    """
+    Envía un correo electrónico al usuario cuando realiza un pago exitoso.
+    Solo envía el email si el usuario tiene activada la preferencia recibir_notificaciones_pago.
+    
+    Args:
+        transaccion: Objeto Transaccion relacionado con el pago
+        monto_pago: Monto del pago realizado (Decimal)
+        moneda_pago: Código de la moneda del pago (str)
+        metodo_pago: Método de pago utilizado (str)
+    """
+    usuario = transaccion.usuario
+    
+    # Verificar si el usuario tiene activada la preferencia de notificaciones de pago
+    if not usuario.recibir_notificaciones_pago:
+        return
+    
+    # Obtener el objeto moneda
+    try:
+        from monedas.models import Moneda
+        moneda_obj = Moneda.objects.get(codigo=moneda_pago)
+        monto_formateado = moneda_obj.formatear_monto(monto_pago)
+    except Moneda.DoesNotExist:
+        monto_formateado = f"{moneda_pago} {monto_pago:,.2f}"
+    
+    # Determinar el tipo de operación para el mensaje
+    if transaccion.tipo_operacion.codigo == 'COMPRA':
+        tipo_operacion = 'Compra'
+        descripcion_operacion = f"{transaccion.monto_destino} {transaccion.moneda_destino.codigo}"
+    else:
+        tipo_operacion = 'Venta'
+        descripcion_operacion = f"{transaccion.monto_origen} {transaccion.moneda_origen.codigo}"
+    
+    # Asunto del correo
+    asunto = f"✅ Pago Exitoso - Transacción #{transaccion.id_transaccion}"
+    
+    # URL del sitio
+    url_sitio = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+    
+    # Contexto para el template
+    context = {
+        'usuario': usuario,
+        'transaccion': transaccion,
+        'monto_pago': monto_pago,
+        'monto_formateado': monto_formateado,
+        'moneda_pago': moneda_pago,
+        'metodo_pago': metodo_pago,
+        'tipo_operacion': tipo_operacion,
+        'descripcion_operacion': descripcion_operacion,
+        'url_sitio': url_sitio,
+        'fecha_pago': transaccion.fecha_pago,
+    }
+    
+    try:
+        # Renderizar el template HTML
+        html_message = render_to_string('notificaciones/email_pago_exitoso.html', context)
+        
+        # Enviar el correo
+        send_mail(
+            subject=asunto,
+            message='',  # Mensaje en texto plano (vacío porque usamos HTML)
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[usuario.email],
+            html_message=html_message,
+            fail_silently=True,
+        )
+        print(f"✓ Email de pago exitoso enviado a {usuario.email}")
+    except Exception as e:
+        # Log del error
+        print(f"Error enviando email de pago exitoso a {usuario.email}: {e}")
+
+

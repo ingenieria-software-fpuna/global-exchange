@@ -27,6 +27,7 @@ from tasa_cambio.models import TasaCambio
 from configuracion.models import ConfiguracionSistema
 from django.db.models import Sum
 from datetime import datetime, timedelta
+from notificaciones.signals import notificar_pago_exitoso
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,14 @@ def _procesar_pago_con_pasarela(request, transaccion, datos_formulario, nombre_m
                                 transaccion.observaciones += f"\n{key}: {value}"
                     
                     transaccion.save()
+                    
+                    # Crear notificación de pago exitoso
+                    notificar_pago_exitoso(
+                        transaccion=transaccion,
+                        monto_pago=monto_pago,
+                        moneda_pago=moneda_pago,
+                        metodo_pago=nombre_metodo
+                    )
                     
                     messages.success(request, f'¡Pago procesado exitosamente con {nombre_metodo.lower()}!')
                     return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion.id_transaccion)
@@ -404,6 +413,14 @@ def webhook_pago(request):
                 pago_pasarela.transaccion.observaciones += f"\nPago confirmado por webhook el {timezone.now()}"
                 pago_pasarela.transaccion.save()
                 
+                # Crear notificación de pago exitoso
+                notificar_pago_exitoso(
+                    transaccion=pago_pasarela.transaccion,
+                    monto_pago=pago_pasarela.monto,
+                    moneda_pago=pago_pasarela.moneda,
+                    metodo_pago=pago_pasarela.metodo_pasarela
+                )
+                
             elif estado.lower() == 'fallo':
                 # Si el pago falló, agregar información del motivo
                 motivo_rechazo = data.get('motivo_rechazo', 'Fallo reportado por la pasarela')
@@ -677,6 +694,14 @@ def stripe_success(request):
                         transaccion.observaciones += f"\nPago confirmado con Stripe el {timezone.now()}"
                         transaccion.observaciones += f"\nPayment Intent: {resultado['payment_intent']}"
                         transaccion.save()
+                        
+                        # Crear notificación de pago exitoso
+                        notificar_pago_exitoso(
+                            transaccion=transaccion,
+                            monto_pago=pago_pasarela.monto,
+                            moneda_pago=pago_pasarela.moneda,
+                            metodo_pago='Stripe'
+                        )
 
                         messages.success(request, '¡Pago procesado exitosamente con Stripe!')
                     else:
@@ -780,6 +805,14 @@ def stripe_webhook(request):
                             pago_pasarela.transaccion.fecha_pago = timezone.now()
                             pago_pasarela.transaccion.observaciones += f"\nPago confirmado por webhook Stripe el {timezone.now()}"
                             pago_pasarela.transaccion.save()
+                            
+                            # Crear notificación de pago exitoso
+                            notificar_pago_exitoso(
+                                transaccion=pago_pasarela.transaccion,
+                                monto_pago=pago_pasarela.monto,
+                                moneda_pago=pago_pasarela.moneda,
+                                metodo_pago='Stripe'
+                            )
 
                             logger.info(f"Transacción {pago_pasarela.transaccion.id_transaccion} marcada como pagada")
 

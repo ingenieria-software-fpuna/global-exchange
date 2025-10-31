@@ -1,0 +1,205 @@
+{% load tz %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pago Exitoso</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #000000 !important;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            color: #000000 !important;
+        }
+        .header {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #28a745;
+            margin-bottom: 30px;
+        }
+        .header h2 {
+            color: #000000 !important;
+            margin: 0;
+        }
+        p {
+            color: #000000 !important;
+            margin: 15px 0;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+            margin-bottom: 10px;
+        }
+        .success-icon {
+            font-size: 64px;
+            margin: 20px 0;
+        }
+        .pago-container {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: #ffffff !important;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 30px 0;
+        }
+        .pago-container * {
+            color: #ffffff !important;
+        }
+        .monto-pago {
+            font-size: 36px;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        .metodo-pago {
+            font-size: 18px;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+        .detalles-table {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .detalles-table * {
+            color: #000000 !important;
+        }
+        .detalle-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .detalle-item:last-child {
+            border-bottom: none;
+        }
+        .detalle-label {
+            font-weight: 600;
+            color: #495057 !important;
+        }
+        .detalle-valor {
+            color: #212529 !important;
+            text-align: right;
+        }
+        .info-box {
+            background: #e7f5ff;
+            border-left: 4px solid #007bff;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .info-box * {
+            color: #000000 !important;
+        }
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .warning-box * {
+            color: #000000 !important;
+        }
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            margin-top: 30px;
+            font-size: 12px;
+            color: #666;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #28a745;
+            color: white !important;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">Global Exchange</div>
+            <div class="success-icon">✅</div>
+            <h2>¡Pago Procesado Exitosamente!</h2>
+        </div>
+        
+        <p>Hola <strong>{{ usuario.nombre }}</strong>,</p>
+        
+        <p>Tu pago ha sido procesado con éxito. A continuación, encontrarás los detalles de tu transacción:</p>
+        
+        <div class="pago-container">
+            <div style="font-size: 16px; opacity: 0.9; margin-bottom: 10px;">Monto Pagado</div>
+            <div class="monto-pago">{{ monto_formateado }}</div>
+            <div class="metodo-pago">💳 {{ metodo_pago }}</div>
+        </div>
+        
+        <div class="detalles-table">
+            <div class="detalle-item">
+                <div class="detalle-label">ID de Transacción:</div>
+                <div class="detalle-valor"><strong>{{ transaccion.id_transaccion }}</strong></div>
+            </div>
+            <div class="detalle-item">
+                <div class="detalle-label">Tipo de Operación:</div>
+                <div class="detalle-valor">{{ tipo_operacion }}</div>
+            </div>
+            <div class="detalle-item">
+                <div class="detalle-label">Monto de Operación:</div>
+                <div class="detalle-valor">{{ descripcion_operacion }}</div>
+            </div>
+            <div class="detalle-item">
+                <div class="detalle-label">Fecha y Hora:</div>
+                <div class="detalle-valor">{{ fecha_pago|localtime|date:"d/m/Y H:i" }}</div>
+            </div>
+            <div class="detalle-item">
+                <div class="detalle-label">Estado:</div>
+                <div class="detalle-valor"><span style="color: #28a745 !important;">✓ Pagado</span></div>
+            </div>
+        </div>
+        
+        <div class="info-box">
+            <strong>ℹ️ Información:</strong>
+            <p style="margin: 10px 0 0 0;">
+                Tu transacción ha sido confirmada y procesada correctamente. Puedes ver los detalles completos 
+                en tu historial de transacciones.
+            </p>
+        </div>
+        
+        <div class="warning-box">
+            <strong>🔒 Seguridad:</strong>
+            <p style="margin: 10px 0 0 0;">
+                Si no reconoces esta transacción, por favor contacta inmediatamente a nuestro equipo de soporte.
+            </p>
+        </div>
+        
+        <p style="margin-top: 30px; font-size: 14px;">
+            💡 <strong>Nota:</strong> Puedes desactivar las notificaciones de pago por correo en cualquier momento 
+            desde tu <a href="{{ url_sitio }}/notificaciones/preferencias/" style="color: #007bff;">panel de preferencias</a>.
+        </p>
+        
+        <div class="footer">
+            <p><strong>Global Exchange</strong><br>Sistema de Gestión de Cambio de Monedas</p>
+            <p>Este es un correo automático, por favor no responder.</p>
+            <p style="margin-top: 10px; color: #999;">
+                Si tienes alguna pregunta, contáctanos en: soporte@globalexchange.com
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -8,10 +8,11 @@ Usuario = get_user_model()
 
 class Notificacion(models.Model):
     """
-    Modelo para representar notificaciones de cambios en tasas de cambio a los usuarios.
+    Modelo para representar notificaciones de cambios en tasas de cambio y pagos exitosos a los usuarios.
     """
     TIPO_CHOICES = [
         ('tasa_cambio', 'Cambio de Tasa'),
+        ('pago_exitoso', 'Pago Exitoso'),
     ]
 
     usuario = models.ForeignKey(
@@ -85,6 +86,27 @@ class Notificacion(models.Model):
         null=True,
         blank=True,
         help_text="Comisión de venta nueva (si aplica)"
+    )
+    
+    # Campos adicionales para notificaciones de pago
+    transaccion_id = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text="ID de la transacción relacionada (si aplica)"
+    )
+    monto_pago = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Monto del pago realizado (si aplica)"
+    )
+    metodo_pago = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text="Método de pago utilizado (si aplica)"
     )
 
     class Meta:

@@ -53,6 +53,12 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
         help_text="Si está activado, recibirás notificaciones de cambios en tasas por correo electrónico"
     )
     
+    recibir_notificaciones_pago = models.BooleanField(
+        default=True,
+        verbose_name="Recibir notificaciones de pagos exitosos por email",
+        help_text="Si está activado, recibirás un correo electrónico cada vez que realices un pago exitoso"
+    )
+    
     # Campos de auditoría
     fecha_creacion = models.DateTimeField(default=timezone.now, verbose_name="Fecha de creación")
     fecha_actualizacion = models.DateTimeField(auto_now=True, verbose_name="Fecha de actualización")
