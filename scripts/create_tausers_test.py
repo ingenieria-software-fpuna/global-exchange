@@ -8,7 +8,7 @@ Crea múltiples Tausers con stock de al menos 3 monedas y movimientos de histori
 import os
 import sys
 import django
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import random
 from datetime import datetime, timedelta
 
@@ -148,7 +148,7 @@ def crear_tausers_ejemplo(datos, cantidad=5):
                     tipo_movimiento='ENTRADA',
                     origen_movimiento='MANUAL',
                     cantidad_movida=cantidad_inicial,
-                    cantidad_anterior=Decimal('0.00'),
+                    cantidad_anterior=Decimal('0'),
                     cantidad_posterior=cantidad_inicial,
                     usuario=operador,
                     observaciones=f'Stock inicial creado para {moneda.nombre}'
@@ -164,14 +164,24 @@ def crear_tausers_ejemplo(datos, cantidad=5):
                     # Tipo de movimiento (70% entradas, 30% salidas)
                     if random.random() < 0.7:
                         # Entrada
-                        cantidad_movida = (cantidad_inicial * Decimal(str(random.uniform(0.1, 0.3)))).quantize(Decimal('0.01'))
+                        cantidad_movida = (
+                            cantidad_inicial
+                            * Decimal(str(random.uniform(0.1, 0.3)))
+                        ).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+                        if cantidad_movida <= 0:
+                            cantidad_movida = Decimal('1')
                         cantidad_anterior = cantidad_actual
                         cantidad_actual += cantidad_movida
                         tipo_movimiento = 'ENTRADA'
                         observacion = f'Carga de stock - {cantidad_movida} {moneda.simbolo}'
                     else:
                         # Salida
-                        cantidad_movida = (cantidad_inicial * Decimal(str(random.uniform(0.05, 0.15)))).quantize(Decimal('0.01'))
+                        cantidad_movida = (
+                            cantidad_inicial
+                            * Decimal(str(random.uniform(0.05, 0.15)))
+                        ).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+                        if cantidad_movida <= 0:
+                            cantidad_movida = Decimal('1')
                         if cantidad_movida < cantidad_actual:  # Solo si hay suficiente stock
                             cantidad_anterior = cantidad_actual
                             cantidad_actual -= cantidad_movida
@@ -181,6 +191,8 @@ def crear_tausers_ejemplo(datos, cantidad=5):
                             continue  # Saltar este movimiento si no hay suficiente stock
 
                     # Crear movimiento en historial
+                    cantidad_actual = cantidad_actual.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+
                     historial = HistorialStock.objects.create(
                         stock=stock,
                         tipo_movimiento=tipo_movimiento,
@@ -198,7 +210,7 @@ def crear_tausers_ejemplo(datos, cantidad=5):
                     )
 
                 # Actualizar stock con la cantidad final
-                stock.cantidad = cantidad_actual
+                stock.cantidad = cantidad_actual.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
                 stock.save()
 
             tausers_creados += 1
@@ -248,7 +260,7 @@ def mostrar_estadisticas():
     for tauser in Tauser.objects.filter(es_activo=True):
         total_stock = sum(stock.cantidad for stock in tauser.stocks.filter(es_activo=True))
         if total_stock > 0:
-            print(f"  • {tauser.nombre}: {total_stock:,.2f} total")
+            print(f"  • {tauser.nombre}: {int(total_stock):,} total")
 
 
 def verificar_datos():

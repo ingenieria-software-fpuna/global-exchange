@@ -25,7 +25,7 @@ def crear_monedas_ejemplo():
             'nombre': 'Guaraní',
             'codigo': 'PYG',
             'simbolo': '₲',
-            'decimales': 0
+            'decimales': 0,
             # NO tiene precio_base, comision_compra, comision_venta porque es la moneda base,
             'denominaciones': [
                 {'valor': 100000, 'tipo': 'BILLETE'},

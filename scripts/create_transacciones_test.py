@@ -8,7 +8,7 @@ Crea múltiples transacciones para operadores con diferentes estados y tipos.
 import os
 import sys
 import django
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import random
 from datetime import datetime, timedelta
 
@@ -128,7 +128,7 @@ def obtener_tasa_para_monedas(moneda_origen, moneda_destino, tasas_cambio):
             return tasa.precio_base - tasa.comision_compra
 
     # Tasa por defecto si no se encuentra
-    return Decimal('7500.00')
+    return Decimal('7500')
 
 
 def generar_fecha_realista():
@@ -251,10 +251,10 @@ def crear_transacciones_ejemplo(datos, cantidad=100):
             # Calcular monto destino
             if moneda_origen.codigo == 'PYG':
                 # PYG -> Divisa extranjera
-                monto_destino = (monto_origen / tasa_cambio).quantize(Decimal('0.01'))
+                monto_destino = (monto_origen / tasa_cambio).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
             else:
                 # Divisa extranjera -> PYG
-                monto_destino = (monto_origen * tasa_cambio).quantize(Decimal('0.01'))
+                monto_destino = (monto_origen * tasa_cambio).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
             # Seleccionar métodos de pago/cobro
             metodo_cobro = random.choice(datos['metodos_cobro']) if datos['metodos_cobro'] else None
@@ -264,15 +264,18 @@ def crear_transacciones_ejemplo(datos, cantidad=100):
             tauser = random.choice(datos['tausers']) if random.random() < 0.3 else None
 
             # Calcular comisiones básicas
-            porcentaje_comision = Decimal(str(random.uniform(0.5, 2.0)))  # 0.5% - 2%
-            monto_comision = (monto_origen * porcentaje_comision / 100).quantize(Decimal('0.01'))
+            porcentaje_comision = Decimal(random.randint(1, 3))
+            monto_comision = (monto_origen * porcentaje_comision / 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
             # Descuento del cliente
-            porcentaje_descuento = Decimal('0.00')
-            monto_descuento = Decimal('0.00')
+            porcentaje_descuento = Decimal('0')
+            monto_descuento = Decimal('0')
             if cliente and cliente.tipo_cliente:
                 porcentaje_descuento = cliente.tipo_cliente.descuento
-                monto_descuento = (monto_comision * porcentaje_descuento / 100).quantize(Decimal('0.01'))
+                monto_descuento_bruto = (monto_comision * porcentaje_descuento / 100)
+                monto_descuento = monto_descuento_bruto.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+                if monto_descuento_bruto > 0 and monto_descuento == 0:
+                    monto_descuento = Decimal('1')
 
             # Generar fecha realista
             fecha_creacion = generar_fecha_realista()
