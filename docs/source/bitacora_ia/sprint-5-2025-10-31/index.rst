@@ -13,6 +13,7 @@ Sesiones de IA
    cursor_cambiar_id_transacci_n_por_c_dig
    cursor_filtrar_monedas_por_m_todo_de_pa
    cursor_mejorar_vista_de_cotizaciones_en
+   chat_export
 
 Resumen del Sprint
 ------------------
