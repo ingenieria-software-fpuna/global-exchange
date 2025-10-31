@@ -16,6 +16,8 @@
             <span class="badge fs-6 px-3 py-2 
               {% if transaccion.estado.codigo == 'PENDIENTE' %}bg-warning text-dark
               {% elif transaccion.estado.codigo == 'PAGADA' %}bg-success
+              {% elif transaccion.estado.codigo == 'ENTREGADA' %}bg-info
+              {% elif transaccion.estado.codigo == 'RETIRADO' %}bg-primary
               {% elif transaccion.estado.codigo == 'CANCELADA' %}bg-danger
               {% elif transaccion.estado.codigo == 'ANULADA' %}bg-secondary
               {% endif %}">
@@ -42,7 +44,7 @@
 
       <!-- Observaciones (si las hay) -->
       {% if transaccion.observaciones %}
-        {% if transaccion.estado.codigo == 'PAGADA' %}
+        {% if transaccion.estado.codigo == 'PAGADA' or transaccion.estado.codigo == 'ENTREGADA' or transaccion.estado.codigo == 'RETIRADO' %}
         <div class="alert alert-success mb-4" style="border-left: 4px solid #198754;">
           <h5 class="alert-heading mb-2">
             <i class="fas fa-check-circle"></i> Observaciones
@@ -280,7 +282,19 @@
             <div class="text-muted">
               {% if transaccion.estado.codigo == 'PAGADA' %}
                 <i class="fas fa-check-circle text-success fs-3"></i>
-                <p class="mt-2">Esta transacción ha sido completada exitosamente.</p>
+                <p class="mt-2">
+                  {% if transaccion.tipo_operacion.codigo == 'COMPRA' %}
+                    Esta transacción ha sido pagada. Puede retirar sus divisas en el Tauser.
+                  {% else %}
+                    Esta transacción ha sido pagada. {% if transaccion.metodo_cobro.requiere_retiro_fisico %}Puede retirar sus guaraníes en el Tauser.{% else %}El pago fue procesado.{% endif %}
+                  {% endif %}
+                </p>
+              {% elif transaccion.estado.codigo == 'ENTREGADA' %}
+                <i class="fas fa-hand-holding-usd text-info fs-3"></i>
+                <p class="mt-2">Las divisas han sido entregadas al cliente. Transacción completada.</p>
+              {% elif transaccion.estado.codigo == 'RETIRADO' %}
+                <i class="fas fa-money-bill-wave text-primary fs-3"></i>
+                <p class="mt-2">Los guaraníes han sido retirados por el cliente. Transacción completada.</p>
               {% elif transaccion.estado.codigo == 'CANCELADA' %}
                 <i class="fas fa-times-circle text-danger fs-3"></i>
                 <p class="mt-2">Esta transacción fue cancelada.</p>
@@ -298,10 +312,14 @@
               <i class="fas fa-arrow-left me-2"></i>
               Ir al Simulador
             </a>
-            {% if transaccion.estado.codigo == 'PAGADA' %}
+            {% if transaccion.estado.codigo == 'PAGADA' and transaccion.requiere_retiro_fisico %}
             <a href="{% url 'tauser:simulador_cajero' %}" class="btn btn-success ms-2">
               <i class="fas fa-cash-register me-2"></i>
-              Retirar Efectivo
+              {% if transaccion.tipo_operacion.codigo == 'COMPRA' %}
+                Retirar Divisas
+              {% else %}
+                Retirar Guaraníes
+              {% endif %}
             </a>
             {% endif %}
           </div>

@@ -68,12 +68,16 @@ class EstadoTransaccion(models.Model):
     """
     PENDIENTE = 'PENDIENTE'
     PAGADA = 'PAGADA'
+    ENTREGADA = 'ENTREGADA'
+    RETIRADO = 'RETIRADO'
     CANCELADA = 'CANCELADA'
     ANULADA = 'ANULADA'
     
     ESTADOS_CHOICES = [
         (PENDIENTE, 'Pendiente de Pago'),
         (PAGADA, 'Pagada'),
+        (ENTREGADA, 'Entregada'),
+        (RETIRADO, 'Retirado'),
         (CANCELADA, 'Cancelada'),
         (ANULADA, 'Anulada'),
     ]
