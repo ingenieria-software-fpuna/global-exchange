@@ -434,6 +434,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Cache de denominaciones por moneda
     const denominacionesCache = {};
     
+    // Variable para almacenar el HTML base de la información de moneda (sin stock por denominación)
+    let infoMonedaBaseHTML = '';
+    
     if (monedaSelect) {
         monedaSelect.addEventListener('change', function() {
             const selectedOption = this.options[this.selectedIndex];
@@ -456,8 +459,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     const cantidadFormateada = cantidadActualStr.replace(',', '.');
                     info += `<strong>Stock actual:</strong> ${symbol}${cantidadFormateada}`;
                     
+                    // Guardar el HTML base (sin stock por denominación)
+                    infoMonedaBaseHTML = info;
                     detallesMoneda.innerHTML = info;
                     infoMoneda.style.display = 'block';
+                    // El stock por denominación se agregará después cuando se carguen las denominaciones
                 }
                 
                 
@@ -476,22 +482,51 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Función para cargar denominaciones
     function cargarDenominaciones(monedaId, symbol, decimales) {
-        if (denominacionesCache[monedaId]) {
-            mostrarDenominaciones(denominacionesCache[monedaId], symbol, decimales);
+        const tauserId = {{ tauser.pk }};
+        const cacheKey = `${monedaId}_${tauserId}`;
+        
+        if (denominacionesCache[cacheKey]) {
+            mostrarDenominaciones(denominacionesCache[cacheKey], symbol, decimales);
+            // Actualizar información de moneda con stock disponible
+            actualizarInfoMonedaConStock(denominacionesCache[cacheKey], symbol);
             return;
         }
         
-        // Hacer petición AJAX para obtener denominaciones
-        fetch(`/tauser/denominaciones/${monedaId}/`)
+        // Hacer petición AJAX para obtener denominaciones con stock disponible
+        fetch(`/tauser/denominaciones/${monedaId}/?tauser_id=${tauserId}`)
             .then(response => response.json())
             .then(data => {
-                denominacionesCache[monedaId] = data.denominaciones;
+                denominacionesCache[cacheKey] = data.denominaciones;
                 mostrarDenominaciones(data.denominaciones, symbol, decimales);
+                // Actualizar información de moneda con stock disponible
+                actualizarInfoMonedaConStock(data.denominaciones, symbol);
             })
             .catch(error => {
                 console.error('Error al cargar denominaciones:', error);
                 if (denominacionesContainer) denominacionesContainer.style.display = 'none';
             });
+    }
+    
+    // Función para actualizar la información de moneda con stock disponible por denominación
+    function actualizarInfoMonedaConStock(denominaciones, symbol) {
+        if (!detallesMoneda || !infoMonedaBaseHTML) return;
+        
+        // Restaurar el HTML base
+        detallesMoneda.innerHTML = infoMonedaBaseHTML;
+        
+        // Filtrar solo las denominaciones que tienen stock disponible
+        const denominacionesConStock = denominaciones.filter(d => d.stock_disponible > 0);
+        
+        if (denominacionesConStock.length > 0) {
+            let stockInfo = '<hr class="my-2"><strong>Billetes disponibles por denominación:</strong><ul class="mb-0 mt-2">';
+            denominacionesConStock.forEach(denominacion => {
+                stockInfo += `<li>${denominacion.mostrar_denominacion}: <strong>${denominacion.stock_disponible}</strong> billetes</li>`;
+            });
+            stockInfo += '</ul>';
+            
+            // Agregar al contenido base
+            detallesMoneda.innerHTML += stockInfo;
+        }
     }
     
     // Función para mostrar denominaciones

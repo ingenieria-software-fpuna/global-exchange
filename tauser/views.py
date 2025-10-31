@@ -372,14 +372,34 @@ def obtener_denominaciones(request, moneda_id):
             tipo='BILLETE'  # Solo billetes
         ).order_by('-valor')
         
+        # Obtener stock disponible por denominación si se proporciona tauser_id
+        stock_por_denominacion = {}
+        tauser_id = request.GET.get('tauser_id')
+        if tauser_id:
+            try:
+                from .models import Stock, StockDenominacion
+                tauser = Tauser.objects.get(pk=tauser_id)
+                stock = Stock.objects.filter(tauser=tauser, moneda=moneda).first()
+                if stock:
+                    stock_denominaciones = StockDenominacion.objects.filter(
+                        stock=stock,
+                        es_activo=True
+                    ).select_related('denominacion')
+                    for sd in stock_denominaciones:
+                        stock_por_denominacion[sd.denominacion.pk] = sd.cantidad
+            except (Tauser.DoesNotExist, ValueError):
+                pass
+        
         denominaciones_data = []
         for denominacion in denominaciones:
+            stock_disponible = stock_por_denominacion.get(denominacion.pk, 0)
             denominaciones_data.append({
                 'id': denominacion.pk,
                 'valor': float(denominacion.valor),
                 'tipo': denominacion.tipo,
                 'mostrar_denominacion': denominacion.mostrar_denominacion(),
-                'es_activa': denominacion.es_activa
+                'es_activa': denominacion.es_activa,
+                'stock_disponible': stock_disponible
             })
         
         return JsonResponse({
@@ -743,17 +763,89 @@ def procesar_retiro(request):
                         'error': f'Stock insuficiente. Disponible: {stock.mostrar_cantidad()}, Requerido: {transaccion.moneda_destino.mostrar_monto(transaccion.monto_destino)}'
                     })
                 
-                # Reducir el stock
-                if not stock.reducir_cantidad(
-                    transaccion.monto_destino,
-                    usuario=request.user,
-                    transaccion=transaccion,
-                    observaciones=f'Retiro por transacción {transaccion.id_transaccion}'
-                ):
-                    return JsonResponse({
-                        'success': False,
-                        'error': 'No se pudo reducir el stock'
-                    })
+                # Reducir el stock por denominaciones si existen, de lo contrario reducir el stock general
+                from monedas.models import DenominacionMoneda
+                from .models import StockDenominacion
+                from decimal import Decimal
+                
+                # Obtener denominaciones activas de la moneda ordenadas de mayor a menor
+                denominaciones = DenominacionMoneda.objects.filter(
+                    moneda=transaccion.moneda_destino,
+                    es_activa=True,
+                    tipo='BILLETE'
+                ).order_by('-valor')
+                
+                # Obtener stock por denominación
+                stock_denominaciones_dict = {}
+                if denominaciones.exists():
+                    stock_denominaciones = StockDenominacion.objects.filter(
+                        stock=stock,
+                        es_activo=True
+                    ).select_related('denominacion')
+                    for sd in stock_denominaciones:
+                        stock_denominaciones_dict[sd.denominacion.pk] = sd
+                
+                # Si hay stock por denominación, actualizar por denominaciones
+                if stock_denominaciones_dict:
+                    monto_restante = Decimal(str(transaccion.monto_destino))
+                    denominaciones_retiradas = []
+                    
+                    # Algoritmo greedy: empezar con las denominaciones más grandes
+                    for denominacion in denominaciones:
+                        if monto_restante <= 0:
+                            break
+                        
+                        sd = stock_denominaciones_dict.get(denominacion.pk)
+                        if not sd or sd.cantidad == 0:
+                            continue
+                        
+                        # Calcular cuántos billetes de esta denominación necesitamos
+                        valor_denominacion = Decimal(str(denominacion.valor))
+                        cantidad_necesaria = int(monto_restante / valor_denominacion)
+                        
+                        # No podemos retirar más de lo que tenemos
+                        cantidad_a_retirar = min(cantidad_necesaria, sd.cantidad)
+                        
+                        if cantidad_a_retirar > 0:
+                            # Reducir el stock de esta denominación
+                            # Nota: reducir_cantidad de StockDenominacion actualiza automáticamente el stock general
+                            if not sd.reducir_cantidad(
+                                cantidad_a_retirar,
+                                usuario=request.user,
+                                transaccion=transaccion,
+                                observaciones=f'Retiro por transacción {transaccion.id_transaccion}'
+                            ):
+                                return JsonResponse({
+                                    'success': False,
+                                    'error': f'No se pudo reducir el stock de {denominacion.mostrar_denominacion()}'
+                                })
+                            
+                            valor_retirado = cantidad_a_retirar * valor_denominacion
+                            monto_restante -= valor_retirado
+                            denominaciones_retiradas.append({
+                                'denominacion': denominacion.mostrar_denominacion(),
+                                'cantidad': cantidad_a_retirar,
+                                'valor': float(valor_retirado)
+                            })
+                    
+                    # Si quedó monto sin cubrir, hay un problema
+                    if monto_restante > Decimal('0.01'):  # Tolerancia para errores de redondeo
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'No se pudo completar el retiro. Faltan {transaccion.moneda_destino.mostrar_monto(monto_restante)}. Posiblemente no hay denominaciones adecuadas disponibles.'
+                        })
+                else:
+                    # Si no hay stock por denominación, reducir el stock general directamente
+                    if not stock.reducir_cantidad(
+                        transaccion.monto_destino,
+                        usuario=request.user,
+                        transaccion=transaccion,
+                        observaciones=f'Retiro por transacción {transaccion.id_transaccion}'
+                    ):
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'No se pudo reducir el stock'
+                        })
             else:
                 # Para PYG, no hay stock físico que reducir
                 stock = None
