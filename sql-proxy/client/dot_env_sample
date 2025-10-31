@@ -1,0 +1,5 @@
+DB_USER=fs_proxy_user
+DB_PASSWORD=p123456
+DB_HOST=localhost
+DB_PORT=45432
+DB_NAME=fs_proxy_bd

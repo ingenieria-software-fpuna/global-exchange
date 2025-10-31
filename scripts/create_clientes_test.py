@@ -58,17 +58,19 @@ def crear_clientes_ejemplo():
     clientes_datos = [
         # Clientes VIP
         {
-            'nombre_comercial': 'Inversiones Premium S.A.',
-            'ruc': '80001234567',
+            'nombre_comercial': 'Toyotoshi SA',
+            'ruc': '80003128',
+            'dv': '8',
             'direccion': 'Av. Mariscal López 3400, Asunción',
-            'correo_electronico': 'contacto@inversionespremium.com.py',
+            'correo_electronico': 'contacto@toyotoshi.com.py',
             'numero_telefono': '+595 21 123-4567',
             'tipo_cliente_nombre': 'VIP',
-            'monto_limite_transaccion': Decimal('500000.00')
+            'monto_limite_transaccion': Decimal('5000000.00')
         },
         {
-            'nombre_comercial': 'Corporación Global Trading',
-            'ruc': '80001234568',
+            'nombre_comercial': 'Bolsas Plasticas SRL',
+            'ruc': '80001047',
+            'dv': '7',
             'direccion': 'World Trade Center, Torre A, Piso 15',
             'correo_electronico': 'admin@globaltrading.com.py',
             'numero_telefono': '+595 21 234-5678',
@@ -76,28 +78,31 @@ def crear_clientes_ejemplo():
             'monto_limite_transaccion': Decimal('1000000.00')
         },
         {
-            'nombre_comercial': 'Elite Finance Group',
-            'ruc': '80001234569',
+            'nombre_comercial': 'Konecta SA',
+            'ruc': '80027374',
+            'dv': '5',
             'direccion': 'Av. República Argentina 1234, Asunción',
-            'correo_electronico': 'info@elitefinance.com.py',
+            'correo_electronico': 'info@konecta.com.py',
             'numero_telefono': '+595 21 345-6789',
             'tipo_cliente_nombre': 'VIP',
-            'monto_limite_transaccion': Decimal('750000.00')
+            'monto_limite_transaccion': Decimal('7500000.00')
         },
 
         # Clientes Corporativos
         {
-            'nombre_comercial': 'Importadora del Este S.R.L.',
-            'ruc': '80002234567',
+            'nombre_comercial': 'IMPORTEX SRL',
+            'ruc': '80000617',
+            'dv': '8',
             'direccion': 'Ruta 2, Km 30, Ciudad del Este',
             'correo_electronico': 'ventas@importadoraeste.com.py',
             'numero_telefono': '+595 61 456-7890',
             'tipo_cliente_nombre': 'Corporativo',
-            'monto_limite_transaccion': Decimal('300000.00')
+            'monto_limite_transaccion': Decimal('3000000.00')
         },
         {
-            'nombre_comercial': 'Constructora San Miguel S.A.',
-            'ruc': '80002234568',
+            'nombre_comercial': 'CONSTRUCTORA CIVIL E INDUSTRIAL S.R.L.',
+            'ruc': '80000520',
+            'dv': '1',
             'direccion': 'Av. Eusebio Ayala 2100, Asunción',
             'correo_electronico': 'proyectos@sanmiguel.com.py',
             'numero_telefono': '+595 21 567-8901',
@@ -105,8 +110,9 @@ def crear_clientes_ejemplo():
             'monto_limite_transaccion': Decimal('400000.00')
         },
         {
-            'nombre_comercial': 'Agropecuaria del Sur S.A.',
-            'ruc': '80002234569',
+            'nombre_comercial': 'CONSTRUCTORA HELAMAN SA',
+            'ruc': '80000865',
+            'dv': '0',
             'direccion': 'Ruta 1, Km 45, Encarnación',
             'correo_electronico': 'administracion@agrosur.com.py',
             'numero_telefono': '+595 71 678-9012',
@@ -114,8 +120,9 @@ def crear_clientes_ejemplo():
             'monto_limite_transaccion': Decimal('250000.00')
         },
         {
-            'nombre_comercial': 'Textil Paraguay S.R.L.',
-            'ruc': '80002234570',
+            'nombre_comercial': 'TEXTIL PARANA SA',
+            'ruc': '80000023',
+            'dv': '4',
             'direccion': 'Zona Industrial, Luque',
             'correo_electronico': 'gerencia@textilpy.com.py',
             'numero_telefono': '+595 21 789-0123',
@@ -125,8 +132,9 @@ def crear_clientes_ejemplo():
 
         # Clientes Minoristas
         {
-            'nombre_comercial': 'Ferretería Central',
-            'ruc': '80003234567',
+            'nombre_comercial': 'TEXTIL TORO BLANCO S.A.',
+            'ruc': '80001798',
+            'dv': '6',
             'direccion': 'Av. Pettirossi 1500, Asunción',
             'correo_electronico': 'info@ferreteriacentral.com.py',
             'numero_telefono': '+595 21 890-1234',
@@ -134,44 +142,49 @@ def crear_clientes_ejemplo():
             'monto_limite_transaccion': Decimal('50000.00')
         },
         {
-            'nombre_comercial': 'Boutique Elegance',
-            'ruc': '80003234568',
+            'nombre_comercial': 'BOUTIQUE LIDA S.R.L.',
+            'ruc': '80000443',
+            'dv': '4',
             'direccion': 'Shopping del Sol, Local 45',
             'correo_electronico': 'ventas@elegance.com.py',
             'numero_telefono': '+595 21 901-2345',
             'tipo_cliente_nombre': 'Minorista',
-            'monto_limite_transaccion': Decimal('30000.00')
+            'monto_limite_transaccion': Decimal('300000.00')
         },
         {
-            'nombre_comercial': 'Librería Universitaria',
-            'ruc': '80003234569',
+            'nombre_comercial': 'GRANDES LIBRERIAS EL COLEGIO S.A.',
+            'ruc': '80003004',
+            'dv': '4',
             'direccion': 'Av. España 1234, Asunción',
             'correo_electronico': 'pedidos@libreriauni.com.py',
             'numero_telefono': '+595 21 012-3456',
             'tipo_cliente_nombre': 'Minorista',
-            'monto_limite_transaccion': Decimal('25000.00')
+            'monto_limite_transaccion': Decimal('2500000.00')
         },
         {
-            'nombre_comercial': 'Farmacia San José',
-            'ruc': '80003234570',
+            'nombre_comercial': 'FARMACIA ALHOA SRL',
+            'ruc': '80000223',
+            'dv': '7',
             'direccion': 'Av. Brasil 890, Asunción',
             'correo_electronico': 'contacto@farmaciasanjose.com.py',
             'numero_telefono': '+595 21 123-4567',
             'tipo_cliente_nombre': 'Minorista',
-            'monto_limite_transaccion': Decimal('40000.00')
+            'monto_limite_transaccion': Decimal('4000000.00')
         },
         {
-            'nombre_comercial': 'Restaurante Don Carlos',
-            'ruc': '80003234571',
+            'nombre_comercial': 'LOS ALPES SRL - HOTEL - RESTAURANT - MERENDERO',
+            'ruc': '80017115',
+            'dv': '2',
             'direccion': 'Av. Santísimo Sacramento 567, Asunción',
             'correo_electronico': 'reservas@doncarlos.com.py',
             'numero_telefono': '+595 21 234-5678',
             'tipo_cliente_nombre': 'Minorista',
-            'monto_limite_transaccion': Decimal('35000.00')
+            'monto_limite_transaccion': Decimal('350000.00')
         },
         {
-            'nombre_comercial': 'Autopartes Mecánico',
-            'ruc': '80003234572',
+            'nombre_comercial': 'MECANOGRAFICA SA',
+            'ruc': '80000349',
+            'dv': '7',
             'direccion': 'Av. Artigas 2300, Asunción',
             'correo_electronico': 'ventas@autopartesmecanico.com.py',
             'numero_telefono': '+595 21 345-6789',

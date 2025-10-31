@@ -29,3 +29,81 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - default
+
+  # SQL-Proxy services for tax invoicing
+  sql-proxy-db:
+    image: postgres:17-bullseye
+    container_name: glx-sql-proxy-db
+    volumes:
+      - sql_proxy_data:/var/lib/postgresql/data/
+    env_file:
+      - ./sql-proxy/.env.test.db
+    ports:
+      - 45432:5432
+    networks:
+      sqlproxy:
+        aliases:
+          - db
+
+  sql-proxy-web:
+    build:
+      context: ./sql-proxy/services/web
+      dockerfile: Dockerfile.test
+    container_name: glx-sql-proxy-web
+    command: gunicorn --bind 0.0.0.0:5000 manage:app --log-level debug --workers 3 --threads 4 --access-logfile /home/app/web-test/logs/access.log --error-logfile /home/app/web-test/logs/error.log
+    volumes:
+      - ./sql-proxy/volumes/web/logs:/home/app/web-test/logs
+      - ./sql-proxy/volumes/web/kude:/kude
+    expose:
+      - 5000
+    env_file:
+      - ./sql-proxy/.env.test
+    depends_on:
+      - sql-proxy-db
+    networks:
+      sqlproxy:
+        aliases:
+          - web
+
+  sql-proxy-scheduler:
+    build:
+      context: ./sql-proxy/services/web-sched
+      dockerfile: Dockerfile.test
+    container_name: glx-sql-proxy-scheduler
+    command: flask run --host=0.0.0.0 --port=5001 --no-debugger --no-reload --with-threads
+    volumes:
+      - ./sql-proxy/volumes/web-sched/logs:/home/app/sched-test/logs
+    expose:
+      - 5001
+    env_file:
+      - ./sql-proxy/.env-sched.test
+    depends_on:
+      - sql-proxy-web
+    networks:
+      sqlproxy:
+        aliases:
+          - web-sched
+
+  sql-proxy-nginx:
+    build: ./sql-proxy/services/nginx
+    container_name: glx-sql-proxy-nginx
+    volumes:
+      - ./sql-proxy/volumes/nginx/logs:/var/log/nginx
+      - ./sql-proxy/volumes/web/kude:/kude
+    ports:
+      - 40080:80
+      - 40088:88
+    depends_on:
+      - sql-proxy-web
+      - sql-proxy-scheduler
+    env_file:
+      - ./sql-proxy/.env.test
+    networks:
+      - sqlproxy
+
+networks:
+  sqlproxy:
+    name: glx-sqlproxy-network
+
+volumes:
+  sql_proxy_data:
