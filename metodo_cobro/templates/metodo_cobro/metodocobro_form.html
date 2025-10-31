@@ -36,10 +36,34 @@
               <label class="form-check-label" for="id_es_activo">Activo</label>
             </div>
           </div>
+          <div class="col-md-3 d-flex align-items-end">
+            <div class="form-check">
+              {{ form.requiere_retiro_fisico }}
+              <label class="form-check-label" for="id_requiere_retiro_fisico">Requiere Retiro Físico</label>
+            </div>
+          </div>
           <div class="col-12">
             <label class="form-label" for="id_descripcion">Descripción</label>
             {{ form.descripcion }}
             {% for e in form.descripcion.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+        </div>
+
+        <!-- Configuración de Retiro Físico -->
+        <div class="row mt-4">
+          <div class="col-12">
+            <div class="alert alert-info">
+              <h6 class="alert-heading">
+                <i class="fas fa-info-circle me-2"></i>Configuración de Retiro Físico
+              </h6>
+              <p class="mb-2">
+                <strong>Requiere Retiro Físico:</strong> Indica si este método de cobro necesita que el cliente vaya físicamente al Tauser para completar la transacción.
+              </p>
+              <ul class="mb-0">
+                <li><strong>Marcado (Sí):</strong> Cliente debe ir al Tauser (ej: Efectivo)</li>
+                <li><strong>Desmarcado (No):</strong> Proceso completamente digital (ej: Transferencia, Tarjeta)</li>
+              </ul>
+            </div>
           </div>
         </div>
 

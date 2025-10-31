@@ -46,8 +46,6 @@
               Las ventas de divisas requieren cliente para aplicar descuentos y controlar límites.
             </div>
           </div>
-
-          <!-- Método de Cobro -->
           <div class="col-md-6">
             <label for="metodo_cobro" class="form-label">Método de Cobro <span class="text-danger">*</span></label>
             <select id="metodo_cobro" name="metodo_cobro_id" class="form-select" required>
@@ -62,10 +60,12 @@
             <select id="metodo_pago" name="metodo_pago_id" class="form-select" required>
               <option value="">Seleccione cómo pagará los Guaraníes</option>
               {% for metodo in metodos_pago %}
+                {% if "efectivo" not in metodo.nombre|lower %}
                 <option value="{{ metodo.id }}" data-comision="{{ metodo.comision }}">
                   {{ metodo.nombre }} 
                   {% if metodo.comision > 0 %}({{ metodo.comision }}% comisión){% else %}(sin comisión){% endif %}
                 </option>
+                {% endif %}
               {% empty %}
                 <option value="" disabled>No hay métodos de pago activos</option>
               {% endfor %}
@@ -124,6 +124,24 @@
             </select>
             <div class="form-text">
               Las ventas siempre reciben Guaraníes
+            </div>
+          </div>
+
+          <!-- Tauser -->
+          <div class="col-md-12">
+            <label for="tauser" class="form-label">Punto de Atención <span class="text-danger">*</span></label>
+            <select id="tauser" name="tauser_id" class="form-select" required>
+              <option value="">Seleccione un punto de atención</option>
+              {% for tauser in tausers %}
+                <option value="{{ tauser.id }}" data-direccion="{{ tauser.direccion }}" data-horario="{{ tauser.horario_atencion }}">
+                  {{ tauser.nombre }} - {{ tauser.direccion }}
+                </option>
+              {% empty %}
+                <option value="" disabled>No hay puntos de atención disponibles</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              Seleccione el punto de atención donde se realizará la transacción.
             </div>
           </div>
 
@@ -194,6 +212,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const metodoPago = document.getElementById('metodo_pago');
     const camposMetodoPago = document.getElementById('campos-metodo-pago');
     const camposContainer = document.getElementById('campos-container');
+    const tauser = document.getElementById('tauser');
     
     // Función para cargar campos del método de pago
     async function cargarCamposMetodoPago(metodoPagoId) {
@@ -382,7 +401,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Función para validar si se puede proceder con la venta
     function validarFormularioCompleto() {
-        const esValido = cliente.value && 
+        const esValido = tauser.value &&
+                        cliente.value && 
                         metodoCobro.value && 
                         metodoPago.value &&
                         monto.value && 
@@ -445,7 +465,8 @@ document.addEventListener('DOMContentLoaded', function() {
             destino: 'PYG',
             cliente_id: cliente.value || null,
             metodo_cobro_id: metodoCobro.value || null,
-            metodo_pago_id: metodoPago.value || null
+            metodo_pago_id: metodoPago.value || null,
+            tauser_id: tauser.value || null
         };
         
         if (!datos.monto || parseFloat(datos.monto) <= 0) {
@@ -462,6 +483,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (datos.cliente_id) params.append('cliente_id', datos.cliente_id);
             if (metodoCobro.value) params.append('metodo_cobro_id', metodoCobro.value);
             if (metodoPago.value) params.append('metodo_pago_id', metodoPago.value);
+            if (datos.tauser_id) params.append('tauser_id', datos.tauser_id);
             
             const response = await fetch(`{% url 'transacciones:api_calcular_venta_completa' %}?${params}`);
             const result = await response.json();
@@ -519,6 +541,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     <hr class="my-2">
 
                 `;
+                
+                // Mostrar mensaje informativo para ventas con cobro en efectivo
+                if (datos.tauser_id && datos.metodo_cobro_id) {
+                    try {
+                        // Obtener información del método de cobro para verificar si es efectivo
+                        const metodoCobroOption = document.querySelector(`#metodo_cobro option[value="${datos.metodo_cobro_id}"]`);
+                        const esEfectivo = metodoCobroOption && metodoCobroOption.textContent.toLowerCase().includes('efectivo');
+                        
+                        if (esEfectivo) {
+                            // Mostrar mensaje informativo sobre el proceso de venta
+                            const metodoPagoOption = document.querySelector(`#metodo_pago option[value="${datos.metodo_pago_id}"]`);
+                            const nombreMetodoPago = metodoPagoOption ? metodoPagoOption.textContent.split('(')[0].trim() : 'el método seleccionado';
+                            
+                            const mensajeEnvio = `
+                                <div class="alert alert-info alert-sm mt-2">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    <strong>Proceso de venta:</strong> Usted entregará ${datos.monto} ${datos.origen} en efectivo en este punto de atención. 
+                                    Sus Guaraníes serán enviados vía <strong>${nombreMetodoPago}</strong> según su selección.
+                                </div>
+                            `;
+                            previewContent.innerHTML += mensajeEnvio;
+                        }
+                    } catch (error) {
+                        console.error('Error mostrando mensaje informativo:', error);
+                    }
+                }
                 
                 // Validar límites antes de habilitar el botón de venta
                 // Para ventas: validar el monto que el cliente va a recibir contra el límite de la moneda que se vende
@@ -598,7 +646,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Auto-calcular cuando cambien los valores (excepto moneda origen que ya tiene su listener)
-    [monto, cliente, metodoCobro, metodoPago].forEach(element => {
+    [monto, cliente, metodoCobro, metodoPago, tauser].forEach(element => {
         element.addEventListener('change', function() {
             if (monto.value && parseFloat(monto.value) > 0) {
                 calcularPreview();
@@ -624,7 +672,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // No mostrar mensaje inmediato al hacer focus en campos del método de pago
     
     // Validar formulario completo cuando cambien campos obligatorios
-    [cliente, metodoCobro, metodoPago].forEach(element => {
+    [tauser, cliente, metodoCobro, metodoPago].forEach(element => {
         element.addEventListener('change', function() {
             if (!validarFormularioCompleto()) {
                 btnVender.disabled = true;
@@ -635,6 +683,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Envío del formulario
     form.addEventListener('submit', function(e) {
         e.preventDefault();
+        
+        if (!tauser.value) {
+            alert('Por favor seleccione un punto de atención.');
+            tauser.focus();
+            return;
+        }
         
         if (!cliente.value) {
             alert('Por favor seleccione un cliente. Las ventas requieren cliente.');
@@ -672,6 +726,7 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('cliente_id', cliente.value);
         formData.append('metodo_cobro_id', metodoCobro.value);
         formData.append('metodo_pago_id', metodoPago.value);
+        formData.append('tauser_id', tauser.value);
         
         // Agregar campos del método de pago
         document.querySelectorAll('.campo-metodo-pago').forEach(input => {

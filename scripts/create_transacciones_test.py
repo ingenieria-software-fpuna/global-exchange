@@ -8,7 +8,7 @@ Crea múltiples transacciones para operadores con diferentes estados y tipos.
 import os
 import sys
 import django
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import random
 from datetime import datetime, timedelta
 
@@ -23,6 +23,7 @@ from monedas.models import Moneda
 from metodo_pago.models import MetodoPago
 from metodo_cobro.models import MetodoCobro
 from tasa_cambio.models import TasaCambio
+from tauser.models import Tauser
 from django.contrib.auth.models import Group
 from django.utils import timezone
 
@@ -85,12 +86,19 @@ def obtener_datos_requeridos():
         print("  ❌ No se encontraron tasas de cambio")
         return None
 
+    # Tausers activos
+    tausers = list(Tauser.objects.filter(es_activo=True))
+    if not tausers:
+        print("  ❌ No se encontraron Tausers activos")
+        return None
+
     print(f"  👥 {len(operadores)} operadores encontrados")
     print(f"  📊 {len(tipos_operacion)} tipos de operación")
     print(f"  🏷️  {len(estados)} estados de transacción")
     print(f"  👤 {len(clientes)} clientes activos")
     print(f"  💰 {len(monedas)} monedas activas")
     print(f"  📈 {len(tasas_cambio)} tasas de cambio")
+    print(f"  🏪 {len(tausers)} Tausers activos")
 
     return {
         'operadores': operadores,
@@ -101,7 +109,8 @@ def obtener_datos_requeridos():
         'pyg': pyg,
         'metodos_pago': metodos_pago,
         'metodos_cobro': metodos_cobro,
-        'tasas_cambio': tasas_cambio
+        'tasas_cambio': tasas_cambio,
+        'tausers': tausers
     }
 
 
@@ -119,7 +128,7 @@ def obtener_tasa_para_monedas(moneda_origen, moneda_destino, tasas_cambio):
             return tasa.precio_base - tasa.comision_compra
 
     # Tasa por defecto si no se encuentra
-    return Decimal('7500.00')
+    return Decimal('7500')
 
 
 def generar_fecha_realista():
@@ -242,25 +251,31 @@ def crear_transacciones_ejemplo(datos, cantidad=100):
             # Calcular monto destino
             if moneda_origen.codigo == 'PYG':
                 # PYG -> Divisa extranjera
-                monto_destino = (monto_origen / tasa_cambio).quantize(Decimal('0.01'))
+                monto_destino = (monto_origen / tasa_cambio).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
             else:
                 # Divisa extranjera -> PYG
-                monto_destino = (monto_origen * tasa_cambio).quantize(Decimal('0.01'))
+                monto_destino = (monto_origen * tasa_cambio).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
             # Seleccionar métodos de pago/cobro
             metodo_cobro = random.choice(datos['metodos_cobro']) if datos['metodos_cobro'] else None
             metodo_pago = random.choice(datos['metodos_pago']) if datos['metodos_pago'] else None
 
+            # Seleccionar Tauser (30% de transacciones con Tauser)
+            tauser = random.choice(datos['tausers']) if random.random() < 0.3 else None
+
             # Calcular comisiones básicas
-            porcentaje_comision = Decimal(str(random.uniform(0.5, 2.0)))  # 0.5% - 2%
-            monto_comision = (monto_origen * porcentaje_comision / 100).quantize(Decimal('0.01'))
+            porcentaje_comision = Decimal(random.randint(1, 3))
+            monto_comision = (monto_origen * porcentaje_comision / 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
             # Descuento del cliente
-            porcentaje_descuento = Decimal('0.00')
-            monto_descuento = Decimal('0.00')
+            porcentaje_descuento = Decimal('0')
+            monto_descuento = Decimal('0')
             if cliente and cliente.tipo_cliente:
                 porcentaje_descuento = cliente.tipo_cliente.descuento
-                monto_descuento = (monto_comision * porcentaje_descuento / 100).quantize(Decimal('0.01'))
+                monto_descuento_bruto = (monto_comision * porcentaje_descuento / 100)
+                monto_descuento = monto_descuento_bruto.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+                if monto_descuento_bruto > 0 and monto_descuento == 0:
+                    monto_descuento = Decimal('1')
 
             # Generar fecha realista
             fecha_creacion = generar_fecha_realista()
@@ -274,6 +289,7 @@ def crear_transacciones_ejemplo(datos, cantidad=100):
             # Crear transacción
             transaccion = Transaccion.objects.create(
                 cliente=cliente,
+                tauser=tauser,
                 usuario=operador,
                 tipo_operacion=tipo_operacion,
                 moneda_origen=moneda_origen,
@@ -290,7 +306,7 @@ def crear_transacciones_ejemplo(datos, cantidad=100):
                 estado=estado,
                 fecha_expiracion=fecha_expiracion,
                 fecha_pago=fecha_pago,
-                observaciones=f"Transacción de ejemplo #{i+1}",
+                observaciones=f"Transacción de ejemplo #{i+1}" + (f" - Procesada en {tauser.nombre}" if tauser else ""),
                 ip_cliente="127.0.0.1"
             )
 
@@ -344,11 +360,20 @@ def mostrar_estadisticas():
     total = Transaccion.objects.count()
     con_cliente = Transaccion.objects.filter(cliente__isnull=False).count()
     casuales = total - con_cliente
+    con_tauser = Transaccion.objects.filter(tauser__isnull=False).count()
 
     print(f"\n📈 Resumen general:")
     print(f"  • Total transacciones: {total}")
     print(f"  • Con cliente: {con_cliente}")
     print(f"  • Casuales: {casuales}")
+    print(f"  • Con Tauser: {con_tauser}")
+
+    # Por Tauser
+    print(f"\n🏪 Por Tauser:")
+    for tauser in Tauser.objects.filter(es_activo=True):
+        count = Transaccion.objects.filter(tauser=tauser).count()
+        if count > 0:
+            print(f"  • {tauser.nombre}: {count} transacción(es)")
 
     # Últimas 30 días
     desde_30_dias = timezone.now().date() - timedelta(days=30)
@@ -412,8 +437,12 @@ def main():
             print(f"   • Fechas inteligentemente distribuidas (40% últimos 7 días, 30% días 8-21, 30% días 22-30)")
             print(f"   • Horarios de oficina en días laborables, fines de semana ocasionales")
             print(f"   • Clientes asociados (80%) y casuales (20%)")
+            print(f"   • Tausers asociados (30% de transacciones)")
             print(f"   • Montos y tasas de cambio realistas")
-            print(f"\n🎯 Ahora puedes probar el dashboard de 'Mis transacciones'")
+            print(f"\n🎯 Ahora puedes probar:")
+            print(f"   • Dashboard de 'Mis transacciones'")
+            print(f"   • Estado de retiro en transacciones")
+            print(f"   • Sistema de Tausers y stock")
         else:
             print("\n❌ Error al crear las transacciones.")
             sys.exit(1)

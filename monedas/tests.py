@@ -235,10 +235,10 @@ class MonedaViewsTests(TestCase):
         bitcoin = Moneda.objects.get(codigo='BTC')
         self.assertEqual(bitcoin.decimales, 8)
     
-    def test_moneda_update_view(self):
+    def test_moneda_edit_view(self):
         """Test de la vista editar"""
         self.client.login(email='test@test.com', password='testpass123')
-        response = self.client.get(reverse('monedas:moneda_update', args=[self.moneda.pk]))
+        response = self.client.get(reverse('monedas:moneda_edit', args=[self.moneda.pk]))
         self.assertEqual(response.status_code, 200)
     
     def test_unauthorized_access(self):

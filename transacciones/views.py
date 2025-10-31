@@ -465,11 +465,33 @@ def verificar_cambio_cotizacion(request, transaccion_id):
             if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
                 return JsonResponse({'success': False, 'error': 'Sin permisos'})
         
-        # Verificar que esté pendiente o cancelada por cambio de tasa
-        if transaccion.estado.codigo not in ['PENDIENTE', 'CANCELADA']:
+        # Verificar estado según el tipo de operación
+        es_compra = transaccion.tipo_operacion.codigo == 'COMPRA'
+        es_venta = transaccion.tipo_operacion.codigo == 'VENTA'
+        
+        # Para COMPRAS que ya están PAGADAS: no verificar cambio de cotización
+        # La transacción ya fue pagada, solo necesita retiro físico (no hay cambio de cotización relevante)
+        if es_compra and transaccion.estado.codigo == EstadoTransaccion.PAGADA:
+            return JsonResponse({
+                'success': True,
+                'hay_cambio': False,
+                'message': 'Transacción pagada, no requiere verificación de cotización'
+            })
+        
+        # Para COMPRAS con estado ENTREGADA: ya fue procesada
+        if es_compra and transaccion.estado.codigo == EstadoTransaccion.ENTREGADA:
+            return JsonResponse({
+                'success': False,
+                'error': 'Esta transacción ya fue entregada al cliente.'
+            })
+        
+        # Para VENTAS con efectivo en PENDIENTE: verificar cambio de cotización antes de entregar divisas
+        # Para otras transacciones PENDIENTE: también verificar
+        # Para transacciones CANCELADAS: permitir verificar (por si se quiere recrear)
+        if transaccion.estado.codigo not in [EstadoTransaccion.PENDIENTE, EstadoTransaccion.CANCELADA]:
             return JsonResponse({
                 'success': False, 
-                'error': f'Transacción ya no se puede procesar. Estado actual: {transaccion.estado.codigo}'
+                'error': f'Transacción ya no se puede procesar. Estado actual: {transaccion.estado.nombre}'
             })
             
         # Verificar expiración
@@ -658,6 +680,103 @@ def crear_con_nueva_cotizacion(request, transaccion_id):
             
             print(f"DEBUG: Nueva transacción creada con ID: {nueva_transaccion.id_transaccion}")
             
+            # Detectar si se está llamando desde el simulador (tauser_id presente)
+            es_desde_simulador = datos.get('tauser_id') is not None
+            
+            # Si es desde el simulador, devolver datos completos similar a verificar_codigo_retiro
+            if es_desde_simulador:
+                tauser_id = datos.get('tauser_id')
+                from tauser.models import Tauser, Stock
+                
+                try:
+                    tauser = Tauser.objects.get(id=tauser_id, es_activo=True)
+                except Tauser.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Tauser no válido o inactivo'
+                    })
+                
+                # Verificar stock si es necesario
+                stock = None
+                if nueva_transaccion.moneda_destino.codigo != 'PYG':
+                    try:
+                        stock = Stock.objects.get(
+                            tauser=tauser,
+                            moneda=nueva_transaccion.moneda_destino,
+                            es_activo=True
+                        )
+                        if stock.cantidad < nueva_transaccion.monto_destino:
+                            return JsonResponse({
+                                'success': False,
+                                'error': f'Stock insuficiente. Disponible: {stock.mostrar_cantidad()}, Requerido: {nueva_transaccion.moneda_destino.mostrar_monto(nueva_transaccion.monto_destino)}'
+                            })
+                    except Stock.DoesNotExist:
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'No hay stock de {nueva_transaccion.moneda_destino.nombre} en {tauser.nombre}'
+                        })
+                
+                # Preparar datos de la transacción para mostrar (similar a verificar_codigo_retiro)
+                resumen_detallado = nueva_transaccion.get_resumen_detallado()
+                
+                # Detectar si es venta con cobro en efectivo
+                es_venta_con_efectivo = (
+                    nueva_transaccion.tipo_operacion.codigo == 'VENTA' and 
+                    nueva_transaccion.metodo_cobro and 
+                    nueva_transaccion.metodo_cobro.nombre.lower().find('efectivo') != -1
+                )
+                
+                # Preparar datos adicionales para ventas con cobro en efectivo
+                datos_adicionales = {
+                    'metodo_cobro': nueva_transaccion.metodo_cobro.nombre if nueva_transaccion.metodo_cobro else None,
+                    'metodo_pago': nueva_transaccion.metodo_pago.nombre if nueva_transaccion.metodo_pago else None,
+                }
+                
+                if es_venta_con_efectivo:
+                    datos_adicionales.update({
+                        'moneda_origen': {
+                            'codigo': nueva_transaccion.moneda_origen.codigo,
+                            'nombre': nueva_transaccion.moneda_origen.nombre,
+                            'simbolo': nueva_transaccion.moneda_origen.simbolo
+                        } if nueva_transaccion.moneda_origen else None,
+                        'monto_a_entregar': float(nueva_transaccion.monto_origen),
+                        'monto_a_entregar_formateado': f"{nueva_transaccion.moneda_origen.simbolo}{nueva_transaccion.monto_origen:.{nueva_transaccion.moneda_origen.decimales}f}" if nueva_transaccion.moneda_origen else None,
+                        'monto_a_recibir': float(nueva_transaccion.monto_destino),
+                        'monto_a_recibir_formateado': f"{nueva_transaccion.moneda_destino.simbolo}{nueva_transaccion.monto_destino:.{nueva_transaccion.moneda_destino.decimales}f}" if nueva_transaccion.moneda_destino else None,
+                    })
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Nueva transacción creada exitosamente con cotización actualizada',
+                    'transaccion': {
+                        'id': nueva_transaccion.id_transaccion,
+                        'codigo_verificacion': nueva_transaccion.codigo_verificacion,
+                        'tipo': nueva_transaccion.tipo_operacion.nombre,
+                        'cliente': nueva_transaccion.cliente.nombre_comercial if nueva_transaccion.cliente else 'Casual',
+                        'moneda_destino': {
+                            'codigo': nueva_transaccion.moneda_destino.codigo,
+                            'nombre': nueva_transaccion.moneda_destino.nombre,
+                            'simbolo': nueva_transaccion.moneda_destino.simbolo
+                        },
+                        'monto_a_retirar': float(nueva_transaccion.monto_destino),
+                        'monto_a_retirar_formateado': f"{nueva_transaccion.moneda_destino.simbolo}{nueva_transaccion.monto_destino:.{nueva_transaccion.moneda_destino.decimales}f}",
+                        'fecha_creacion': nueva_transaccion.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+                        'fecha_pago': nueva_transaccion.fecha_pago.strftime('%d/%m/%Y %H:%M') if nueva_transaccion.fecha_pago else None,
+                        **datos_adicionales
+                    },
+                    'tauser': {
+                        'id': tauser.id,
+                        'nombre': tauser.nombre,
+                        'direccion': tauser.direccion,
+                    },
+                    'stock_disponible': {
+                        'cantidad': float(stock.cantidad) if stock else 0,
+                        'cantidad_formateada': stock.mostrar_cantidad() if stock else 'N/A',
+                        'esta_bajo_stock': stock.esta_bajo_stock() if stock else False
+                    }
+                })
+            
+            # Si no es desde el simulador, devolver respuesta estándar
             return JsonResponse({
                 'success': True,
                 'message': 'Nueva transacción creada exitosamente',
@@ -790,6 +909,10 @@ def comprar_divisas(request):
     # Métodos de pago activos (para entregar divisas al cliente)
     metodos_pago = MetodoPago.objects.filter(es_activo=True).order_by('nombre')
     
+    # Tausers activos para selección
+    from tauser.models import Tauser
+    tausers = Tauser.objects.filter(es_activo=True).order_by('nombre')
+    
     # Obtener parámetros de URL para pre-poblar el formulario (desde el simulador)
     moneda_origen_id = request.GET.get('moneda_origen')
     moneda_destino_id = request.GET.get('moneda_destino')
@@ -802,6 +925,7 @@ def comprar_divisas(request):
         'clientes': clientes_usuario,
         'metodos_cobro': metodos_cobro,
         'metodos_pago': metodos_pago,
+        'tausers': tausers,
         'moneda_origen_preseleccionada': moneda_origen_id,
         'moneda_destino_preseleccionada': moneda_destino_id,
         'cantidad_preseleccionada': cantidad,
@@ -1291,6 +1415,10 @@ def vender_divisas(request):
         monedas_permitidas__codigo='PYG'
     ).distinct().order_by('nombre')
     
+    # Tausers activos para selección
+    from tauser.models import Tauser
+    tausers = Tauser.objects.filter(es_activo=True).order_by('nombre')
+    
     context = {
         'titulo': 'Vender Divisas',
         'monedas_origen': monedas_origen,
@@ -1300,6 +1428,7 @@ def vender_divisas(request):
         'clientes': clientes,
         'metodos_cobro': metodos_cobro,
         'metodos_pago': metodos_pago,
+        'tausers': tausers,
     }
     
     return render(request, 'transacciones/vender_divisas.html', context)
@@ -1825,6 +1954,77 @@ class MisTransaccionesListView(LoginRequiredMixin, ListView):
         })
 
         return context
+
+
+@login_required
+def api_validar_stock_tauser(request):
+    """
+    API endpoint para validar si hay stock suficiente en un Tauser para una transacción
+    """
+    if request.method == 'GET':
+        try:
+            tauser_id = request.GET.get('tauser_id')
+            moneda_codigo = request.GET.get('moneda_codigo')
+            cantidad_requerida = Decimal(request.GET.get('cantidad', '0'))
+            
+            # Validaciones básicas
+            if not tauser_id or not moneda_codigo or cantidad_requerida <= 0:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Parámetros inválidos'
+                })
+            
+            # Obtener objetos
+            try:
+                from tauser.models import Tauser
+                from monedas.models import Moneda
+                tauser = Tauser.objects.get(id=tauser_id, es_activo=True)
+                moneda = Moneda.objects.get(codigo=moneda_codigo, es_activa=True)
+            except (Tauser.DoesNotExist, Moneda.DoesNotExist):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Tauser o moneda no válidos'
+                })
+            
+            # Verificar stock disponible
+            try:
+                from tauser.models import Stock
+                stock = Stock.objects.get(tauser=tauser, moneda=moneda, es_activo=True)
+                stock_disponible = stock.cantidad
+                
+                if stock_disponible >= cantidad_requerida:
+                    return JsonResponse({
+                        'success': True,
+                        'stock_suficiente': True,
+                        'stock_disponible': float(stock_disponible),
+                        'cantidad_requerida': float(cantidad_requerida),
+                        'mensaje': f'Stock suficiente: {stock_disponible} {moneda.codigo} disponibles'
+                    })
+                else:
+                    return JsonResponse({
+                        'success': True,
+                        'stock_suficiente': False,
+                        'stock_disponible': float(stock_disponible),
+                        'cantidad_requerida': float(cantidad_requerida),
+                        'mensaje': f'Stock insuficiente: solo {stock_disponible} {moneda.codigo} disponibles'
+                    })
+                    
+            except Stock.DoesNotExist:
+                return JsonResponse({
+                    'success': True,
+                    'stock_suficiente': False,
+                    'stock_disponible': 0,
+                    'cantidad_requerida': float(cantidad_requerida),
+                    'mensaje': f'No hay stock de {moneda.codigo} en este punto de atención'
+                })
+                
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error interno: {str(e)}'
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido'})
 
 
 # ============================================================================

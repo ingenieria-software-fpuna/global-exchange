@@ -87,8 +87,6 @@
               Seleccione el cliente para aplicar beneficios
             </div>
           </div>
-
-          <!-- Método de Cobro -->
           <div class="col-md-6">
             <label for="metodo_cobro" class="form-label">¿Cómo va a pagar? <span class="text-danger">*</span></label>
             <select id="metodo_cobro" name="metodo_cobro_id" class="form-select" required>
@@ -124,6 +122,24 @@
               <i class="fas fa-calculator me-1"></i>
               Calcular cuánto debo pagar
             </button>
+          </div>
+
+          <!-- Tauser -->
+          <div class="col-md-12">
+            <label for="tauser" class="form-label">Punto de Atención <span class="text-danger">*</span></label>
+            <select id="tauser" name="tauser_id" class="form-select" required>
+              <option value="">Seleccione un punto de atención</option>
+              {% for tauser in tausers %}
+                <option value="{{ tauser.id }}" data-direccion="{{ tauser.direccion }}" data-horario="{{ tauser.horario_atencion }}">
+                  {{ tauser.nombre }} - {{ tauser.direccion }}
+                </option>
+              {% empty %}
+                <option value="" disabled>No hay puntos de atención disponibles</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              Seleccione el punto de atención donde se realizará la transacción.
+            </div>
           </div>
 
           <!-- Preview del Cálculo -->
@@ -211,6 +227,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const cliente = document.getElementById('cliente');
     const metodoCobro = document.getElementById('metodo_cobro');
     const metodoPago = document.getElementById('metodo_pago');
+    const tauser = document.getElementById('tauser');
     
     // Actualizar símbolo de moneda cuando cambie la selección
     function actualizarSimboloMoneda() {
@@ -224,7 +241,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Función para validar si se puede proceder con la compra
     function validarFormularioCompleto() {
-        const esValido = cliente.value && 
+        const esValido = tauser.value &&
+                        cliente.value && 
                         metodoCobro.value && 
                         metodoPago.value &&
                         cantidadDivisa.value && 
@@ -233,12 +251,77 @@ document.addEventListener('DOMContentLoaded', function() {
         return esValido;
     }
     
+    // Variable para almacenar el HTML base del preview
+    let previewBaseHTML = '';
+    let cantidadDeseadaCalculada = null;
+    let monedaComprarCalculada = null;
+    
+    // Función para validar stock y actualizar el preview
+    async function validarStockYActualizarPreview(cantidad, moneda, baseHTML) {
+        // Restaurar el HTML base antes de agregar alertas
+        previewContent.innerHTML = baseHTML;
+        
+        // Si no hay tauser seleccionado, no validar stock pero habilitar botón si todo está completo
+        if (!tauser.value) {
+            const formularioCompleto = validarFormularioCompleto();
+            btnComprar.disabled = !formularioCompleto;
+            return true;
+        }
+        
+        try {
+            const stockParams = new URLSearchParams({
+                tauser_id: tauser.value,
+                moneda_codigo: moneda,
+                cantidad: cantidad
+            });
+            
+            const stockResponse = await fetch(`{% url 'transacciones:api_validar_stock_tauser' %}?${stockParams.toString()}`);
+            const stockResult = await stockResponse.json();
+            
+            if (!stockResult.stock_suficiente) {
+                // Agregar alerta de stock insuficiente
+                const alertaStock = `
+                    <div class="alert alert-warning alert-sm mt-2" id="alerta-stock">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        <strong>Stock insuficiente:</strong> ${stockResult.mensaje}
+                    </div>
+                `;
+                previewContent.innerHTML += alertaStock;
+                btnComprar.disabled = true;
+                return false;
+            } else {
+                // Si hay stock suficiente y el preview está visible, verificar formulario completo
+                if (preview.style.display !== 'none') {
+                    const formularioCompleto = validarFormularioCompleto();
+                    btnComprar.disabled = !formularioCompleto;
+                }
+                return true;
+            }
+        } catch (stockError) {
+            console.error('Error validando stock:', stockError);
+            // En caso de error, no habilitar el botón por seguridad
+            btnComprar.disabled = true;
+            return false;
+        }
+    }
+    
     // Función para calcular preview
     async function calcularPreview() {
+        // Validar que haya cantidad de divisa ingresada
         const cantidadDivisaQuiere = cantidadDivisa.value;
         const monedaComprar = monedaDestino.value;
         
         if (!cantidadDivisaQuiere || parseFloat(cantidadDivisaQuiere) <= 0) {
+            alert('Por favor ingrese la cantidad de divisa que desea comprar.');
+            cantidadDivisa.focus();
+            preview.style.display = 'none';
+            btnComprar.disabled = true;
+            return;
+        }
+        
+        if (!monedaComprar) {
+            alert('Por favor seleccione la moneda que desea comprar.');
+            monedaDestino.focus();
             preview.style.display = 'none';
             btnComprar.disabled = true;
             return;
@@ -261,6 +344,7 @@ document.addEventListener('DOMContentLoaded', function() {
             params.append('monto', '1000000'); // 1 millón PYG como base
             params.append('origen', 'PYG');
             params.append('destino', monedaComprar);
+            if (tauser.value) params.append('tauser_id', tauser.value);
             
             const response = await fetch(`{% url 'transacciones:api_calcular_compra_completa' %}?${params}`);
             const result = await response.json();
@@ -364,7 +448,31 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         </div>
                     </div>
+                    <hr class="my-2">
+                    <div class="text-center">
+                        <small class="text-muted">${data.detalle}</small>
+                    </div>
                 `;
+                
+                // Guardar el HTML base del preview y datos para validaciones futuras (antes de agregar alertas)
+                previewBaseHTML = previewContent.innerHTML;
+                cantidadDeseadaCalculada = cantidadDeseada;
+                monedaComprarCalculada = monedaComprar;
+                
+                // Validar stock inicialmente
+                const stockSuficienteInicial = await validarStockYActualizarPreview(cantidadDeseada, monedaComprar, previewBaseHTML);
+                
+                // Si no hay stock suficiente, no continuar con validaciones de límites
+                if (!stockSuficienteInicial) {
+                    // Actualizar el preview base con la alerta de stock
+                    previewBaseHTML = previewContent.innerHTML;
+                    preview.style.display = 'block';
+                    preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    return;
+                }
+                
+                // Actualizar preview base después de validación de stock (sin alertas)
+                previewBaseHTML = previewContent.innerHTML;
                 
                 // Validar límites antes de habilitar el botón de compra
                 try {
@@ -379,7 +487,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     if (!limitesResult.valido) {
                         const alertaLimites = `
-                            <div class="alert alert-danger mt-3 mb-0 py-2">
+                            <div class="alert alert-danger mt-3 mb-0 py-2" id="alerta-limites">
                                 <small><i class="fas fa-exclamation-triangle me-1"></i>
                                 ${limitesResult.mensaje}</small>
                             </div>
@@ -389,7 +497,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         if (limitesResult.limites_aplicados && limitesResult.limites_aplicados.length > 0) {
                             const infoLimites = `
-                                <div class="mt-3 text-center">
+                                <div class="mt-3 text-center" id="info-limites">
                                     <small class="text-muted">
                                         <i class="fas fa-info-circle"></i> ${limitesResult.limites_aplicados[0]}
                                     </small>
@@ -397,14 +505,18 @@ document.addEventListener('DOMContentLoaded', function() {
                             `;
                             previewContent.innerHTML += infoLimites;
                         }
+                        // Si llegamos aquí, ya validamos stock antes, solo verificar formulario completo
                         const formularioCompleto = validarFormularioCompleto();
                         btnComprar.disabled = !formularioCompleto;
                     }
                 } catch (limitesError) {
                     console.error('Error validando límites:', limitesError);
-                    const formularioCompleto = validarFormularioCompleto();
-                    btnComprar.disabled = !formularioCompleto;
+                    // Verificar stock aunque haya error en límites
+                    await validarStockYActualizarPreview(cantidadDeseada, monedaComprar, previewBaseHTML);
                 }
+                
+                // Actualizar el HTML base con las alertas de límites (si las hay) para preservarlas
+                previewBaseHTML = previewContent.innerHTML;
                 
                 // Guardar el total calculado para usarlo en el envío
                 form.dataset.totalCalculado = Math.round(totalAPagar);
@@ -474,6 +586,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // Event listeners
     btnCalcular.addEventListener('click', calcularPreview);
     
+    // Actualizar métodos de pago cuando cambie la moneda destino
+    monedaDestino.addEventListener('change', actualizarMetodosPago);
+    
+    // Auto-calcular cuando cambien los valores
+    {% comment %} [monto, monedaDestino, cliente, metodoCobro, metodoPago, tauser].forEach(element => {
+        element.addEventListener('change', function() {
+            if (monto.value && parseFloat(monto.value) > 0) {
+                calcularPreview();
+            } else {
+                // Si no hay monto válido, deshabilitar botón
+                btnComprar.disabled = true;
+                preview.style.display = 'none';
+            }
+        });
+    }); {% endcomment %}
     monedaDestino.addEventListener('change', function() {
         actualizarMetodosPago();
         preview.style.display = 'none';
@@ -482,8 +609,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Auto-calcular NO está habilitado, el usuario debe hacer clic en Calcular
     
-    // Validar formulario cuando cambien campos obligatorios
-    [cliente, metodoCobro, metodoPago, cantidadDivisa].forEach(element => {
+    // Validar stock cuando cambie el punto de atención (si ya hay un cálculo previo)
+    tauser.addEventListener('change', async function() {
+        // Si ya hay un cálculo previo, validar el stock con el nuevo punto de atención
+        if (previewBaseHTML && cantidadDeseadaCalculada && monedaComprarCalculada && preview.style.display !== 'none') {
+            await validarStockYActualizarPreview(cantidadDeseadaCalculada, monedaComprarCalculada, previewBaseHTML);
+        } else {
+            // Si no hay cálculo previo, solo deshabilitar el botón
+            btnComprar.disabled = true;
+        }
+    });
+    
+    // Validar formulario completo cuando cambien campos obligatorios
+    [cliente, metodoCobro, metodoPago].forEach(element => {
         element.addEventListener('change', function() {
             if (!validarFormularioCompleto()) {
                 btnComprar.disabled = true;
@@ -494,6 +632,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Envío del formulario
     form.addEventListener('submit', function(e) {
         e.preventDefault();
+        
+        if (!tauser.value) {
+            alert('Por favor seleccione un punto de atención.');
+            tauser.focus();
+            return;
+        }
         
         if (!cliente.value) {
             alert('Por favor seleccione un cliente.');
@@ -531,6 +675,7 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('cliente_id', cliente.value);
         formData.append('metodo_cobro_id', metodoCobro.value);
         formData.append('metodo_pago_id', metodoPago.value);
+        formData.append('tauser_id', tauser.value); // Agregar tauser
         
         btnComprar.disabled = true;
         btnComprar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Procesando...';

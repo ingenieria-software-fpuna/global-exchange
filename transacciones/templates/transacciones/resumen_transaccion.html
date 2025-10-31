@@ -16,6 +16,8 @@
             <span class="badge fs-6 px-3 py-2 
               {% if transaccion.estado.codigo == 'PENDIENTE' %}bg-warning text-dark
               {% elif transaccion.estado.codigo == 'PAGADA' %}bg-success
+              {% elif transaccion.estado.codigo == 'ENTREGADA' %}bg-info
+              {% elif transaccion.estado.codigo == 'RETIRADO' %}bg-primary
               {% elif transaccion.estado.codigo == 'CANCELADA' %}bg-danger
               {% elif transaccion.estado.codigo == 'ANULADA' %}bg-secondary
               {% endif %}">
@@ -42,7 +44,7 @@
 
       <!-- Observaciones (si las hay) -->
       {% if transaccion.observaciones %}
-        {% if transaccion.estado.codigo == 'PAGADA' %}
+        {% if transaccion.estado.codigo == 'PAGADA' or transaccion.estado.codigo == 'ENTREGADA' or transaccion.estado.codigo == 'RETIRADO' %}
         <div class="alert alert-success mb-4" style="border-left: 4px solid #198754;">
           <h5 class="alert-heading mb-2">
             <i class="fas fa-check-circle"></i> Observaciones
@@ -234,28 +236,65 @@
       <div class="card shadow-sm">
         <div class="card-body text-center">
           {% if puede_pagar %}
-            <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-              <form id="form-procesar-pago" method="post" action="{% url 'transacciones:procesar_pago' transaccion.id_transaccion %}" class="me-md-2">
-                {% csrf_token %}
-                <button type="button" class="btn btn-success btn-lg" id="btn-procesar-pago">
-                  <i class="fas fa-credit-card me-2"></i>
-                  Procesar Pago
-                </button>
-              </form>
-              
-              <form method="post" action="{% url 'transacciones:cancelar_transaccion' transaccion.id_transaccion %}">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-outline-danger btn-lg" onclick="return confirm('¿Está seguro que desea cancelar esta transacción?')">
-                  <i class="fas fa-times me-2"></i>
-                  Cancelar
-                </button>
-              </form>
-            </div>
+            {% comment %}Detectar si es venta con cobro en efectivo{% endcomment %}
+            {% if transaccion.tipo_operacion.codigo == 'VENTA' and transaccion.metodo_cobro and 'efectivo' in transaccion.metodo_cobro.nombre|lower %}
+              <!-- Mensaje para ventas con cobro en efectivo -->
+              <div class="alert alert-info mb-4">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Venta con cobro en efectivo</strong>
+                <p class="mb-2 mt-2">Para completar esta transacción, debe entregar las divisas extranjeras en el punto de atención.</p>
+                <p class="mb-0">Presente este código de verificación al personal del punto de atención: <strong>{{ transaccion.codigo_verificacion }}</strong></p>
+              </div>
+              <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                <a href="{% url 'tauser:simulador_cajero' %}" class="btn btn-primary btn-lg">
+                  <i class="fas fa-cash-register me-2"></i>
+                  Ir al Simulador de Cajero
+                </a>
+                <form method="post" action="{% url 'transacciones:cancelar_transaccion' transaccion.id_transaccion %}" class="ms-md-2">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline-danger btn-lg" onclick="return confirm('¿Está seguro que desea cancelar esta transacción?')">
+                    <i class="fas fa-times me-2"></i>
+                    Cancelar
+                  </button>
+                </form>
+              </div>
+            {% else %}
+              <!-- Botones normales para otras transacciones -->
+              <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                <form id="form-procesar-pago" method="post" action="{% url 'transacciones:procesar_pago' transaccion.id_transaccion %}" class="me-md-2">
+                  {% csrf_token %}
+                  <button type="button" class="btn btn-success btn-lg" id="btn-procesar-pago">
+                    <i class="fas fa-credit-card me-2"></i>
+                    Procesar Pago
+                  </button>
+                </form>
+                
+                <form method="post" action="{% url 'transacciones:cancelar_transaccion' transaccion.id_transaccion %}">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline-danger btn-lg" onclick="return confirm('¿Está seguro que desea cancelar esta transacción?')">
+                    <i class="fas fa-times me-2"></i>
+                    Cancelar
+                  </button>
+                </form>
+              </div>
+            {% endif %}
           {% else %}
             <div class="text-muted">
               {% if transaccion.estado.codigo == 'PAGADA' %}
                 <i class="fas fa-check-circle text-success fs-3"></i>
-                <p class="mt-2">Esta transacción ha sido completada exitosamente.</p>
+                <p class="mt-2">
+                  {% if transaccion.tipo_operacion.codigo == 'COMPRA' %}
+                    Esta transacción ha sido pagada. Puede retirar sus divisas en el Tauser.
+                  {% else %}
+                    Esta transacción ha sido pagada. {% if transaccion.metodo_cobro.requiere_retiro_fisico %}Puede retirar sus guaraníes en el Tauser.{% else %}El pago fue procesado.{% endif %}
+                  {% endif %}
+                </p>
+              {% elif transaccion.estado.codigo == 'ENTREGADA' %}
+                <i class="fas fa-hand-holding-usd text-info fs-3"></i>
+                <p class="mt-2">Las divisas han sido entregadas al cliente. Transacción completada.</p>
+              {% elif transaccion.estado.codigo == 'RETIRADO' %}
+                <i class="fas fa-money-bill-wave text-primary fs-3"></i>
+                <p class="mt-2">Los guaraníes han sido retirados por el cliente. Transacción completada.</p>
               {% elif transaccion.estado.codigo == 'CANCELADA' %}
                 <i class="fas fa-times-circle text-danger fs-3"></i>
                 <p class="mt-2">Esta transacción fue cancelada.</p>
@@ -273,6 +312,16 @@
               <i class="fas fa-arrow-left me-2"></i>
               Ir al Simulador
             </a>
+            {% if transaccion.estado.codigo == 'PAGADA' and transaccion.requiere_retiro_fisico %}
+            <a href="{% url 'tauser:simulador_cajero' %}" class="btn btn-success ms-2">
+              <i class="fas fa-cash-register me-2"></i>
+              {% if transaccion.tipo_operacion.codigo == 'COMPRA' %}
+                Retirar Divisas
+              {% else %}
+                Retirar Guaraníes
+              {% endif %}
+            </a>
+            {% endif %}
           </div>
         </div>
       </div>

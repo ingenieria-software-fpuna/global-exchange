@@ -83,7 +83,7 @@ class MetodoPagoForm(forms.ModelForm):
 
     class Meta:
         model = MetodoPago
-        fields = ['nombre', 'descripcion', 'comision', 'monedas_permitidas', 'es_activo']
+        fields = ['nombre', 'descripcion', 'comision', 'monedas_permitidas', 'es_activo', 'requiere_retiro_fisico']
         widgets = {
             'nombre': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -104,6 +104,9 @@ class MetodoPagoForm(forms.ModelForm):
             'es_activo': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             }),
+            'requiere_retiro_fisico': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            }),
             'monedas_permitidas': MonedaSelectorWidget(),
         }
         labels = {
@@ -112,6 +115,7 @@ class MetodoPagoForm(forms.ModelForm):
             'comision': 'Comisión (%)',
             'monedas_permitidas': 'Monedas Permitidas',
             'es_activo': 'Activo',
+            'requiere_retiro_fisico': 'Requiere Retiro Físico',
         }
 
     def clean_nombre(self):

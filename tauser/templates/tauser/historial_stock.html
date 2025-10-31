@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% load static %}
+{% load moneda_extras %}
+
+{% block title %}Historial de Stock - {{ tauser.nombre }} - Global Exchange{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'auth:dashboard' %}">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'tauser:tauser_list' %}">
+                    <i class="fas fa-store me-1"></i>Tausers
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'tauser:tauser_detail' tauser.pk %}">
+                    <i class="fas fa-warehouse me-1"></i>{{ tauser.nombre }}
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-history me-1"></i>Historial de Stock
+            </li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-start mb-3">
+        <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='{% url 'tauser:tauser_detail' tauser.pk %}'">
+            <i class="fas fa-arrow-left me-2"></i>Volver a {{ tauser.nombre }}
+        </button>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center">
+            <div class="currency-symbol bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px; font-size: 18px; font-weight: bold;">
+                <i class="fas fa-warehouse"></i>
+            </div>
+            <div>
+                <h1 class="h2 mb-0">{{ tauser.nombre }}</h1>
+                <p class="text-muted mb-0">Historial de movimientos de stock</p>
+            </div>
+        </div>
+        {% if perms.tauser.add_stock %}
+        <a href="{% url 'tauser:tauser_detail' tauser.pk %}#cargarStockModal" class="btn btn-success">
+            <i class="fas fa-plus me-2"></i>Cargar Stock
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label for="tipo_movimiento" class="form-label">Tipo de Movimiento</label>
+                    <select id="tipo_movimiento" name="tipo_movimiento" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="ENTRADA" {% if filtros.tipo_movimiento == 'ENTRADA' %}selected{% endif %}>Entradas</option>
+                        <option value="SALIDA" {% if filtros.tipo_movimiento == 'SALIDA' %}selected{% endif %}>Salidas</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="origen_movimiento" class="form-label">Origen</label>
+                    <select id="origen_movimiento" name="origen_movimiento" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="MANUAL" {% if filtros.origen_movimiento == 'MANUAL' %}selected{% endif %}>Manual</option>
+                        <option value="TRANSACCION" {% if filtros.origen_movimiento == 'TRANSACCION' %}selected{% endif %}>Transacción</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="fecha_desde" class="form-label">Desde</label>
+                    <input type="date" id="fecha_desde" name="fecha_desde" class="form-control" value="{{ filtros.fecha_desde }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="fecha_hasta" class="form-label">Hasta</label>
+                    <input type="date" id="fecha_hasta" name="fecha_hasta" class="form-control" value="{{ filtros.fecha_hasta }}">
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-1"></i>Filtrar
+                    </button>
+                    <a href="{% url 'tauser:historial_stock' tauser.pk %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times me-1"></i>Limpiar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Resumen de estadísticas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Total Entradas</h6>
+                            <h4 class="mb-0">{{ total_entradas }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-arrow-up fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Total Salidas</h6>
+                            <h4 class="mb-0">{{ total_salidas }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-arrow-down fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Movimientos Manuales</h6>
+                            <h4 class="mb-0">{{ total_manuales }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-hand-paper fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Por Transacciones</h6>
+                            <h4 class="mb-0">{{ total_transacciones }}</h4>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-exchange-alt fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de Historial -->
+    {% if page_obj %}
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th class="text-center">Moneda</th>
+                            <th class="text-center">Tipo</th>
+                            <th class="text-center">Origen</th>
+                            <th class="text-center">Cantidad Movida</th>
+                            <th class="text-center">Cantidad Anterior</th>
+                            <th class="text-center">Cantidad Posterior</th>
+                            <th class="text-center">Usuario</th>
+                            <th class="text-center">Transacción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for movimiento in page_obj %}
+                        <tr>
+                            <td>
+                                <div>
+                                    <strong>{{ movimiento.fecha_movimiento|date:"d/m/Y" }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ movimiento.fecha_movimiento|date:"H:i" }}</small>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <div class="d-flex align-items-center justify-content-center">
+                                    <span class="badge bg-secondary me-2">{{ movimiento.stock.moneda.simbolo }}</span>
+                                    <span>{{ movimiento.stock.moneda.codigo }}</span>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                {% if movimiento.tipo_movimiento == 'ENTRADA' %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-arrow-up me-1"></i>Entrada
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-arrow-down me-1"></i>Salida
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if movimiento.origen_movimiento == 'MANUAL' %}
+                                    <span class="badge bg-info">
+                                        <i class="fas fa-hand-paper me-1"></i>Manual
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-exchange-alt me-1"></i>Transacción
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge {% if movimiento.tipo_movimiento == 'ENTRADA' %}bg-success{% else %}bg-danger{% endif %} text-white">
+                                    {{ movimiento.formatear_cantidad_movida }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-secondary text-white">
+                                    {{ movimiento.formatear_cantidad_anterior }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-primary text-white">
+                                    {{ movimiento.formatear_cantidad_posterior }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                {% if movimiento.usuario %}
+                                    <small class="text-muted">{{ movimiento.usuario.email }}</small>
+                                {% else %}
+                                    <small class="text-muted">-</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if movimiento.transaccion %}
+                                    <a href="#" class="badge bg-warning text-dark" title="Ver transacción">
+                                        {{ movimiento.transaccion.id_transaccion }}
+                                    </a>
+                                {% else %}
+                                    <small class="text-muted">-</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginación -->
+            {% if page_obj.has_other_pages %}
+            <nav aria-label="Navegación de páginas" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if filtros.tipo_movimiento %}&tipo_movimiento={{ filtros.tipo_movimiento }}{% endif %}{% if filtros.origen_movimiento %}&origen_movimiento={{ filtros.origen_movimiento }}{% endif %}{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filtros.tipo_movimiento %}&tipo_movimiento={{ filtros.tipo_movimiento }}{% endif %}{% if filtros.origen_movimiento %}&origen_movimiento={{ filtros.origen_movimiento }}{% endif %}{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filtros.tipo_movimiento %}&tipo_movimiento={{ filtros.tipo_movimiento }}{% endif %}{% if filtros.origen_movimiento %}&origen_movimiento={{ filtros.origen_movimiento }}{% endif %}{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if filtros.tipo_movimiento %}&tipo_movimiento={{ filtros.tipo_movimiento }}{% endif %}{% if filtros.origen_movimiento %}&origen_movimiento={{ filtros.origen_movimiento }}{% endif %}{% if filtros.fecha_desde %}&fecha_desde={{ filtros.fecha_desde }}{% endif %}{% if filtros.fecha_hasta %}&fecha_hasta={{ filtros.fecha_hasta }}{% endif %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        No se encontraron movimientos de stock para {{ tauser.nombre }}.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

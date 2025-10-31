@@ -16,7 +16,7 @@
         </div>
 
     <!-- Quick Actions Section -->
-    {% if can_view_transacciones or can_view_usuarios or can_view_groups or can_view_tipocliente or can_view_cliente or can_view_monedas or can_view_tasacambio or can_view_metodopago or can_view_metodocobro or can_view_configuracion %}
+    {% if can_view_transacciones or can_view_usuarios or can_view_groups or can_view_tipocliente or can_view_cliente or can_view_monedas or can_view_tasacambio or can_view_metodopago or can_view_metodocobro or can_view_configuracion or can_view_tauser %}
     <div class="row mb-3">
         <div class="col-12 mb-1">
             <h2 class="h6 fw-semibold text-dark mb-0">
@@ -105,11 +105,11 @@
     {% endif %}
 
     <!-- Administration Sections Row 1: User & Client Management -->
-    {% if can_view_usuarios or can_view_groups or can_view_tipocliente or can_view_cliente %}
+    {% if can_view_usuarios or can_view_groups or can_view_tauser or can_view_tipocliente or can_view_cliente %}
     <div class="admin-section-container p-3 mb-3">
     <div class="row">
         <!-- User Management Section -->
-        {% if can_view_usuarios or can_view_groups %}
+        {% if can_view_usuarios or can_view_groups or can_view_tauser %}
         <div class="col-lg-6 mb-2">
             <div class="group-header p-2 mb-2">
                 <h2 class="h6 fw-bold text-dark mb-0">
@@ -149,6 +149,26 @@
                             <a href="{% url 'grupos:group_list' %}" class="btn btn-outline-primary btn-sm">
                                 <i class="fas fa-arrow-right"></i>
                             </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if can_view_tauser %}
+                <div class="col-12 mb-1">
+                    <div class="card border-0 shadow-sm hover-shadow">
+                        <div class="card-body d-flex align-items-center p-3">
+                            <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 35px; height: 35px;">
+                                <i class="fas fa-boxes text-primary"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="card-title fw-semibold mb-1">Tausers</h6>
+                                <p class="card-text text-muted mb-0" style="font-size: 0.7rem;">Gestiona los tausers del sistema</p>
+                            </div>
+                            <div class="btn-group" role="group">
+                                <a href="{% url 'tauser:tauser_list' %}" class="btn btn-outline-primary btn-sm" title="Ver Tausers">
+                                    <i class="fas fa-list"></i>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -73,6 +73,10 @@ setup-transactions:
 	@echo "Configurando tipos y estados de transacciones..."
 	poetry run python manage.py setup_transacciones
 
+create-tausers:
+	@echo "Creando Tausers de ejemplo con stock..."
+	poetry run python scripts/create_tausers_test.py
+
 create-transactions:
 	@echo "Creando transacciones de ejemplo..."
 	poetry run python scripts/create_transacciones_test.py
@@ -127,6 +131,7 @@ endif
 	@echo ""
 	@echo "→ Configurando transacciones..."
 	@make setup-transactions
+	make create-tausers
 	@echo ""
 	@echo "→ Creando transacciones de ejemplo..."
 	@make create-transactions
