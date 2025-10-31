@@ -11,7 +11,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 import json
 
-from .models import Moneda
+from .models import Moneda, DenominacionMoneda
 from .forms import MonedaForm
 
 
@@ -67,7 +67,31 @@ class MonedaCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
         return context
 
     def form_valid(self, form):
-        messages.success(self.request, f"Moneda '{form.instance.nombre}' creada exitosamente.")
+        moneda = form.save()
+        
+        # Procesar denominaciones desde los campos individuales
+        valores = self.request.POST.getlist('denominaciones_valor[]')
+        tipos = self.request.POST.getlist('denominaciones_tipo[]')
+        
+        denominaciones_creadas = 0
+        for i, valor in enumerate(valores):
+            if valor.strip():  # Solo procesar si hay valor
+                try:
+                    DenominacionMoneda.objects.create(
+                        moneda=moneda,
+                        valor=float(valor),
+                        tipo=tipos[i] if i < len(tipos) else 'BILLETE',
+                        es_activa=True
+                    )
+                    denominaciones_creadas += 1
+                except (ValueError, IndexError):
+                    continue
+        
+        if denominaciones_creadas > 0:
+            messages.success(self.request, f"Moneda '{moneda.nombre}' y {denominaciones_creadas} denominaciones creadas exitosamente.")
+        else:
+            messages.success(self.request, f"Moneda '{moneda.nombre}' creada exitosamente.")
+            
         return super().form_valid(form)
 
     def form_invalid(self, form):
@@ -87,10 +111,43 @@ class MonedaUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context['titulo'] = f'Editar Moneda: {self.object.nombre}'
         context['accion'] = 'Actualizar'
+        
+        # Obtener denominaciones existentes para mostrar (ordenadas por valor descendente)
+        context['denominaciones'] = DenominacionMoneda.objects.filter(
+            moneda=self.object
+        ).order_by('-valor', 'tipo')
+        
         return context
 
     def form_valid(self, form):
-        messages.success(self.request, f"Moneda '{form.instance.nombre}' actualizada exitosamente.")
+        moneda = form.save()
+        
+        # Eliminar denominaciones existentes y recrear
+        DenominacionMoneda.objects.filter(moneda=moneda).delete()
+        
+        # Procesar nuevas denominaciones desde los campos individuales
+        valores = self.request.POST.getlist('denominaciones_valor[]')
+        tipos = self.request.POST.getlist('denominaciones_tipo[]')
+        
+        denominaciones_creadas = 0
+        for i, valor in enumerate(valores):
+            if valor.strip():  # Solo procesar si hay valor
+                try:
+                    DenominacionMoneda.objects.create(
+                        moneda=moneda,
+                        valor=float(valor),
+                        tipo=tipos[i] if i < len(tipos) else 'BILLETE',
+                        es_activa=True
+                    )
+                    denominaciones_creadas += 1
+                except (ValueError, IndexError):
+                    continue
+        
+        if denominaciones_creadas > 0:
+            messages.success(self.request, f"Moneda '{moneda.nombre}' y {denominaciones_creadas} denominaciones actualizadas exitosamente.")
+        else:
+            messages.success(self.request, f"Moneda '{moneda.nombre}' actualizada exitosamente.")
+            
         return super().form_valid(form)
 
     def form_invalid(self, form):
@@ -180,3 +237,5 @@ def dashboard_monedas(request):
     }
     
     return render(request, 'monedas/dashboard.html', context)
+
+

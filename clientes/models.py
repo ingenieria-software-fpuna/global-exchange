@@ -30,14 +30,27 @@ class Cliente(models.Model):
         help_text="Nombre comercial o razón social del cliente"
     )
     ruc = models.CharField(
-        max_length=20, 
-        unique=True, 
+        max_length=20,
+        unique=True,
         verbose_name="RUC",
         help_text="Número de RUC del cliente",
         validators=[
             RegexValidator(
                 regex=r'^\d{5,20}$',
                 message='El RUC debe contener solo números y tener entre 5 y 20 dígitos.'
+            )
+        ]
+    )
+    dv = models.CharField(
+        max_length=1,
+        verbose_name="DV",
+        help_text="Dígito verificador del RUC",
+        blank=True,
+        null=True,
+        validators=[
+            RegexValidator(
+                regex=r'^\d$',
+                message='El DV debe ser un solo dígito numérico.'
             )
         ]
     )
@@ -117,6 +130,8 @@ class Cliente(models.Model):
         ]
 
     def __str__(self):
+        if self.dv:
+            return f"{self.nombre_comercial} ({self.ruc}-{self.dv})"
         return f"{self.nombre_comercial} ({self.ruc})"
 
     def clean(self):

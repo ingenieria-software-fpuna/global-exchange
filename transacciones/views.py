@@ -1,3 +1,4 @@
+from asyncio.log import logger
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
@@ -11,10 +12,12 @@ from django.db import transaction
 from django.db.models import Q, Count
 from decimal import Decimal, ROUND_HALF_UP
 import json
+import re
 from datetime import datetime, date
 
 from .models import Transaccion, TipoOperacion, EstadoTransaccion
 from monedas.models import Moneda
+from monedas.templatetags.moneda_extras import moneda_format
 from metodo_pago.models import MetodoPago
 from metodo_cobro.models import MetodoCobro
 from clientes.models import Cliente
@@ -22,6 +25,11 @@ from tasa_cambio.models import TasaCambio
 from configuracion.models import ConfiguracionSistema
 from django.db.models import Sum
 from datetime import datetime, timedelta
+
+
+def formatear_guaranies_view(valor):
+    """Helper para formatear guaraníes en vistas"""
+    return moneda_format(valor, 'PYG')
 
 
 def validar_limites_transaccion(monto_origen, moneda_origen, cliente=None, usuario=None):
@@ -44,14 +52,18 @@ def validar_limites_transaccion(monto_origen, moneda_origen, cliente=None, usuar
     # 1. Validar límite por transacción del cliente
     if cliente and cliente.monto_limite_transaccion:
         if monto_origen > cliente.monto_limite_transaccion:
-            errores.append(f'El monto excede el límite por transacción del cliente: {cliente.monto_limite_transaccion}')
-        limites_aplicados.append(f'Cliente: máx. {cliente.monto_limite_transaccion} PYG')
+            limite_formateado = moneda_format(cliente.monto_limite_transaccion, 'PYG')
+            errores.append(f'El monto excede el límite por transacción del cliente: {limite_formateado}')
+        limite_formateado = moneda_format(cliente.monto_limite_transaccion, 'PYG')
+        limites_aplicados.append(f'Cliente: máx. {limite_formateado}')
     
     # 2. Validar límite por transacción de la moneda
     if moneda_origen.monto_limite_transaccion:
         if monto_origen > moneda_origen.monto_limite_transaccion:
-            errores.append(f'El monto excede el límite por transacción de la moneda {moneda_origen.codigo}: {moneda_origen.monto_limite_transaccion}')
-        limites_aplicados.append(f'Moneda {moneda_origen.codigo}: máx. {moneda_origen.monto_limite_transaccion}')
+            limite_formateado = moneda_format(moneda_origen.monto_limite_transaccion, 'PYG')
+            errores.append(f'El monto excede el límite por transacción de la moneda {moneda_origen.codigo}: {limite_formateado}')
+        limite_formateado = moneda_format(moneda_origen.monto_limite_transaccion, 'PYG')
+        limites_aplicados.append(f'Moneda {moneda_origen.codigo}: máx. {limite_formateado}')
     
     # 3. Validar límites diarios y mensuales
     config = ConfiguracionSistema.get_configuracion()
@@ -90,18 +102,28 @@ def validar_limites_transaccion(monto_origen, moneda_origen, cliente=None, usuar
             total_dia_con_nueva = transacciones_hoy + monto_origen
             if total_dia_con_nueva > config.limite_diario_transacciones:
                 disponible_hoy = config.limite_diario_transacciones - transacciones_hoy
-                errores.append(f'Excede el límite diario para {cliente.nombre_comercial}: {config.limite_diario_transacciones} (ya usado: {transacciones_hoy}, disponible: {disponible_hoy})')
+                limite_fmt = moneda_format(config.limite_diario_transacciones, 'PYG')
+                usado_fmt = moneda_format(transacciones_hoy, 'PYG')
+                disponible_fmt = moneda_format(disponible_hoy, 'PYG')
+                errores.append(f'Excede el límite diario para {cliente.nombre_comercial}: {limite_fmt} (ya usado: {usado_fmt}, disponible: {disponible_fmt})')
             
-            limites_aplicados.append(f'Límite diario ({cliente.nombre_comercial}): {config.limite_diario_transacciones} (usado: {transacciones_hoy})')
+            limite_fmt = moneda_format(config.limite_diario_transacciones, 'PYG')
+            usado_fmt = moneda_format(transacciones_hoy, 'PYG')
+            limites_aplicados.append(f'Límite diario ({cliente.nombre_comercial}): {limite_fmt} (usado: {usado_fmt})')
         
         # Validar límite mensual
         if config.limite_mensual_transacciones > 0:
             total_mes_con_nueva = transacciones_mes + monto_origen
             if total_mes_con_nueva > config.limite_mensual_transacciones:
                 disponible_mes = config.limite_mensual_transacciones - transacciones_mes
-                errores.append(f'Excede el límite mensual para {cliente.nombre_comercial}: {config.limite_mensual_transacciones} (ya usado: {transacciones_mes}, disponible: {disponible_mes})')
+                limite_fmt = moneda_format(config.limite_mensual_transacciones, 'PYG')
+                usado_fmt = moneda_format(transacciones_mes, 'PYG')
+                disponible_fmt = moneda_format(disponible_mes, 'PYG')
+                errores.append(f'Excede el límite mensual para {cliente.nombre_comercial}: {limite_fmt} (ya usado: {usado_fmt}, disponible: {disponible_fmt})')
             
-            limites_aplicados.append(f'Límite mensual ({cliente.nombre_comercial}): {config.limite_mensual_transacciones} (usado: {transacciones_mes})')
+            limite_fmt = moneda_format(config.limite_mensual_transacciones, 'PYG')
+            usado_fmt = moneda_format(transacciones_mes, 'PYG')
+            limites_aplicados.append(f'Límite mensual ({cliente.nombre_comercial}): {limite_fmt} (usado: {usado_fmt})')
     
     elif usuario and not cliente:
         # Sin cliente: no validar límites diarios/mensuales, pero informar que se requiere cliente
@@ -193,24 +215,7 @@ def iniciar_compra(request):
                 messages.error(request, 'El método de pago seleccionado no es válido.')
                 return redirect('tasa_cambio:dashboard')
         
-        # Validar límites de transacción
-        # Para compras: validar el monto que el cliente va a pagar contra el límite de la moneda que se compra
-        validacion_limites = validar_limites_transaccion(
-            monto_origen=monto,
-            moneda_origen=moneda_destino,  # Moneda que se compra (AUD) para validar su límite
-            cliente=cliente,
-            usuario=request.user
-        )
-        
-        if not validacion_limites['valido']:
-            messages.error(request, f'Transacción rechazada: {validacion_limites["mensaje"]}')
-            # Redirigir según desde donde vino
-            if metodo_cobro_id:
-                return redirect('transacciones:comprar_divisas')
-            else:
-                return redirect('tasa_cambio:dashboard')
-        
-        # Calcular la transacción usando la NUEVA lógica (igual que la vista previa)
+        # Calcular la transacción primero para saber cuánto pagará en PYG
         resultado = calcular_transaccion_completa(
             monto=monto,
             moneda_origen=moneda_origen,
@@ -225,6 +230,26 @@ def iniciar_compra(request):
             messages.error(request, f'Error en el cálculo: {error_msg}')
             return redirect('tasa_cambio:dashboard')
         
+        # Obtener el total a pagar en PYG para validar límites
+        data = resultado['data']
+        total_a_pagar_pyg = Decimal(str(data['total']))
+        
+        # Validar límites de transacción usando el monto en PYG que va a pagar
+        validacion_limites = validar_limites_transaccion(
+            monto_origen=total_a_pagar_pyg,
+            moneda_origen=moneda_origen,  # PYG
+            cliente=cliente,
+            usuario=request.user
+        )
+        
+        if not validacion_limites['valido']:
+            messages.error(request, f'Transacción rechazada: {validacion_limites["mensaje"]}')
+            # Redirigir según desde donde vino
+            if metodo_cobro_id:
+                return redirect('transacciones:comprar_divisas')
+            else:
+                return redirect('tasa_cambio:dashboard')
+        
         # Crear la transacción
         with transaction.atomic():
             tipo_compra = TipoOperacion.objects.get(codigo=TipoOperacion.COMPRA)
@@ -234,9 +259,11 @@ def iniciar_compra(request):
             data = resultado['data']
             
             # Calcular porcentajes de comisión correctos
+            # El porcentaje se calcula sobre el SUBTOTAL (antes de comisiones)
+            subtotal_pyg = Decimal(str(data.get('subtotal', 0)))
             porcentaje_comision_total = Decimal('0')
-            if monto > 0:
-                porcentaje_comision_total = (Decimal(str(data.get('comision_total', 0))) / monto * Decimal('100')).quantize(Decimal('0.0001'))
+            if subtotal_pyg > 0:
+                porcentaje_comision_total = (Decimal(str(data.get('comision_total', 0))) / subtotal_pyg * Decimal('100')).quantize(Decimal('0.0001'))
             
             nueva_transaccion = Transaccion(
                 cliente=cliente,
@@ -244,7 +271,7 @@ def iniciar_compra(request):
                 tipo_operacion=tipo_compra,
                 moneda_origen=moneda_origen,
                 moneda_destino=moneda_destino,
-                monto_origen=monto,  # Lo que el cliente pagará
+                monto_origen=total_a_pagar_pyg,  # Lo que el cliente pagará en PYG
                 monto_destino=Decimal(str(data['resultado'])),  # Lo que recibirá
                 metodo_cobro=metodo_cobro,  # Para compras, usamos método de cobro
                 metodo_pago=metodo_pago,    # Para compatibilidad con dashboard antiguo
@@ -290,14 +317,24 @@ def resumen_transaccion(request, transaccion_id):
         transaccion.cancelar_por_expiracion()
         messages.warning(request, 'Esta transacción ha expirado y fue cancelada automáticamente.')
     
+    # Obtener información de factura electrónica si existe
+    factura_info = None
+    if transaccion.de_id:
+        try:
+            from facturacion_service.factura_utils import get_factura_files_for_transaction
+            factura_info = get_factura_files_for_transaction(transaccion.de_id)
+        except Exception as e:
+            logger.error(f"Error al obtener info de factura para transacción {transaccion_id}: {e}")
+
     context = {
         'transaccion': transaccion,
         'resumen_financiero': transaccion.get_resumen_financiero(),  # Mantener compatibilidad
         'resumen_detallado': transaccion.get_resumen_detallado(),    # Nuevo resumen detallado
         'puede_pagar': transaccion.estado.codigo == EstadoTransaccion.PENDIENTE and not transaccion.esta_expirada(),
         'tiempo_restante': (transaccion.fecha_expiracion - timezone.now()).total_seconds() if not transaccion.esta_expirada() else 0,
+        'factura_info': factura_info,  # Información de factura electrónica
     }
-    
+
     return render(request, 'transacciones/resumen_transaccion.html', context)
 
 
@@ -440,11 +477,33 @@ def verificar_cambio_cotizacion(request, transaccion_id):
             if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
                 return JsonResponse({'success': False, 'error': 'Sin permisos'})
         
-        # Verificar que esté pendiente o cancelada por cambio de tasa
-        if transaccion.estado.codigo not in ['PENDIENTE', 'CANCELADA']:
+        # Verificar estado según el tipo de operación
+        es_compra = transaccion.tipo_operacion.codigo == 'COMPRA'
+        es_venta = transaccion.tipo_operacion.codigo == 'VENTA'
+        
+        # Para COMPRAS que ya están PAGADAS: no verificar cambio de cotización
+        # La transacción ya fue pagada, solo necesita retiro físico (no hay cambio de cotización relevante)
+        if es_compra and transaccion.estado.codigo == EstadoTransaccion.PAGADA:
+            return JsonResponse({
+                'success': True,
+                'hay_cambio': False,
+                'message': 'Transacción pagada, no requiere verificación de cotización'
+            })
+        
+        # Para COMPRAS con estado ENTREGADA: ya fue procesada
+        if es_compra and transaccion.estado.codigo == EstadoTransaccion.ENTREGADA:
+            return JsonResponse({
+                'success': False,
+                'error': 'Esta transacción ya fue entregada al cliente.'
+            })
+        
+        # Para VENTAS con efectivo en PENDIENTE: verificar cambio de cotización antes de entregar divisas
+        # Para otras transacciones PENDIENTE: también verificar
+        # Para transacciones CANCELADAS: permitir verificar (por si se quiere recrear)
+        if transaccion.estado.codigo not in [EstadoTransaccion.PENDIENTE, EstadoTransaccion.CANCELADA]:
             return JsonResponse({
                 'success': False, 
-                'error': f'Transacción ya no se puede procesar. Estado actual: {transaccion.estado.codigo}'
+                'error': f'Transacción ya no se puede procesar. Estado actual: {transaccion.estado.nombre}'
             })
             
         # Verificar expiración
@@ -633,6 +692,103 @@ def crear_con_nueva_cotizacion(request, transaccion_id):
             
             print(f"DEBUG: Nueva transacción creada con ID: {nueva_transaccion.id_transaccion}")
             
+            # Detectar si se está llamando desde el simulador (tauser_id presente)
+            es_desde_simulador = datos.get('tauser_id') is not None
+            
+            # Si es desde el simulador, devolver datos completos similar a verificar_codigo_retiro
+            if es_desde_simulador:
+                tauser_id = datos.get('tauser_id')
+                from tauser.models import Tauser, Stock
+                
+                try:
+                    tauser = Tauser.objects.get(id=tauser_id, es_activo=True)
+                except Tauser.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Tauser no válido o inactivo'
+                    })
+                
+                # Verificar stock si es necesario
+                stock = None
+                if nueva_transaccion.moneda_destino.codigo != 'PYG':
+                    try:
+                        stock = Stock.objects.get(
+                            tauser=tauser,
+                            moneda=nueva_transaccion.moneda_destino,
+                            es_activo=True
+                        )
+                        if stock.cantidad < nueva_transaccion.monto_destino:
+                            return JsonResponse({
+                                'success': False,
+                                'error': f'Stock insuficiente. Disponible: {stock.mostrar_cantidad()}, Requerido: {nueva_transaccion.moneda_destino.mostrar_monto(nueva_transaccion.monto_destino)}'
+                            })
+                    except Stock.DoesNotExist:
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'No hay stock de {nueva_transaccion.moneda_destino.nombre} en {tauser.nombre}'
+                        })
+                
+                # Preparar datos de la transacción para mostrar (similar a verificar_codigo_retiro)
+                resumen_detallado = nueva_transaccion.get_resumen_detallado()
+                
+                # Detectar si es venta con cobro en efectivo
+                es_venta_con_efectivo = (
+                    nueva_transaccion.tipo_operacion.codigo == 'VENTA' and 
+                    nueva_transaccion.metodo_cobro and 
+                    nueva_transaccion.metodo_cobro.nombre.lower().find('efectivo') != -1
+                )
+                
+                # Preparar datos adicionales para ventas con cobro en efectivo
+                datos_adicionales = {
+                    'metodo_cobro': nueva_transaccion.metodo_cobro.nombre if nueva_transaccion.metodo_cobro else None,
+                    'metodo_pago': nueva_transaccion.metodo_pago.nombre if nueva_transaccion.metodo_pago else None,
+                }
+                
+                if es_venta_con_efectivo:
+                    datos_adicionales.update({
+                        'moneda_origen': {
+                            'codigo': nueva_transaccion.moneda_origen.codigo,
+                            'nombre': nueva_transaccion.moneda_origen.nombre,
+                            'simbolo': nueva_transaccion.moneda_origen.simbolo
+                        } if nueva_transaccion.moneda_origen else None,
+                        'monto_a_entregar': float(nueva_transaccion.monto_origen),
+                        'monto_a_entregar_formateado': f"{nueva_transaccion.moneda_origen.simbolo}{nueva_transaccion.monto_origen:.{nueva_transaccion.moneda_origen.decimales}f}" if nueva_transaccion.moneda_origen else None,
+                        'monto_a_recibir': float(nueva_transaccion.monto_destino),
+                        'monto_a_recibir_formateado': f"{nueva_transaccion.moneda_destino.simbolo}{nueva_transaccion.monto_destino:.{nueva_transaccion.moneda_destino.decimales}f}" if nueva_transaccion.moneda_destino else None,
+                    })
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Nueva transacción creada exitosamente con cotización actualizada',
+                    'transaccion': {
+                        'id': nueva_transaccion.id_transaccion,
+                        'codigo_verificacion': nueva_transaccion.codigo_verificacion,
+                        'tipo': nueva_transaccion.tipo_operacion.nombre,
+                        'cliente': nueva_transaccion.cliente.nombre_comercial if nueva_transaccion.cliente else 'Casual',
+                        'moneda_destino': {
+                            'codigo': nueva_transaccion.moneda_destino.codigo,
+                            'nombre': nueva_transaccion.moneda_destino.nombre,
+                            'simbolo': nueva_transaccion.moneda_destino.simbolo
+                        },
+                        'monto_a_retirar': float(nueva_transaccion.monto_destino),
+                        'monto_a_retirar_formateado': f"{nueva_transaccion.moneda_destino.simbolo}{nueva_transaccion.monto_destino:.{nueva_transaccion.moneda_destino.decimales}f}",
+                        'fecha_creacion': nueva_transaccion.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+                        'fecha_pago': nueva_transaccion.fecha_pago.strftime('%d/%m/%Y %H:%M') if nueva_transaccion.fecha_pago else None,
+                        **datos_adicionales
+                    },
+                    'tauser': {
+                        'id': tauser.id,
+                        'nombre': tauser.nombre,
+                        'direccion': tauser.direccion,
+                    },
+                    'stock_disponible': {
+                        'cantidad': float(stock.cantidad) if stock else 0,
+                        'cantidad_formateada': stock.mostrar_cantidad() if stock else 'N/A',
+                        'esta_bajo_stock': stock.esta_bajo_stock() if stock else False
+                    }
+                })
+            
+            # Si no es desde el simulador, devolver respuesta estándar
             return JsonResponse({
                 'success': True,
                 'message': 'Nueva transacción creada exitosamente',
@@ -736,8 +892,15 @@ def comprar_divisas(request):
     Vista para la pantalla dedicada de compra de divisas.
     Muestra un formulario específico para compras con métodos de cobro.
     """
-    # Monedas activas para el selector
-    monedas_activas = Moneda.objects.filter(es_activa=True).order_by('nombre')
+    # Monedas activas que tienen tasa de cambio (excluye PYG que es la moneda base)
+    monedas_con_tasa = TasaCambio.objects.filter(
+        es_activa=True
+    ).values_list('moneda_id', flat=True)
+    
+    monedas_activas = Moneda.objects.filter(
+        es_activa=True,
+        id__in=monedas_con_tasa
+    ).order_by('nombre')
     
     # Clientes asociados al usuario
     clientes_usuario = Cliente.objects.filter(
@@ -758,6 +921,10 @@ def comprar_divisas(request):
     # Métodos de pago activos (para entregar divisas al cliente)
     metodos_pago = MetodoPago.objects.filter(es_activo=True).order_by('nombre')
     
+    # Tausers activos para selección
+    from tauser.models import Tauser
+    tausers = Tauser.objects.filter(es_activo=True).order_by('nombre')
+    
     # Obtener parámetros de URL para pre-poblar el formulario (desde el simulador)
     moneda_origen_id = request.GET.get('moneda_origen')
     moneda_destino_id = request.GET.get('moneda_destino')
@@ -770,6 +937,7 @@ def comprar_divisas(request):
         'clientes': clientes_usuario,
         'metodos_cobro': metodos_cobro,
         'metodos_pago': metodos_pago,
+        'tausers': tausers,
         'moneda_origen_preseleccionada': moneda_origen_id,
         'moneda_destino_preseleccionada': moneda_destino_id,
         'cantidad_preseleccionada': cantidad,
@@ -892,46 +1060,51 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
         tipo_operacion = 'venta' + (' (ajustada)' if descuento_pct > 0 else '')
         
         # LÓGICA DE CÁLCULO PARA COMPRAS:
-        # 1. El monto ingresado es lo que el cliente quiere PAGAR (en PYG)
-        monto_a_pagar = monto
+        # 1. El monto ingresado es lo que el cliente quiere RECIBIR (en divisa extranjera)
+        cantidad_divisa_deseada = monto
         
-        # 2. Calcular comisiones de métodos SOBRE el monto que va a pagar
-        comision_cobro = Decimal('0')
-        comision_pago = Decimal('0')
+        # 2. Calcular el subtotal en PYG necesario para obtener esa cantidad de divisa
+        # subtotal = cantidad_deseada × tasa_ajustada
+        subtotal_pyg = cantidad_divisa_deseada * precio_usado
+        
+        # 3. Calcular comisiones de métodos SOBRE el subtotal
+        comision_cobro_pct = Decimal('0')
+        comision_pago_pct = Decimal('0')
         
         if metodo_cobro and metodo_cobro.comision > 0:
-            comision_cobro = monto_a_pagar * (Decimal(str(metodo_cobro.comision)) / Decimal('100'))
+            comision_cobro_pct = Decimal(str(metodo_cobro.comision)) / Decimal('100')
         
         if metodo_pago and metodo_pago.comision > 0:
-            comision_pago = monto_a_pagar * (Decimal(str(metodo_pago.comision)) / Decimal('100'))
+            comision_pago_pct = Decimal(str(metodo_pago.comision)) / Decimal('100')
         
+        comision_total_pct = comision_cobro_pct + comision_pago_pct
+        
+        comision_cobro = subtotal_pyg * comision_cobro_pct
+        comision_pago = subtotal_pyg * comision_pago_pct
         comision_total = comision_cobro + comision_pago
         
-        # 3. Calcular el monto neto disponible para la conversión (después de comisiones)
-        monto_neto_conversion = monto_a_pagar - comision_total
+        # 4. Total a pagar = subtotal + comisiones
+        total_a_pagar = subtotal_pyg + comision_total
         
-        # 4. Convertir el monto neto a la divisa destino usando la tasa ajustada
-        resultado_final = (monto_neto_conversion / precio_usado).quantize(
+        # 5. Lo que recibirá es exactamente lo que pidió
+        resultado_final = cantidad_divisa_deseada.quantize(
             Decimal('1.' + '0' * max(moneda_destino.decimales, 0)), 
             rounding=ROUND_HALF_UP
         )
         
-        # 5. Calcular el monto real del descuento aplicado
-        # El descuento es el ahorro en PYG que obtiene el cliente sobre la comisión de cambio
+        # 6. Calcular el monto real del descuento aplicado
+        # El descuento es el ahorro sobre la comisión de venta (por unidad de divisa)
         descuento_aplicado = Decimal('0')
         if descuento_pct > 0:
             # El descuento se aplica sobre la comisión de venta
             comision_original = Decimal(str(tasa_destino.comision_venta))
             comision_con_descuento = comision_venta_ajustada
-            descuento_en_comision = comision_original - comision_con_descuento
-            
-            # El descuento en PYG es: (descuento en comisión) × (cantidad de divisa que obtiene)
-            cantidad_divisa_obtenida = resultado_final
-            descuento_aplicado = descuento_en_comision * cantidad_divisa_obtenida
+            # El descuento aplicado es la diferencia entre la comisión original y la ajustada
+            descuento_aplicado = comision_original - comision_con_descuento
         
-        # 6. Valores para mostrar
-        subtotal = monto_a_pagar  # Lo que ingresó el cliente
-        total_origen = monto_a_pagar  # El cliente paga exactamente lo que ingresó
+        # 7. Valores para mostrar
+        subtotal = subtotal_pyg  # Monto base antes de comisiones de métodos
+        total_origen = total_a_pagar  # Total que debe pagar incluyendo TODO
         
         # Formatear montos
         def formatear_monto(valor, moneda):
@@ -1254,6 +1427,10 @@ def vender_divisas(request):
         monedas_permitidas__codigo='PYG'
     ).distinct().order_by('nombre')
     
+    # Tausers activos para selección
+    from tauser.models import Tauser
+    tausers = Tauser.objects.filter(es_activo=True).order_by('nombre')
+    
     context = {
         'titulo': 'Vender Divisas',
         'monedas_origen': monedas_origen,
@@ -1263,6 +1440,7 @@ def vender_divisas(request):
         'clientes': clientes,
         'metodos_cobro': metodos_cobro,
         'metodos_pago': metodos_pago,
+        'tausers': tausers,
     }
     
     return render(request, 'transacciones/vender_divisas.html', context)
@@ -1563,12 +1741,47 @@ def iniciar_venta(request):
                 return redirect('transacciones:vender_divisas')
         
         metodo_pago = None
+        datos_metodo_pago = {}
         if metodo_pago_id:
             try:
                 metodo_pago = MetodoPago.objects.get(id=metodo_pago_id, es_activo=True)
             except MetodoPago.DoesNotExist:
                 messages.error(request, 'Método de pago seleccionado no válido.')
                 return redirect('transacciones:vender_divisas')
+        
+        # Capturar y validar los campos dinámicos del método de pago seleccionado
+        if metodo_pago:
+            campos_recibidos = []
+            for campo in metodo_pago.get_campos_activos():
+                key = f"campos_metodo_pago[{campo.id}]"
+                valor = request.POST.get(key, '')
+                valor_normalizado = valor.strip() if isinstance(valor, str) else valor
+                
+                if campo.es_obligatorio and not valor_normalizado:
+                    messages.error(request, f'Complete el campo requerido: {campo.etiqueta}.')
+                    return redirect('transacciones:vender_divisas')
+                
+                if valor_normalizado and campo.regex_validacion:
+                    if not re.match(campo.regex_validacion, valor_normalizado):
+                        messages.error(
+                            request,
+                            f'El valor ingresado en "{campo.etiqueta}" no cumple con el formato requerido.'
+                        )
+                        return redirect('transacciones:vender_divisas')
+                
+                campos_recibidos.append({
+                    'id': campo.id,
+                    'nombre': campo.nombre,
+                    'etiqueta': campo.etiqueta,
+                    'valor': valor_normalizado,
+                    'tipo': campo.tipo,
+                })
+            
+            datos_metodo_pago = {
+                'metodo_pago_id': metodo_pago.id,
+                'metodo_pago_nombre': metodo_pago.nombre,
+                'campos': campos_recibidos,
+            }
         
         # Calcular la transacción
         resultado_calculo = calcular_venta_completa(
@@ -1628,6 +1841,7 @@ def iniciar_venta(request):
                 monto_comision=Decimal(str(data.get('comision_total', 0))),  # Monto total de comisión
                 porcentaje_descuento=Decimal(str(data.get('descuento_pct', 0))),  # Porcentaje de descuento del cliente
                 monto_descuento=Decimal(str(data.get('descuento_aplicado', 0))),  # Monto de descuento aplicado
+                datos_metodo_pago=datos_metodo_pago,
                 estado=estado_pendiente,
                 ip_cliente=get_client_ip(request)
             )
@@ -1790,15 +2004,199 @@ class MisTransaccionesListView(LoginRequiredMixin, ListView):
         return context
 
 
+@login_required
+def api_validar_stock_tauser(request):
+    """
+    API endpoint para validar si hay stock suficiente en un Tauser para una transacción
+    """
+    if request.method == 'GET':
+        try:
+            tauser_id = request.GET.get('tauser_id')
+            moneda_codigo = request.GET.get('moneda_codigo')
+            cantidad_requerida = Decimal(request.GET.get('cantidad', '0'))
+            
+            # Validaciones básicas
+            if not tauser_id or not moneda_codigo or cantidad_requerida <= 0:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Parámetros inválidos'
+                })
+            
+            # Obtener objetos
+            try:
+                from tauser.models import Tauser
+                from monedas.models import Moneda
+                tauser = Tauser.objects.get(id=tauser_id, es_activo=True)
+                moneda = Moneda.objects.get(codigo=moneda_codigo, es_activa=True)
+            except (Tauser.DoesNotExist, Moneda.DoesNotExist):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Tauser o moneda no válidos'
+                })
+            
+            # Verificar stock disponible
+            try:
+                from tauser.models import Stock
+                stock = Stock.objects.get(tauser=tauser, moneda=moneda, es_activo=True)
+                stock_disponible = stock.cantidad
+                
+                if stock_disponible >= cantidad_requerida:
+                    return JsonResponse({
+                        'success': True,
+                        'stock_suficiente': True,
+                        'stock_disponible': float(stock_disponible),
+                        'cantidad_requerida': float(cantidad_requerida),
+                        'mensaje': f'Stock suficiente: {stock_disponible} {moneda.codigo} disponibles'
+                    })
+                else:
+                    return JsonResponse({
+                        'success': True,
+                        'stock_suficiente': False,
+                        'stock_disponible': float(stock_disponible),
+                        'cantidad_requerida': float(cantidad_requerida),
+                        'mensaje': f'Stock insuficiente: solo {stock_disponible} {moneda.codigo} disponibles'
+                    })
+                    
+            except Stock.DoesNotExist:
+                return JsonResponse({
+                    'success': True,
+                    'stock_suficiente': False,
+                    'stock_disponible': 0,
+                    'cantidad_requerida': float(cantidad_requerida),
+                    'mensaje': f'No hay stock de {moneda.codigo} en este punto de atención'
+                })
+                
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error interno: {str(e)}'
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido'})
+
+
 # ============================================================================
 # FUNCIONES DE PAGOS MOVIDAS A LA APP 'pagos'
 # ============================================================================
 # Las funciones de procesamiento de pagos ahora están en pagos/views.py
 # - _procesar_pago_con_pasarela()
 # - pago_billetera_electronica()
-# - pago_tarjeta_debito() 
+# - pago_tarjeta_debito()
 # - pago_transferencia_bancaria()
 # - webhook_pago()
 #
 # Esta app solo maneja la lógica de transacciones.
 # ============================================================================
+
+
+# ============================================================================
+# FACTURACIÓN ELECTRÓNICA - Descarga de archivos
+# ============================================================================
+
+@login_required
+def descargar_factura(request, transaccion_id, tipo_archivo):
+    """
+    Permite descargar los archivos PDF o XML de una factura electrónica.
+
+    Args:
+        transaccion_id: ID de la transacción
+        tipo_archivo: 'pdf' o 'xml'
+    """
+    from django.http import FileResponse
+    import os
+
+    # Obtener la transacción
+    transaccion = get_object_or_404(
+        Transaccion.objects.select_related('cliente', 'usuario'),
+        id_transaccion=transaccion_id
+    )
+
+    # Verificar permisos
+    if transaccion.usuario != request.user:
+        if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+            raise Http404("Transacción no encontrada")
+
+    # Verificar que la transacción tenga DE asignado
+    if not transaccion.de_id:
+        messages.error(request, 'Esta transacción no tiene factura electrónica generada.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+    # Obtener información de los archivos
+    try:
+        from facturacion_service.factura_utils import get_factura_files_for_transaction
+
+        factura_info = get_factura_files_for_transaction(transaccion.de_id)
+
+        if not factura_info['disponible']:
+            messages.error(request, f'La factura no está disponible para descarga. Estado: {factura_info["estado"]}')
+            return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+        # Obtener la ruta del archivo solicitado
+        if tipo_archivo == 'pdf':
+            archivo_path = factura_info['pdf']
+        elif tipo_archivo == 'xml':
+            archivo_path = factura_info['xml']
+        else:
+            raise Http404("Tipo de archivo no válido")
+
+        if not archivo_path or not os.path.exists(archivo_path):
+            messages.error(request, f'Archivo {tipo_archivo.upper()} no encontrado.')
+            return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+        # Servir el archivo
+        filename = os.path.basename(archivo_path)
+        response = FileResponse(
+            open(archivo_path, 'rb'),
+            content_type='application/pdf' if tipo_archivo == 'pdf' else 'application/xml'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error al descargar factura para transacción {transaccion_id}: {e}")
+        messages.error(request, 'Error al descargar el archivo.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+
+@login_required
+@require_http_methods(["POST"])
+def reintentar_factura(request, transaccion_id):
+    """
+    Reintenta la generación de factura para una transacción cuando falló o está en "Verificar datos".
+    """
+    # Obtener la transacción
+    transaccion = get_object_or_404(
+        Transaccion.objects.select_related('cliente', 'usuario'),
+        id_transaccion=transaccion_id
+    )
+
+    # Verificar permisos
+    if transaccion.usuario != request.user:
+        if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+            raise Http404("Transacción no encontrada")
+
+    # Verificar que la transacción esté pagada
+    if transaccion.estado.codigo != EstadoTransaccion.PAGADA:
+        messages.error(request, 'Solo se puede generar factura para transacciones pagadas.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+    try:
+        from facturacion_service import generar_factura_desde_transaccion
+
+        logger.info(f"Reintentando generación de factura para transacción {transaccion_id}")
+
+        # Generar nueva factura (esto creará un nuevo DE)
+        de_id = generar_factura_desde_transaccion(transaccion)
+
+        # Actualizar transacción con el nuevo de_id
+        Transaccion.objects.filter(id=transaccion.id).update(de_id=de_id)
+
+        logger.info(f"✅ Factura regenerada exitosamente. Nuevo DE ID: {de_id}")
+        messages.success(request, f'Factura regenerada exitosamente. Nuevo DE ID: {de_id}')
+
+    except Exception as e:
+        logger.error(f"Error al reintentar factura para transacción {transaccion_id}: {e}")
+        messages.error(request, f'Error al generar la factura: {str(e)}')
+
+    return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)

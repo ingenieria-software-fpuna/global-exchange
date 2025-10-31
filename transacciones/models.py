@@ -13,6 +13,7 @@ from monedas.models import Moneda
 from metodo_pago.models import MetodoPago
 from metodo_cobro.models import MetodoCobro
 from clientes.models import Cliente
+from tauser.models import Tauser
 
 User = get_user_model()
 
@@ -67,12 +68,16 @@ class EstadoTransaccion(models.Model):
     """
     PENDIENTE = 'PENDIENTE'
     PAGADA = 'PAGADA'
+    ENTREGADA = 'ENTREGADA'
+    RETIRADO = 'RETIRADO'
     CANCELADA = 'CANCELADA'
     ANULADA = 'ANULADA'
     
     ESTADOS_CHOICES = [
         (PENDIENTE, 'Pendiente de Pago'),
         (PAGADA, 'Pagada'),
+        (ENTREGADA, 'Entregada'),
+        (RETIRADO, 'Retirado'),
         (CANCELADA, 'Cancelada'),
         (ANULADA, 'Anulada'),
     ]
@@ -133,6 +138,15 @@ class Transaccion(models.Model):
         null=True,
         blank=True,
         help_text="Cliente que realiza la transacción (opcional para clientes casuales)"
+    )
+    tauser = models.ForeignKey(
+        Tauser,
+        on_delete=models.PROTECT,
+        related_name='transacciones',
+        verbose_name="Tauser",
+        null=True,
+        blank=True,
+        help_text="Punto de atención donde se realiza la transacción (opcional)"
     )
     usuario = models.ForeignKey(
         User,
@@ -196,6 +210,18 @@ class Transaccion(models.Model):
         null=True,
         blank=True,
         help_text="Método por el cual se entrega el dinero"
+    )
+    datos_metodo_pago = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Datos del Método de Pago",
+        help_text="Información adicional requerida por el método de pago seleccionado (número de cuenta, billetera, etc.)"
+    )
+    registro_deposito = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Registro del Depósito",
+        help_text="Información del depósito realizado al cliente mediante el simulador"
     )
     
     # Tasa de cambio utilizada
@@ -288,6 +314,14 @@ class Transaccion(models.Model):
         help_text="Dirección IP desde donde se originó la transacción"
     )
 
+    # Facturación electrónica
+    de_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="ID del Documento Electrónico",
+        help_text="ID del DE generado en SQL-Proxy para facturación"
+    )
+
     class Meta:
         verbose_name = "Transacción"
         verbose_name_plural = "Transacciones"
@@ -295,6 +329,7 @@ class Transaccion(models.Model):
         indexes = [
             models.Index(fields=['id_transaccion']),
             models.Index(fields=['cliente', '-fecha_creacion']),
+            models.Index(fields=['tauser', '-fecha_creacion']),
             models.Index(fields=['usuario', '-fecha_creacion']),
             models.Index(fields=['estado', '-fecha_creacion']),
             models.Index(fields=['fecha_expiracion']),
@@ -318,7 +353,7 @@ class Transaccion(models.Model):
         
         # Establecer fecha de expiración si no existe (5 minutos por defecto)
         if not self.fecha_expiracion:
-            self.fecha_expiracion = timezone.now() + timezone.timedelta(minutes=5)
+            self.fecha_expiracion = timezone.now() + timezone.timedelta(minutes=60)
         
         super().save(*args, **kwargs)
 
@@ -336,6 +371,12 @@ class Transaccion(models.Model):
         if self.cliente and not self.cliente.activo:
             raise ValidationError({
                 'cliente': 'No se puede crear una transacción para un cliente inactivo.'
+            })
+        
+        # Validar que el tauser esté activo si se especifica
+        if self.tauser and not self.tauser.es_activo:
+            raise ValidationError({
+                'tauser': 'No se puede crear una transacción para un tauser inactivo.'
             })
         
         # Validar que el tipo de operación esté activo
@@ -411,14 +452,16 @@ class Transaccion(models.Model):
             if self.metodo_pago and self.metodo_pago.comision > 0:
                 comision_pago = monto_pyg_bruto * (Decimal(str(self.metodo_pago.comision)) / Decimal('100'))
         else:
-            # Para COMPRAS: las comisiones se calculan sobre el monto que paga el cliente (PYG)
-            monto_total_pagado = self.monto_origen
+            # Para COMPRAS: recalcular el subtotal desde el total almacenado
+            # monto_origen almacena el TOTAL (subtotal + comisiones)
+            # Necesitamos recalcular el subtotal: cantidad_divisa × tasa
+            subtotal_pyg = self.monto_destino * self.tasa_cambio
             
             if self.metodo_cobro and self.metodo_cobro.comision > 0:
-                comision_cobro = monto_total_pagado * (Decimal(str(self.metodo_cobro.comision)) / Decimal('100'))
+                comision_cobro = subtotal_pyg * (Decimal(str(self.metodo_cobro.comision)) / Decimal('100'))
             
             if self.metodo_pago and self.metodo_pago.comision > 0:
-                comision_pago = monto_total_pagado * (Decimal(str(self.metodo_pago.comision)) / Decimal('100'))
+                comision_pago = subtotal_pyg * (Decimal(str(self.metodo_pago.comision)) / Decimal('100'))
         
         comision_total = comision_cobro + comision_pago
         
@@ -433,11 +476,13 @@ class Transaccion(models.Model):
         if self.tipo_operacion.codigo == 'VENTA':
             # Para ventas: el cliente entrega divisa extranjera
             monto_base = self.monto_origen  # Divisa extranjera que entrega
+            subtotal_display = self.monto_origen  # Divisa que vende
             total_cliente = self.monto_origen  # Lo que entrega el cliente
         else:
-            # Para compras: el cliente paga PYG
-            monto_base = self.monto_origen  # PYG que paga
-            total_cliente = self.monto_origen  # Lo que paga el cliente
+            # Para compras: recalcular subtotal desde la cantidad de divisa × tasa
+            subtotal_display = self.monto_destino * self.tasa_cambio  # Subtotal en PYG antes de comisiones
+            monto_base = subtotal_display  # Monto base para mostrar
+            total_cliente = self.monto_origen  # Total que paga (incluye comisiones)
         
         # Formatear montos
         def formatear_monto(valor, moneda):
@@ -448,8 +493,8 @@ class Transaccion(models.Model):
         
         return {
             # Básicos
-            'subtotal': float(self.monto_origen),
-            'subtotal_formateado': formatear_monto(self.monto_origen, self.moneda_origen),
+            'subtotal': float(subtotal_display),
+            'subtotal_formateado': formatear_monto(subtotal_display, self.moneda_origen),
             
             # Comisiones - formatear según el tipo de operación
             'comision_cobro': float(comision_cobro),
@@ -618,3 +663,19 @@ class Transaccion(models.Model):
                     canceladas += 1
 
         return canceladas
+
+    def requiere_retiro_fisico(self):
+        """
+        Determina si la transacción requiere retiro físico en un Tauser.
+        
+        Para COMPRA: Siempre requiere retiro físico (cliente retira divisas)
+        Para VENTA: Solo si el método de cobro requiere retiro físico
+        """
+        if self.tipo_operacion.codigo == 'COMPRA':
+            # Para compras, siempre requiere retiro físico (cliente retira divisas)
+            return True
+        elif self.tipo_operacion.codigo == 'VENTA':
+            # Para ventas, verificar si el método de cobro requiere retiro físico
+            if self.metodo_cobro and self.metodo_cobro.requiere_retiro_fisico:
+                return True
+        return False

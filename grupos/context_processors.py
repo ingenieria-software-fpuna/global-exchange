@@ -117,6 +117,19 @@ def permissions_context(request):
         # Permisos específicos para configuración
         context['can_view_configuracion'] = request.user.has_perm('configuracion.change_configuracionsistema')
         
+        # Permisos específicos para tauser
+        context['can_view_tauser'] = request.user.has_perm('tauser.view_tauser')
+        context['can_create_tauser'] = request.user.has_perm('tauser.add_tauser')
+        context['can_edit_tauser'] = request.user.has_perm('tauser.change_tauser')
+        context['can_delete_tauser'] = request.user.has_perm('tauser.delete_tauser')
+        
+        # Permisos específicos para stock
+        context['can_view_stock'] = request.user.has_perm('tauser.view_stock')
+        context['can_create_stock'] = request.user.has_perm('tauser.add_stock')
+        context['can_edit_stock'] = request.user.has_perm('tauser.change_stock')
+        context['can_delete_stock'] = request.user.has_perm('tauser.delete_stock')
+        context['can_manage_stock'] = request.user.has_perm('tauser.manage_stock')
+        
         # Dashboard
         context['can_view_dashboard'] = (
             context['is_admin'] or 
@@ -129,7 +142,8 @@ def permissions_context(request):
             context['can_view_metodopago'] or
             context['can_view_metodocobro'] or
             context['can_view_transacciones'] or
-            context['can_view_configuracion']
+            context['can_view_configuracion'] or
+            context['can_view_tauser']
         )
         
     else:
@@ -179,5 +193,13 @@ def permissions_context(request):
         context['can_delete_transacciones'] = False
         context['can_operate'] = False
         context['can_view_configuracion'] = False
-    
+        context['can_view_tauser'] = False
+        context['can_create_tauser'] = False
+        context['can_edit_tauser'] = False
+        context['can_delete_tauser'] = False
+        context['can_view_stock'] = False
+        context['can_create_stock'] = False
+        context['can_edit_stock'] = False
+        context['can_delete_stock'] = False
+        context['can_manage_stock'] = False
     return context

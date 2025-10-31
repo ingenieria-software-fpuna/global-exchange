@@ -10,6 +10,7 @@ urlpatterns = [
     path('vender/', views.vender_divisas, name='vender_divisas'),
     path('iniciar-venta/', views.iniciar_venta, name='iniciar_venta'),
     path('api/validar-limites/', views.api_validar_limites, name='api_validar_limites'),
+    path('api/validar-stock-tauser/', views.api_validar_stock_tauser, name='api_validar_stock_tauser'),
     path('api/calcular-compra-completa/', views.api_calcular_compra_completa, name='api_calcular_compra_completa'),
     path('api/calcular-venta-completa/', views.api_calcular_venta_completa, name='api_calcular_venta_completa'),
     path('api/metodos-cobro-por-moneda/', views.api_metodos_cobro_por_moneda, name='api_metodos_cobro_por_moneda'),
@@ -20,4 +21,6 @@ urlpatterns = [
     path('verificar-cambio-cotizacion/<str:transaccion_id>/', views.verificar_cambio_cotizacion, name='verificar_cambio_cotizacion'),
     path('crear-con-nueva-cotizacion/<str:transaccion_id>/', views.crear_con_nueva_cotizacion, name='crear_con_nueva_cotizacion'),
     path('cancelar-por-cambio-cotizacion/<str:transaccion_id>/', views.cancelar_por_cambio_cotizacion, name='cancelar_por_cambio_cotizacion'),
+    path('descargar-factura/<str:transaccion_id>/<str:tipo_archivo>/', views.descargar_factura, name='descargar_factura'),
+    path('reintentar-factura/<str:transaccion_id>/', views.reintentar_factura, name='reintentar_factura'),
 ]

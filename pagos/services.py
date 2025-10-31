@@ -26,6 +26,8 @@ class PasarelaService:
         'tarjeta de debito': 'tarjeta',
         'tarjeta de crédito local': 'tarjeta_credito_local',
         'tarjeta de credito local': 'tarjeta_credito_local',
+        'pago en cuenta bancaria': 'transferencia',
+        'cuenta bancaria': 'transferencia',
         'transferencia bancaria': 'transferencia',
     }
     
@@ -97,9 +99,13 @@ class PasarelaService:
                 
                 # Para billetera electrónica, agregar número de teléfono
                 elif metodo_pasarela == 'billetera':
-                    telefono = datos_adicionales.get('telefono')
-                    if telefono:
-                        payload['numero_billetera'] = telefono
+                    numero_billetera = (
+                        datos_adicionales.get('telefono')
+                        or datos_adicionales.get('numero_billetera')
+                        or datos_adicionales.get('numero_telefono')
+                    )
+                    if numero_billetera:
+                        payload['numero_billetera'] = str(numero_billetera)
                 
                 # Para transferencia bancaria, agregar número de comprobante
                 elif metodo_pasarela == 'transferencia':

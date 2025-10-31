@@ -35,6 +35,7 @@ def crear_metodos_pago_ejemplo():
             "descripcion": "Transferencia a cuenta bancaria del cliente (Solo PYG)",
             "comision": Decimal('0.50'),
             "es_activo": True,
+            "requiere_retiro_fisico": False,  # Transferencia = No requiere retiro físico
             "monedas_permitidas": [pyg]  # Solo PYG
         },
         {
@@ -42,6 +43,7 @@ def crear_metodos_pago_ejemplo():
             "descripcion": "Pago mediante billeteras digitales (Solo PYG)",
             "comision": Decimal('1.00'),
             "es_activo": True,
+            "requiere_retiro_fisico": False,  # Digital = No requiere retiro físico
             "monedas_permitidas": [pyg]  # Solo PYG
         },
         {
@@ -49,6 +51,7 @@ def crear_metodos_pago_ejemplo():
             "descripcion": "Entrega de dinero en efectivo (Todas las monedas)",
             "comision": Decimal('0.00'),
             "es_activo": True,
+            "requiere_retiro_fisico": True,  # Efectivo = Requiere retiro físico
             "monedas_permitidas": todas_las_monedas  # Todas las monedas
         },
     ]
@@ -70,6 +73,9 @@ def crear_metodos_pago_ejemplo():
                 updated = True
             if not existing.es_activo and datos["es_activo"]:
                 existing.es_activo = True
+                updated = True
+            if existing.requiere_retiro_fisico != datos["requiere_retiro_fisico"]:
+                existing.requiere_retiro_fisico = datos["requiere_retiro_fisico"]
                 updated = True
             
             # Actualizar monedas permitidas
@@ -99,7 +105,8 @@ def crear_metodos_pago_ejemplo():
     print("\n🏦 Métodos de pago configurados:")
     for metodo in MetodoPago.objects.filter(es_activo=True).order_by('nombre'):
         monedas = ', '.join([m.codigo for m in metodo.monedas_permitidas.all()])
-        print(f"  • {metodo.nombre}: {monedas if monedas else 'Sin monedas'}")
+        retiro_text = "Requiere retiro físico" if metodo.requiere_retiro_fisico else "No requiere retiro físico"
+        print(f"  • {metodo.nombre}: {monedas if monedas else 'Sin monedas'} - {retiro_text}")
     
     return creados
 

@@ -21,7 +21,7 @@ class ClienteForm(forms.ModelForm):
     class Meta:
         model = Cliente
         fields = [
-            'nombre_comercial', 'ruc', 'direccion', 'correo_electronico',
+            'nombre_comercial', 'ruc', 'dv', 'direccion', 'correo_electronico',
             'numero_telefono', 'tipo_cliente', 'usuarios_asociados'
         ]
         widgets = {
@@ -32,6 +32,11 @@ class ClienteForm(forms.ModelForm):
             'ruc': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Ej: 801234567'
+            }),
+            'dv': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: 3',
+                'maxlength': '1'
             }),
             'direccion': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -64,14 +69,16 @@ class ClienteForm(forms.ModelForm):
         # Configurar labels y help texts
         self.fields['nombre_comercial'].label = "Nombre Comercial"
         self.fields['ruc'].label = "RUC"
+        self.fields['dv'].label = "DV"
         self.fields['direccion'].label = "Dirección"
         self.fields['correo_electronico'].label = "Correo Electrónico"
         self.fields['numero_telefono'].label = "Número de Teléfono"
         self.fields['tipo_cliente'].label = "Tipo de Cliente"
-        
+
         # Marcar campos requeridos
         self.fields['nombre_comercial'].required = True
         self.fields['ruc'].required = True
+        self.fields['dv'].required = True
         self.fields['correo_electronico'].required = True
         self.fields['tipo_cliente'].required = True
 
@@ -100,7 +107,7 @@ class ClienteUpdateForm(forms.ModelForm):
     class Meta:
         model = Cliente
         fields = [
-            'nombre_comercial', 'ruc', 'direccion', 'correo_electronico',
+            'nombre_comercial', 'ruc', 'dv', 'direccion', 'correo_electronico',
             'numero_telefono', 'tipo_cliente', 'monto_limite_transaccion', 'usuarios_asociados', 'activo'
         ]
         widgets = {
@@ -111,6 +118,11 @@ class ClienteUpdateForm(forms.ModelForm):
             'ruc': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Ej: 801234567'
+            }),
+            'dv': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: 3',
+                'maxlength': '1'
             }),
             'direccion': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -155,6 +167,7 @@ class ClienteUpdateForm(forms.ModelForm):
         # Configurar labels y help texts
         self.fields['nombre_comercial'].label = "Nombre Comercial"
         self.fields['ruc'].label = "RUC"
+        self.fields['dv'].label = "DV"
         self.fields['direccion'].label = "Dirección"
         self.fields['correo_electronico'].label = "Correo Electrónico"
         self.fields['numero_telefono'].label = "Número de Teléfono"
@@ -162,10 +175,11 @@ class ClienteUpdateForm(forms.ModelForm):
         self.fields['monto_limite_transaccion'].label = "Monto límite por transacción"
         self.fields['monto_limite_transaccion'].help_text = "Monto máximo permitido en una sola transacción. Vacío = sin límite."
         self.fields['activo'].label = "Activo"
-        
+
         # Marcar campos requeridos
         self.fields['nombre_comercial'].required = True
         self.fields['ruc'].required = True
+        self.fields['dv'].required = True
         self.fields['correo_electronico'].required = True
         self.fields['tipo_cliente'].required = True
 
