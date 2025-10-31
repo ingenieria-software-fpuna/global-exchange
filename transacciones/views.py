@@ -1,3 +1,4 @@
+from asyncio.log import logger
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
@@ -315,14 +316,24 @@ def resumen_transaccion(request, transaccion_id):
         transaccion.cancelar_por_expiracion()
         messages.warning(request, 'Esta transacción ha expirado y fue cancelada automáticamente.')
     
+    # Obtener información de factura electrónica si existe
+    factura_info = None
+    if transaccion.de_id:
+        try:
+            from facturacion_service.factura_utils import get_factura_files_for_transaction
+            factura_info = get_factura_files_for_transaction(transaccion.de_id)
+        except Exception as e:
+            logger.error(f"Error al obtener info de factura para transacción {transaccion_id}: {e}")
+
     context = {
         'transaccion': transaccion,
         'resumen_financiero': transaccion.get_resumen_financiero(),  # Mantener compatibilidad
         'resumen_detallado': transaccion.get_resumen_detallado(),    # Nuevo resumen detallado
         'puede_pagar': transaccion.estado.codigo == EstadoTransaccion.PENDIENTE and not transaccion.esta_expirada(),
         'tiempo_restante': (transaccion.fecha_expiracion - timezone.now()).total_seconds() if not transaccion.esta_expirada() else 0,
+        'factura_info': factura_info,  # Información de factura electrónica
     }
-    
+
     return render(request, 'transacciones/resumen_transaccion.html', context)
 
 
@@ -1833,9 +1844,122 @@ class MisTransaccionesListView(LoginRequiredMixin, ListView):
 # Las funciones de procesamiento de pagos ahora están en pagos/views.py
 # - _procesar_pago_con_pasarela()
 # - pago_billetera_electronica()
-# - pago_tarjeta_debito() 
+# - pago_tarjeta_debito()
 # - pago_transferencia_bancaria()
 # - webhook_pago()
 #
 # Esta app solo maneja la lógica de transacciones.
 # ============================================================================
+
+
+# ============================================================================
+# FACTURACIÓN ELECTRÓNICA - Descarga de archivos
+# ============================================================================
+
+@login_required
+def descargar_factura(request, transaccion_id, tipo_archivo):
+    """
+    Permite descargar los archivos PDF o XML de una factura electrónica.
+
+    Args:
+        transaccion_id: ID de la transacción
+        tipo_archivo: 'pdf' o 'xml'
+    """
+    from django.http import FileResponse
+    import os
+
+    # Obtener la transacción
+    transaccion = get_object_or_404(
+        Transaccion.objects.select_related('cliente', 'usuario'),
+        id_transaccion=transaccion_id
+    )
+
+    # Verificar permisos
+    if transaccion.usuario != request.user:
+        if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+            raise Http404("Transacción no encontrada")
+
+    # Verificar que la transacción tenga DE asignado
+    if not transaccion.de_id:
+        messages.error(request, 'Esta transacción no tiene factura electrónica generada.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+    # Obtener información de los archivos
+    try:
+        from facturacion_service.factura_utils import get_factura_files_for_transaction
+
+        factura_info = get_factura_files_for_transaction(transaccion.de_id)
+
+        if not factura_info['disponible']:
+            messages.error(request, f'La factura no está disponible para descarga. Estado: {factura_info["estado"]}')
+            return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+        # Obtener la ruta del archivo solicitado
+        if tipo_archivo == 'pdf':
+            archivo_path = factura_info['pdf']
+        elif tipo_archivo == 'xml':
+            archivo_path = factura_info['xml']
+        else:
+            raise Http404("Tipo de archivo no válido")
+
+        if not archivo_path or not os.path.exists(archivo_path):
+            messages.error(request, f'Archivo {tipo_archivo.upper()} no encontrado.')
+            return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+        # Servir el archivo
+        filename = os.path.basename(archivo_path)
+        response = FileResponse(
+            open(archivo_path, 'rb'),
+            content_type='application/pdf' if tipo_archivo == 'pdf' else 'application/xml'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error al descargar factura para transacción {transaccion_id}: {e}")
+        messages.error(request, 'Error al descargar el archivo.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+
+@login_required
+@require_http_methods(["POST"])
+def reintentar_factura(request, transaccion_id):
+    """
+    Reintenta la generación de factura para una transacción cuando falló o está en "Verificar datos".
+    """
+    # Obtener la transacción
+    transaccion = get_object_or_404(
+        Transaccion.objects.select_related('cliente', 'usuario'),
+        id_transaccion=transaccion_id
+    )
+
+    # Verificar permisos
+    if transaccion.usuario != request.user:
+        if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
+            raise Http404("Transacción no encontrada")
+
+    # Verificar que la transacción esté pagada
+    if transaccion.estado.codigo != EstadoTransaccion.PAGADA:
+        messages.error(request, 'Solo se puede generar factura para transacciones pagadas.')
+        return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)
+
+    try:
+        from facturacion_service import generar_factura_desde_transaccion
+
+        logger.info(f"Reintentando generación de factura para transacción {transaccion_id}")
+
+        # Generar nueva factura (esto creará un nuevo DE)
+        de_id = generar_factura_desde_transaccion(transaccion)
+
+        # Actualizar transacción con el nuevo de_id
+        Transaccion.objects.filter(id=transaccion.id).update(de_id=de_id)
+
+        logger.info(f"✅ Factura regenerada exitosamente. Nuevo DE ID: {de_id}")
+        messages.success(request, f'Factura regenerada exitosamente. Nuevo DE ID: {de_id}')
+
+    except Exception as e:
+        logger.error(f"Error al reintentar factura para transacción {transaccion_id}: {e}")
+        messages.error(request, f'Error al generar la factura: {str(e)}')
+
+    return redirect('transacciones:resumen_transaccion', transaccion_id=transaccion_id)

@@ -288,6 +288,14 @@ class Transaccion(models.Model):
         help_text="Dirección IP desde donde se originó la transacción"
     )
 
+    # Facturación electrónica
+    de_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="ID del Documento Electrónico",
+        help_text="ID del DE generado en SQL-Proxy para facturación"
+    )
+
     class Meta:
         verbose_name = "Transacción"
         verbose_name_plural = "Transacciones"

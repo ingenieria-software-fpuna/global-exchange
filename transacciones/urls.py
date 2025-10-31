@@ -20,4 +20,6 @@ urlpatterns = [
     path('verificar-cambio-cotizacion/<str:transaccion_id>/', views.verificar_cambio_cotizacion, name='verificar_cambio_cotizacion'),
     path('crear-con-nueva-cotizacion/<str:transaccion_id>/', views.crear_con_nueva_cotizacion, name='crear_con_nueva_cotizacion'),
     path('cancelar-por-cambio-cotizacion/<str:transaccion_id>/', views.cancelar_por_cambio_cotizacion, name='cancelar_por_cambio_cotizacion'),
+    path('descargar-factura/<str:transaccion_id>/<str:tipo_archivo>/', views.descargar_factura, name='descargar_factura'),
+    path('reintentar-factura/<str:transaccion_id>/', views.reintentar_factura, name='reintentar_factura'),
 ]

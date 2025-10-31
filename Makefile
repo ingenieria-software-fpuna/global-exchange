@@ -1,4 +1,4 @@
-.PHONY: db-up db-clean app-run app-migrate check-admin-group app-setup user user-fast app-reset help docs-html docs-clean docs-live app-test create-currencies stripe-up stripe-down stripe-logs stripe-secret stripe-trigger
+.PHONY: db-up db-clean app-run app-migrate check-admin-group app-setup user user-fast app-reset help docs-html docs-clean docs-live app-test create-currencies stripe-up stripe-down stripe-logs stripe-secret stripe-trigger sqlproxy-up sqlproxy-down sqlproxy-build sqlproxy-logs sqlproxy-clean setup-esi inutilizar inutilizar-range inutilizar-docs
 
 #-------------- Operaciones de base de datos ----------------#
 db-up:
@@ -77,6 +77,14 @@ create-transactions:
 	@echo "Creando transacciones de ejemplo..."
 	poetry run python scripts/create_transacciones_test.py
 
+setup-esi:
+	@echo "Configurando ESI desde .env..."
+	poetry run python scripts/setup_esi_from_env.py
+
+init-contador-factura:
+	@echo "Inicializando contador de documentos de factura..."
+	poetry run python scripts/init_contador_factura.py
+
 app-setup:
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║          CONFIGURACIÓN COMPLETA DEL PROYECTO GLX           ║"
@@ -87,6 +95,10 @@ app-setup:
 	@echo ""
 	@echo "→ Levantando base de datos..."
 	@make db-up
+	@echo ""
+	@echo "→ Levantando SQL-Proxy (Facturación)..."
+	@make sqlproxy-build
+	@make sqlproxy-up
 	@echo ""
 	@echo "→ Iniciando Stripe CLI..."
 	@make stripe-up
@@ -130,6 +142,12 @@ endif
 	@echo ""
 	@echo "→ Creando transacciones de ejemplo..."
 	@make create-transactions
+	@echo ""
+	@echo "→ Configurando ESI para facturación..."
+	@make setup-esi
+	@echo ""
+	@echo "→ Inicializando contador de facturas..."
+	@make init-contador-factura
 	@echo ""
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║                  ✅ SETUP COMPLETADO                       ║"
@@ -219,6 +237,69 @@ stripe-trigger:
 		*) echo "Opción inválida" ;; \
 	esac
 
+#-------------- SQL-Proxy (Facturación Electrónica) ----------------#
+sqlproxy-build:
+	@echo "Construyendo servicios de SQL-Proxy..."
+	docker compose -f docker-compose-dev.yml build sql-proxy-web sql-proxy-scheduler sql-proxy-nginx
+	@echo "✅ Servicios de SQL-Proxy construidos"
+
+sqlproxy-up:
+	@echo "Levantando servicios de SQL-Proxy..."
+	@echo "→ Creando directorios de logs..."
+	@mkdir -p sql-proxy/volumes/nginx/logs
+	@mkdir -p sql-proxy/volumes/web-sched/logs
+	@mkdir -p sql-proxy/volumes/web/logs
+	@mkdir -p sql-proxy/volumes/web/kude
+	@chmod -R a+rw sql-proxy/volumes/nginx/logs sql-proxy/volumes/web-sched/logs sql-proxy/volumes/web/logs sql-proxy/volumes/web/kude 2>/dev/null || true
+	@echo "→ Iniciando contenedores..."
+	docker compose -f docker-compose-dev.yml up -d sql-proxy-db sql-proxy-web sql-proxy-scheduler sql-proxy-nginx
+	@echo ""
+	@echo "✅ SQL-Proxy levantado correctamente"
+	@echo ""
+	@echo "📋 Servicios disponibles:"
+	@echo "  - Base de datos: localhost:45432"
+	@echo "  - Web interface: http://localhost:40080/"
+	@echo "  - KuDE (PDFs): http://localhost:40080/kude/ (user: sqlproxy, pass: kude1234)"
+
+sqlproxy-down:
+	@echo "Deteniendo servicios de SQL-Proxy..."
+	docker compose -f docker-compose-dev.yml stop sql-proxy-db sql-proxy-web sql-proxy-scheduler sql-proxy-nginx
+	@echo "SQL-Proxy detenido"
+
+sqlproxy-logs:
+	@echo "Mostrando logs de SQL-Proxy (Ctrl+C para salir)..."
+	docker compose -f docker-compose-dev.yml logs -f sql-proxy-web sql-proxy-scheduler
+
+sqlproxy-clean:
+	@echo "Limpiando SQL-Proxy (⚠️  esto borrará todos los datos de facturas)..."
+	@read -p "¿Estás seguro? [y/N]: " confirm && [ "$$confirm" = "y" ] || exit 1
+	docker compose -f docker-compose-dev.yml down sql-proxy-db sql-proxy-web sql-proxy-scheduler sql-proxy-nginx
+	docker volume rm glx_sql_proxy_data 2>/dev/null || true
+	@echo "SQL-Proxy limpiado"
+
+#-------------- Facturación - Inutilizar ----------------#
+inutilizar:
+	@echo "Inutilizando documentos (rango configurado en .env)..."
+	poetry run python facturacion_service/inutilizar.py
+
+inutilizar-range:
+	@if [ -z "$(START)" ] || [ -z "$(END)" ]; then \
+		echo "❌ Error: Debes especificar START y END"; \
+		echo "Uso: make inutilizar-range START=1 END=100"; \
+		exit 1; \
+	fi
+	@echo "Inutilizando documentos del $(START) al $(END)..."
+	poetry run python facturacion_service/inutilizar.py --start $(START) --end $(END)
+
+inutilizar-docs:
+	@if [ -z "$(DOCS)" ]; then \
+		echo "❌ Error: Debes especificar DOCS"; \
+		echo "Uso: make inutilizar-docs DOCS='1 2 3'"; \
+		exit 1; \
+	fi
+	@echo "Inutilizando documentos: $(DOCS)..."
+	poetry run python facturacion_service/inutilizar.py $(DOCS)
+
 # Ayuda
 help:
 	@echo "Comandos disponibles:"
@@ -236,6 +317,8 @@ help:
 	@echo "  create-clients - Crear clientes de ejemplo con operadores asignados"
 	@echo "  create-historical-rates - Crear datos históricos de tasas de cambio"
 	@echo "  create-transactions - Crear transacciones de ejemplo para operadores"
+	@echo "  setup-esi         - Configurar ESI para facturación electrónica desde .env"
+	@echo "  init-contador-factura - Inicializar contador de documentos de factura"
 	@echo "  migrate-groups    - Migrar grupos existentes al nuevo modelo"
 	@echo "  test-grupo-permisos - Probar funcionalidad de permisos con grupos activos/inactivos"
 	@echo "  limpiar-codigos   - Limpiar códigos de verificación expirados"
@@ -255,6 +338,18 @@ help:
 	@echo "  stripe-secret     - Obtener webhook signing secret"
 	@echo "  stripe-trigger    - Trigger manual de eventos de prueba"
 	@echo ""
+	@echo "Comandos de SQL-Proxy (Facturación Electrónica):"
+	@echo "  sqlproxy-build    - Construir servicios de SQL-Proxy"
+	@echo "  sqlproxy-up       - Levantar servicios de SQL-Proxy"
+	@echo "  sqlproxy-down     - Detener servicios de SQL-Proxy"
+	@echo "  sqlproxy-logs     - Ver logs de SQL-Proxy"
+	@echo "  sqlproxy-clean    - Limpiar SQL-Proxy y sus datos (⚠️  destructivo)"
+	@echo ""
+	@echo "Comandos de Facturación - Inutilizar:"
+	@echo "  inutilizar        - Inutilizar documentos usando rango de .env"
+	@echo "  inutilizar-range START=N END=M - Inutilizar rango específico"
+	@echo "  inutilizar-docs DOCS='1 2 3' - Inutilizar documentos específicos"
+	@echo ""
 	@echo "  help              - Mostrar esta ayuda"
 	@echo ""
 	@echo "Ejemplos de uso:"
@@ -262,6 +357,10 @@ help:
 	@echo "  make user juan.perez         # Con username predefinido"
 	@echo "  make user-fast               # Modo rápido interactivo"
 	@echo "  make user-fast admin         # Modo rápido con username 'admin'"
+	@echo ""
+	@echo "  make inutilizar              # Inutilizar rango configurado en .env"
+	@echo "  make inutilizar-range START=1 END=100  # Inutilizar del 1 al 100"
+	@echo "  make inutilizar-docs DOCS='1 2 3'      # Inutilizar docs 1, 2 y 3"
 
 #-------------- Documentación (Sphinx) ----------------#
 docs-html:

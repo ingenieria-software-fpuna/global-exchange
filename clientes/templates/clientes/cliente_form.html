@@ -25,10 +25,15 @@
             {{ form.nombre_comercial }}
             {% for e in form.nombre_comercial.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           </div>
-          <div class="col-md-3">
+          <div class="col-md-2">
             <label class="form-label" for="id_ruc">RUC</label>
             {{ form.ruc }}
             {% for e in form.ruc.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-md-1">
+            <label class="form-label" for="id_dv">DV</label>
+            {{ form.dv }}
+            {% for e in form.dv.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           </div>
           <div class="col-md-3">
             <label class="form-label" for="id_tipo_cliente">Tipo de Cliente</label>
