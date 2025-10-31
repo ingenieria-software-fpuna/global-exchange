@@ -260,6 +260,7 @@ class ClienteFormTestCase(TestCase):
         form_data = {
             'nombre_comercial': 'Cliente Test',
             'ruc': '12345678',
+            'dv': '0',
             'correo_electronico': 'test@example.com',
             'tipo_cliente': self.tipo_inactivo.id,
         }
