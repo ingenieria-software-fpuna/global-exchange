@@ -107,6 +107,9 @@ app-setup:
 	@echo "→ Iniciando Stripe CLI..."
 	@make stripe-up
 	@echo ""
+	@echo "→ Iniciando Simulador Pasarela de Pagos..."
+	@make simulador-pasarela-up
+	@echo ""
 	@echo "→ Esperando servicios..."
 ifeq ($(OS),Windows_NT)
 	@timeout /t 5 /nobreak > nul
@@ -198,6 +201,18 @@ app-test:
 	@echo "Ejecutando todos los tests del proyecto..."
 	poetry run python manage.py test -v 2
 	@echo "Tests completados"
+
+
+#-------------- Simulador Pasarela de Pagos ----------------#
+simulador-pasarela-build:
+	@echo "Construyendo Simulador de Pasarela de Pagos..."
+	docker compose -f docker-compose-dev.yml build simulador-pasarela
+	@echo "✅ Simulador de Pasarela de Pagos construido"
+
+simulador-pasarela-up: simulador-pasarela-build
+	@echo "Iniciando Simulador de Pasarela de Pagos..."
+	docker compose -f docker-compose-dev.yml up -d simulador-pasarela
+	@echo "Simulador de Pasarela de Pagos iniciado"
 
 #-------------- Stripe CLI (Docker) ----------------#
 stripe-up:
