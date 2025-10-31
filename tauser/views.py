@@ -10,10 +10,15 @@ from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.db import transaction
 from django.core.paginator import Paginator
+import logging
 
 
 from .models import Tauser, Stock, HistorialStock, StockDenominacion, HistorialStockDenominacion
 from .forms import TauserForm, StockForm
+from transacciones.services import registrar_deposito_en_simulador, DepositoSimuladorError
+
+
+logger = logging.getLogger(__name__)
 
 
 class TauserListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
@@ -1243,7 +1248,7 @@ def confirmar_recepcion_divisas(request):
         from transacciones.models import Transaccion, EstadoTransaccion
         try:
             transaccion = Transaccion.objects.select_related(
-                'cliente', 'tipo_operacion', 'estado', 'moneda_origen', 'metodo_cobro'
+                'cliente', 'tipo_operacion', 'estado', 'moneda_origen', 'moneda_destino', 'metodo_cobro', 'metodo_pago'
             ).get(codigo_verificacion=codigo_verificacion)
             print(f"Transacción encontrada: {transaccion.id_transaccion}")
         except Transaccion.DoesNotExist:
@@ -1273,6 +1278,14 @@ def confirmar_recepcion_divisas(request):
             return JsonResponse({
                 'success': False,
                 'error': f'La transacción no está en estado pendiente. Estado actual: {transaccion.estado.nombre}'
+            })
+        
+        registro_deposito_actual = transaccion.registro_deposito if isinstance(transaccion.registro_deposito, dict) else {}
+        if registro_deposito_actual.get('estado') == 'exito':
+            print("ERROR: Depósito ya registrado previamente en el simulador")
+            return JsonResponse({
+                'success': False,
+                'error': 'El depósito ya fue registrado previamente en el simulador para esta transacción.'
             })
         
         # Verificar el monto recibido
@@ -1315,6 +1328,7 @@ def confirmar_recepcion_divisas(request):
         from monedas.models import DenominacionMoneda
         from decimal import Decimal
         
+        deposito_info = None
         with db_transaction.atomic():
             # Obtener o crear el stock de la moneda origen para este tauser
             moneda_origen = transaccion.moneda_origen
@@ -1361,6 +1375,32 @@ def confirmar_recepcion_divisas(request):
                     observaciones=f'Recepción de divisas - Transacción {transaccion.id_transaccion}'
                 )
             
+            try:
+                deposito_info = registrar_deposito_en_simulador(
+                    transaccion,
+                    usuario_email=request.user.email,
+                    extra_payload={
+                        'tauser_id': tauser.id,
+                        'tauser_nombre': tauser.nombre,
+                    }
+                )
+            except DepositoSimuladorError as deposito_error:
+                logger.error(
+                    "Error registrando depósito en simulador para transacción %s: %s",
+                    transaccion.id_transaccion,
+                    deposito_error,
+                    exc_info=True
+                )
+                raise
+            except Exception as deposito_error:
+                logger.error(
+                    "Error inesperado registrando depósito en simulador para transacción %s: %s",
+                    transaccion.id_transaccion,
+                    deposito_error,
+                    exc_info=True
+                )
+                raise
+            
             # Actualizar la transacción con el tauser, estado y observaciones
             from transacciones.models import EstadoTransaccion
             estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
@@ -1371,6 +1411,16 @@ def confirmar_recepcion_divisas(request):
                 transaccion.observaciones += f"\nDivisas recibidas en {tauser.nombre} el {timezone.now()} por {request.user.email}"
             else:
                 transaccion.observaciones = f"Divisas recibidas en {tauser.nombre} el {timezone.now()} por {request.user.email}"
+            if deposito_info:
+                metadata = deposito_info.get('metadata', {})
+                metadata['origen'] = 'tauser'
+                deposito_info['metadata'] = metadata
+                transaccion.registro_deposito = deposito_info
+                if deposito_info.get('estado') == 'exito':
+                    transaccion.observaciones += (
+                        f"\nDepósito registrado en simulador (ID {deposito_info.get('id_pago_externo')}) "
+                        f"el {timezone.now()} por {request.user.email}"
+                    )
             transaccion.save()
         
         print("=== FIN confirmar_recepcion_divisas - ÉXITO ===")
@@ -1385,7 +1435,8 @@ def confirmar_recepcion_divisas(request):
                 'fecha_pago': transaccion.fecha_pago.strftime('%d/%m/%Y %H:%M') if transaccion.fecha_pago else None,
                 'total_recibido': total_calculado,
                 'denominaciones_recibidas': len(denominaciones)
-            }
+            },
+            'deposito': deposito_info or {}
         })
         
     except Exception as e:

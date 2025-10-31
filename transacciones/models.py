@@ -211,6 +211,18 @@ class Transaccion(models.Model):
         blank=True,
         help_text="Método por el cual se entrega el dinero"
     )
+    datos_metodo_pago = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Datos del Método de Pago",
+        help_text="Información adicional requerida por el método de pago seleccionado (número de cuenta, billetera, etc.)"
+    )
+    registro_deposito = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Registro del Depósito",
+        help_text="Información del depósito realizado al cliente mediante el simulador"
+    )
     
     # Tasa de cambio utilizada
     tasa_cambio = models.DecimalField(
