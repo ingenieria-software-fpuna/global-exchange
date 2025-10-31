@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, Http404
@@ -16,6 +17,7 @@ from datetime import datetime, date
 import logging
 
 from transacciones.models import Transaccion, TipoOperacion, EstadoTransaccion
+from transacciones.services import registrar_deposito_en_simulador, DepositoSimuladorError
 from .models import PagoPasarela
 from .forms import BilleteraElectronicaForm, TarjetaDebitoForm, TransferenciaBancariaForm, TarjetaCreditoLocalForm
 from .services import PasarelaService, StripeService
@@ -33,6 +35,108 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # FUNCIONES AUXILIARES PARA PAGOS CON PASARELA
 # ============================================================================
+
+
+def _agregar_observacion(transaccion, texto):
+    if not texto:
+        return
+    if transaccion.observaciones:
+        transaccion.observaciones += f"\n{texto}"
+    else:
+        transaccion.observaciones = texto
+
+
+def _registrar_deposito_automatico(transaccion, *, origen, usuario_email=None, request=None):
+    """
+    Intenta registrar el depósito automático en el simulador después de un pago web.
+    """
+    if transaccion.tipo_operacion.codigo != TipoOperacion.VENTA:
+        return
+
+    usuario_email = usuario_email or (transaccion.usuario.email if transaccion.usuario else None)
+    payload_extra = {'origen': origen}
+
+    try:
+        deposito_info = registrar_deposito_en_simulador(
+            transaccion,
+            usuario_email=usuario_email,
+            extra_payload=payload_extra
+        )
+    except DepositoSimuladorError as deposito_error:
+        mensaje = str(deposito_error)
+        if 'ya fue registrado' in mensaje.lower():
+            logger.info(
+                "Depósito ya registrado para transacción %s (origen: %s)",
+                transaccion.id_transaccion,
+                origen
+            )
+            return
+
+        logger.error(
+            "Depósito automático (%s) falló para transacción %s: %s",
+            origen,
+            transaccion.id_transaccion,
+            mensaje
+        )
+        transaccion.registro_deposito = {
+            'estado': 'error',
+            'motivo': mensaje,
+            'registrado_en': timezone.now().isoformat(),
+            'metadata': payload_extra
+        }
+        _agregar_observacion(
+            transaccion,
+            f"Depósito automático ({origen}) fallido: {mensaje}"
+        )
+        transaccion.save()
+        if request:
+            messages.error(request, f'El depósito automático falló: {mensaje}')
+        return
+    except Exception as deposito_error:
+        mensaje = str(deposito_error)
+        logger.error(
+            "Error inesperado registrando depósito automático (%s) para transacción %s: %s",
+            origen,
+            transaccion.id_transaccion,
+            mensaje,
+            exc_info=True
+        )
+        transaccion.registro_deposito = {
+            'estado': 'error',
+            'motivo': mensaje,
+            'registrado_en': timezone.now().isoformat(),
+            'metadata': payload_extra
+        }
+        _agregar_observacion(
+            transaccion,
+            f"Depósito automático ({origen}) fallido: {mensaje}"
+        )
+        transaccion.save()
+        if request:
+            messages.error(
+                request,
+                'Ocurrió un error inesperado al registrar el depósito automático.'
+            )
+        return
+
+    metadata = deposito_info.get('metadata', {})
+    metadata['origen'] = origen
+    deposito_info['metadata'] = metadata
+    transaccion.registro_deposito = deposito_info
+
+    if deposito_info.get('estado') == 'exito':
+        _agregar_observacion(
+            transaccion,
+            f"Depósito registrado en simulador (ID {deposito_info.get('id_pago_externo')}) "
+            f"el {timezone.now()} por {usuario_email or 'sistema'}"
+        )
+    elif deposito_info.get('estado') == 'omitido':
+        motivo_omitido = deposito_info.get('motivo', 'Depósito automático omitido.')
+        _agregar_observacion(transaccion, motivo_omitido)
+        if request:
+            messages.info(request, motivo_omitido)
+
+    transaccion.save()
 
 def _procesar_pago_con_pasarela(request, transaccion, datos_formulario, nombre_metodo, datos_adicionales=None):
     """
@@ -110,6 +214,71 @@ def _procesar_pago_con_pasarela(request, transaccion, datos_formulario, nombre_m
                         for key, value in datos_adicionales.items():
                             if key not in ['pin_autorizado', 'numero_tarjeta']:  # Excluir datos sensibles
                                 transaccion.observaciones += f"\n{key}: {value}"
+
+                    deposito_info = None
+                    if transaccion.tipo_operacion.codigo == TipoOperacion.VENTA:
+                        try:
+                            deposito_info = registrar_deposito_en_simulador(
+                                transaccion,
+                                usuario_email=request.user.email,
+                                extra_payload={
+                                    'origen': 'pago_web',
+                                }
+                            )
+                        except DepositoSimuladorError as deposito_error:
+                            logger.error(
+                                "Depósito automático falló para transacción %s después de pago web: %s",
+                                transaccion.id_transaccion,
+                                deposito_error,
+                                exc_info=True
+                            )
+                            transaccion.registro_deposito = {
+                                'estado': 'error',
+                                'motivo': str(deposito_error),
+                                'registrado_en': timezone.now().isoformat(),
+                                'metadata': {'origen': 'pago_web'}
+                            }
+                            transaccion.observaciones += f"\nDepósito automático fallido: {deposito_error}"
+                            transaccion.save()
+                            messages.error(
+                                request,
+                                f'El pago se procesó, pero el depósito automático falló: {deposito_error}'
+                            )
+                            return None
+                        except Exception as deposito_error:
+                            logger.error(
+                                "Error inesperado registrando depósito automático para transacción %s: %s",
+                                transaccion.id_transaccion,
+                                deposito_error,
+                                exc_info=True
+                            )
+                            transaccion.registro_deposito = {
+                                'estado': 'error',
+                                'motivo': str(deposito_error),
+                                'registrado_en': timezone.now().isoformat(),
+                                'metadata': {'origen': 'pago_web'}
+                            }
+                            transaccion.observaciones += f"\nDepósito automático fallido: {deposito_error}"
+                            transaccion.save()
+                            messages.error(
+                                request,
+                                'El pago se procesó, pero ocurrió un error inesperado registrando el depósito.'
+                            )
+                            return None
+
+                    if deposito_info:
+                        metadata = deposito_info.get('metadata', {})
+                        metadata['origen'] = 'pago_web'
+                        deposito_info['metadata'] = metadata
+                        transaccion.registro_deposito = deposito_info
+                        if deposito_info.get('estado') == 'exito':
+                            transaccion.observaciones += (
+                                f"\nDepósito registrado en simulador (ID {deposito_info.get('id_pago_externo')}) "
+                                f"el {timezone.now()} por {request.user.email}"
+                            )
+                        elif deposito_info.get('estado') == 'omitido':
+                            motivo_omitido = deposito_info.get('motivo', 'Depósito automático omitido.')
+                            transaccion.observaciones += f"\n{motivo_omitido}"
                     
                     transaccion.save()
                     
@@ -678,6 +847,13 @@ def stripe_success(request):
                         transaccion.observaciones += f"\nPayment Intent: {resultado['payment_intent']}"
                         transaccion.save()
 
+                        _registrar_deposito_automatico(
+                            transaccion,
+                            origen='stripe_success',
+                            usuario_email=request.user.email if request.user.is_authenticated else None,
+                            request=request
+                        )
+
                         messages.success(request, '¡Pago procesado exitosamente con Stripe!')
                     else:
                         messages.info(request, 'El pago ya fue procesado anteriormente.')
@@ -776,10 +952,17 @@ def stripe_webhook(request):
                         # Actualizar transacción si aún está pendiente
                         if pago_pasarela.transaccion.estado.codigo == EstadoTransaccion.PENDIENTE:
                             estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
-                            pago_pasarela.transaccion.estado = estado_pagada
-                            pago_pasarela.transaccion.fecha_pago = timezone.now()
-                            pago_pasarela.transaccion.observaciones += f"\nPago confirmado por webhook Stripe el {timezone.now()}"
-                            pago_pasarela.transaccion.save()
+                            transaccion = pago_pasarela.transaccion
+                            transaccion.estado = estado_pagada
+                            transaccion.fecha_pago = timezone.now()
+                            transaccion.observaciones += f"\nPago confirmado por webhook Stripe el {timezone.now()}"
+                            transaccion.save()
+
+                            _registrar_deposito_automatico(
+                                transaccion,
+                                origen='stripe_webhook',
+                                usuario_email=transaccion.usuario.email if transaccion.usuario else None
+                            )
 
                             logger.info(f"Transacción {pago_pasarela.transaccion.id_transaccion} marcada como pagada")
 

@@ -26,6 +26,8 @@ class PasarelaService:
         'tarjeta de debito': 'tarjeta',
         'tarjeta de crédito local': 'tarjeta_credito_local',
         'tarjeta de credito local': 'tarjeta_credito_local',
+        'pago en cuenta bancaria': 'transferencia',
+        'cuenta bancaria': 'transferencia',
         'transferencia bancaria': 'transferencia',
     }
     

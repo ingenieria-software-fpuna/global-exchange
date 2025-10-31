@@ -540,7 +540,7 @@ class ConfirmarRecepcionDivisasDepositoTest(TestCase):
         # Garantizar que tengamos código de verificación
         self.transaccion.refresh_from_db()
     
-    @patch('tauser.views.PasarelaService')
+    @patch('transacciones.services.PasarelaService')
     def test_confirmar_recepcion_registra_deposito(self, mock_pasarela_cls):
         """El depósito se registra en el simulador cuando todo es correcto."""
         mock_service = mock_pasarela_cls.return_value
@@ -552,6 +552,7 @@ class ConfirmarRecepcionDivisasDepositoTest(TestCase):
                 'fecha': '2025-01-01T00:00:00Z'
             }
         }
+        mock_service._mapear_metodo.return_value = 'billetera'
         
         payload = {
             'codigo_verificacion': self.transaccion.codigo_verificacion,
