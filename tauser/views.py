@@ -448,35 +448,24 @@ def validar_transaccion_retiro(request):
                 'success': False,
                 'error': 'Transacción no encontrada'
             })
-        # Verificar estado de pago según el tipo de transacción
+        
+        # Verificar el tipo de operación
+        es_compra = transaccion.tipo_operacion.codigo == 'COMPRA'
+        es_venta = transaccion.tipo_operacion.codigo == 'VENTA'
         es_venta_con_efectivo = (
-            transaccion.tipo_operacion.codigo == 'VENTA' and 
+            es_venta and 
             transaccion.metodo_cobro and 
             transaccion.metodo_cobro.nombre.lower().find('efectivo') != -1
         )
+        es_venta_otro_metodo = es_venta and not es_venta_con_efectivo
         
-        if es_venta_con_efectivo:
-            # Para ventas con cobro en efectivo, solo verificar que esté pendiente
-            if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Esta venta con cobro en efectivo no está en estado pendiente. Estado actual: {transaccion.estado.nombre}'
-                })
-        else:
-            # Para otras transacciones, verificar que esté pagada
-            if transaccion.estado.codigo != EstadoTransaccion.PAGADA:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'La transacción no está pagada. Estado actual: {transaccion.estado.nombre}'
-                })
-        
- # Verificar si la transacción requiere retiro físico en Tauser
+        # Verificar si la transacción requiere retiro físico en Tauser
         requiere_retiro_fisico = False
-        if transaccion.tipo_operacion.codigo == 'VENTA':
+        if es_venta:
             # Para ventas, verificar si el método de cobro requiere retiro físico
             if transaccion.metodo_cobro and transaccion.metodo_cobro.requiere_retiro_fisico:
                 requiere_retiro_fisico = True
-        elif transaccion.tipo_operacion.codigo == 'COMPRA':
+        elif es_compra:
             # Para compras, siempre requiere retiro físico (cliente retira divisas)
             requiere_retiro_fisico = True
         
@@ -484,6 +473,36 @@ def validar_transaccion_retiro(request):
             return JsonResponse({
                 'success': False,
                 'error': 'Esta transacción no requiere retiro físico en Tauser. El pago se procesó por transferencia.'
+            })
+        
+        # Validar estados según el tipo de transacción
+        estado_actual = transaccion.estado.codigo
+        
+        if es_compra:
+            # COMPRA: Debe estar PAGADA (cliente ya pagó, ahora debe retirar divisas)
+            if estado_actual == EstadoTransaccion.ENTREGADA:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Esta transacción ya fue entregada al cliente.'
+                })
+            elif estado_actual != EstadoTransaccion.PAGADA:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'La transacción debe estar pagada para retirar. Estado actual: {transaccion.estado.nombre}'
+                })
+        elif es_venta_con_efectivo:
+            # VENTA con efectivo: Debe estar PENDIENTE (cliente va a entregar divisas)
+            if estado_actual != EstadoTransaccion.PENDIENTE:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Esta venta con cobro en efectivo debe estar en estado pendiente. Estado actual: {transaccion.estado.nombre}'
+                })
+        elif es_venta_otro_metodo:
+            # VENTA con otro método (transferencia, tarjeta): No debe permitir
+            # Estas transacciones no requieren retiro físico y ya están completas
+            return JsonResponse({
+                'success': False,
+                'error': 'Las ventas con métodos de cobro distintos a efectivo no se procesan en Tauser. El pago ya fue procesado por otro medio.'
             })
         
         # Obtener el tauser
@@ -547,9 +566,18 @@ def validar_transaccion_retiro(request):
         # Preparar datos de la transacción para mostrar
         resumen_detallado = transaccion.get_resumen_detallado()
         
+        # Preparar datos adicionales para todas las transacciones
+        datos_adicionales = {
+            'metodo_cobro': transaccion.metodo_cobro.nombre if transaccion.metodo_cobro else None,
+            'metodo_pago': transaccion.metodo_pago.nombre if transaccion.metodo_pago else None,
+        }
+        
         return JsonResponse({
             'success': True,
             'message': 'Código de verificación enviado por correo',
+            'es_compra': es_compra,
+            'es_venta': es_venta,
+            'es_venta_con_efectivo': es_venta_con_efectivo,
             'transaccion': {
                 'id': transaccion.id_transaccion,
                 'codigo_verificacion': transaccion.codigo_verificacion,
@@ -564,6 +592,7 @@ def validar_transaccion_retiro(request):
                 'monto_a_retirar_formateado': resumen_detallado['monto_recibe_formateado'],
                 'fecha_creacion': transaccion.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
                 'fecha_pago': transaccion.fecha_pago.strftime('%d/%m/%Y %H:%M') if transaccion.fecha_pago else None,
+                **datos_adicionales
             },
             'tauser': {
                 'id': tauser.id,
@@ -601,46 +630,36 @@ def procesar_retiro(request):
                 'error': 'Código de verificación y Tauser son requeridos'
             })
         
-        # Obtener la transacción
+        # Obtener la transacción (forzar recarga desde BD para obtener estado actualizado)
         try:
             from transacciones.models import Transaccion, EstadoTransaccion
             transaccion = Transaccion.objects.select_related(
                 'cliente', 'tipo_operacion', 'estado', 'moneda_destino', 'metodo_cobro'
             ).get(codigo_verificacion=codigo_verificacion)
+            # Forzar refresco del estado desde la base de datos
+            transaccion.refresh_from_db()
         except Transaccion.DoesNotExist:
             return JsonResponse({
                 'success': False,
                 'error': 'Transacción no encontrada'
             })
-        # Verificar estado de pago según el tipo de transacción
+        # Verificar el tipo de operación
+        es_compra = transaccion.tipo_operacion.codigo == 'COMPRA'
+        es_venta = transaccion.tipo_operacion.codigo == 'VENTA'
         es_venta_con_efectivo = (
-            transaccion.tipo_operacion.codigo == 'VENTA' and 
+            es_venta and 
             transaccion.metodo_cobro and 
             transaccion.metodo_cobro.nombre.lower().find('efectivo') != -1
         )
+        es_venta_otro_metodo = es_venta and not es_venta_con_efectivo
         
-        if es_venta_con_efectivo:
-            # Para ventas con cobro en efectivo, solo verificar que esté pendiente
-            if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Esta venta con cobro en efectivo no está en estado pendiente. Estado actual: {transaccion.estado.nombre}'
-                })
-        else:
-            # Para otras transacciones, verificar que esté pagada
-            if transaccion.estado.codigo != EstadoTransaccion.PAGADA:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'La transacción no está pagada. Estado actual: {transaccion.estado.nombre}'
-                })
-        
- # Verificar si la transacción requiere retiro físico en Tauser
+        # Verificar si la transacción requiere retiro físico en Tauser
         requiere_retiro_fisico = False
-        if transaccion.tipo_operacion.codigo == 'VENTA':
+        if es_venta:
             # Para ventas, verificar si el método de cobro requiere retiro físico
             if transaccion.metodo_cobro and transaccion.metodo_cobro.requiere_retiro_fisico:
                 requiere_retiro_fisico = True
-        elif transaccion.tipo_operacion.codigo == 'COMPRA':
+        elif es_compra:
             # Para compras, siempre requiere retiro físico (cliente retira divisas)
             requiere_retiro_fisico = True
         
@@ -648,6 +667,47 @@ def procesar_retiro(request):
             return JsonResponse({
                 'success': False,
                 'error': 'Esta transacción no requiere retiro físico en Tauser. El pago se procesó por transferencia.'
+            })
+        
+        # Validar estados según el tipo de transacción
+        estado_actual = transaccion.estado.codigo
+        
+        if es_compra:
+            # COMPRA: Debe estar PAGADA para retirar (cambiará a ENTREGADA)
+            if estado_actual == EstadoTransaccion.ENTREGADA:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Esta transacción ya fue entregada al cliente.'
+                })
+            elif estado_actual != EstadoTransaccion.PAGADA:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'La transacción debe estar pagada para retirar. Estado actual: {transaccion.estado.nombre}'
+                })
+        elif es_venta_con_efectivo:
+            # VENTA con efectivo: 
+            # 1. Cliente deposita/entrega sus divisas en Tauser (PENDIENTE → PAGADA) - esto se hace en confirmar_recepcion_divisas
+            # 2. Cliente retira sus guaraníes (PAGADA → RETIRADO) - este es el flujo actual
+            if estado_actual == EstadoTransaccion.RETIRADO:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'El cliente ya retiró sus guaraníes de esta transacción.'
+                })
+            elif estado_actual == EstadoTransaccion.PENDIENTE:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'El cliente primero debe entregar sus divisas en el Tauser. Estado actual: {transaccion.estado.nombre}'
+                })
+            elif estado_actual != EstadoTransaccion.PAGADA:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Esta venta con cobro en efectivo debe estar pagada (divisas ya entregadas) para retirar guaraníes. Estado actual: {transaccion.estado.nombre}'
+                })
+        elif es_venta_otro_metodo:
+            # VENTA con otro método: No debe permitir
+            return JsonResponse({
+                'success': False,
+                'error': 'Las ventas con métodos de cobro distintos a efectivo no se procesan en Tauser. El pago ya fue procesado por otro medio.'
             })
         
         # Obtener el tauser
@@ -700,20 +760,51 @@ def procesar_retiro(request):
             
             # Actualizar la transacción con el tauser y agregar observación
             transaccion.tauser = tauser
-            transaccion.observaciones += f"\nRetirado en {tauser.nombre} el {timezone.now()} por {request.user.email}"
             
-            # Si es una venta con cobro en efectivo, marcar como pagada
+            # Determinar tipo de transacción y actualizar estado según corresponda
+            es_compra = transaccion.tipo_operacion.codigo == 'COMPRA'
             es_venta_con_efectivo = (
                 transaccion.tipo_operacion.codigo == 'VENTA' and 
                 transaccion.metodo_cobro and 
                 transaccion.metodo_cobro.nombre.lower().find('efectivo') != -1
             )
             
-            if es_venta_con_efectivo:
-                # Marcar como pagada ya que el cliente entregó las divisas en efectivo
-                transaccion.estado = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
-                transaccion.fecha_pago = timezone.now()
-                transaccion.observaciones += f"\nMarcada como pagada por entrega de divisas en efectivo en {tauser.nombre}"
+            if es_compra:
+                # COMPRA: Cliente retira divisas -> Estado ENTREGADA
+                estado_entregada, _ = EstadoTransaccion.objects.get_or_create(
+                    codigo=EstadoTransaccion.ENTREGADA,
+                    defaults={
+                        'nombre': 'Entregada',
+                        'descripcion': 'Las divisas han sido entregadas al cliente en una transacción de compra',
+                        'es_final': True,
+                        'activo': True
+                    }
+                )
+                transaccion.estado = estado_entregada
+                if transaccion.observaciones:
+                    transaccion.observaciones += f"\nDivisas entregadas al cliente en {tauser.nombre} el {timezone.now()} por {request.user.email}"
+                else:
+                    transaccion.observaciones = f"Divisas entregadas al cliente en {tauser.nombre} el {timezone.now()} por {request.user.email}"
+            elif es_venta_con_efectivo:
+                # VENTA con efectivo: Cliente retira guaraníes después de haber entregado divisas -> Estado RETIRADO
+                # Nota: La entrega de divisas ya marcó la transacción como PAGADA en confirmar_recepcion_divisas
+                estado_retirado, _ = EstadoTransaccion.objects.get_or_create(
+                    codigo=EstadoTransaccion.RETIRADO,
+                    defaults={
+                        'nombre': 'Retirado',
+                        'descripcion': 'El cliente ha retirado sus guaraníes en una transacción de venta',
+                        'es_final': True,
+                        'activo': True
+                    }
+                )
+                transaccion.estado = estado_retirado
+                if transaccion.observaciones:
+                    transaccion.observaciones += f"\nGuaraníes retirados por el cliente en {tauser.nombre} el {timezone.now()} por {request.user.email}"
+                else:
+                    transaccion.observaciones = f"Guaraníes retirados por el cliente en {tauser.nombre} el {timezone.now()} por {request.user.email}"
+            else:
+                # Otros casos (no deberían llegar aquí por las validaciones previas)
+                transaccion.observaciones += f"\nRetirado en {tauser.nombre} el {timezone.now()} por {request.user.email}"
             
             transaccion.save()
         
@@ -832,12 +923,14 @@ def verificar_codigo_retiro(request):
                 'error': 'Código de verificación y Tauser son requeridos'
             })
         
-        # Obtener la transacción por código de verificación
+        # Obtener la transacción por código de verificación (forzar recarga desde BD)
         try:
             from transacciones.models import Transaccion, EstadoTransaccion
             transaccion = Transaccion.objects.select_related(
                 'cliente', 'tipo_operacion', 'estado', 'moneda_destino', 'metodo_cobro'
             ).get(codigo_verificacion=codigo_verificacion)
+            # Forzar refresco del estado desde la base de datos para asegurar datos actualizados
+            transaccion.refresh_from_db()
             print(f"Transacción encontrada: {transaccion.id_transaccion}")
             print(f"Tipo operación: {transaccion.tipo_operacion.nombre}")
             print(f"Estado: {transaccion.estado.nombre}")
@@ -849,27 +942,44 @@ def verificar_codigo_retiro(request):
                 'error': 'Transacción no encontrada'
             })
         
-        # Verificar estado de pago según el tipo de transacción
+        # Verificar el tipo de operación
+        es_compra = transaccion.tipo_operacion.codigo == 'COMPRA'
+        es_venta = transaccion.tipo_operacion.codigo == 'VENTA'
         es_venta_con_efectivo = (
-            transaccion.tipo_operacion.codigo == 'VENTA' and 
+            es_venta and 
             transaccion.metodo_cobro and 
             transaccion.metodo_cobro.nombre.lower().find('efectivo') != -1
         )
+        es_venta_otro_metodo = es_venta and not es_venta_con_efectivo
         
-        if es_venta_con_efectivo:
-            # Para ventas con cobro en efectivo, solo verificar que esté pendiente
-            if transaccion.estado.codigo != EstadoTransaccion.PENDIENTE:
+        # Validar estados según el tipo de transacción
+        estado_actual = transaccion.estado.codigo
+        
+        if es_compra:
+            # COMPRA: Debe estar PAGADA (cliente ya pagó, ahora debe retirar divisas)
+            if estado_actual == EstadoTransaccion.ENTREGADA:
                 return JsonResponse({
                     'success': False,
-                    'error': f'Esta venta con cobro en efectivo no está en estado pendiente. Estado actual: {transaccion.estado.nombre}'
+                    'error': 'Esta transacción ya fue entregada al cliente.'
                 })
-        else:
-            # Para otras transacciones, verificar que esté pagada
-            if transaccion.estado.codigo != EstadoTransaccion.PAGADA:
+            elif estado_actual != EstadoTransaccion.PAGADA:
                 return JsonResponse({
                     'success': False,
-                    'error': f'La transacción no está pagada. Estado actual: {transaccion.estado.nombre}'
+                    'error': f'La transacción debe estar pagada para retirar. Estado actual: {transaccion.estado.nombre}'
                 })
+        elif es_venta_con_efectivo:
+            # VENTA con efectivo: Debe estar PENDIENTE (cliente va a entregar divisas)
+            if estado_actual != EstadoTransaccion.PENDIENTE:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Esta venta con cobro en efectivo debe estar en estado pendiente. Estado actual: {transaccion.estado.nombre}'
+                })
+        elif es_venta_otro_metodo:
+            # VENTA con otro método (transferencia, tarjeta): No debe permitir
+            return JsonResponse({
+                'success': False,
+                'error': 'Las ventas con métodos de cobro distintos a efectivo no se procesan en Tauser. El pago ya fue procesado por otro medio.'
+            })
         
         # Verificar el código de verificación de retiro
         from .models import CodigoVerificacionRetiro
@@ -935,7 +1045,7 @@ def verificar_codigo_retiro(request):
         # Preparar datos de la transacción para mostrar
         resumen_detallado = transaccion.get_resumen_detallado()
         
-        # Preparar datos adicionales para ventas con cobro en efectivo
+        # Preparar datos adicionales para todas las transacciones
         datos_adicionales = {
             'metodo_cobro': transaccion.metodo_cobro.nombre if transaccion.metodo_cobro else None,
             'metodo_pago': transaccion.metodo_pago.nombre if transaccion.metodo_pago else None,
@@ -957,9 +1067,20 @@ def verificar_codigo_retiro(request):
         print("=== FIN verificar_codigo_retiro - ÉXITO ===")
         print(f"Datos adicionales: {datos_adicionales}")
         
+        # Mensaje según el tipo de transacción
+        if es_compra:
+            mensaje = 'Código de verificación válido. Puede proceder con el retiro de sus divisas.'
+        elif es_venta_con_efectivo:
+            mensaje = 'Código de verificación válido. Por favor, entregue las divisas indicadas.'
+        else:
+            mensaje = 'Código de verificación válido.'
+        
         return JsonResponse({
             'success': True,
-            'message': 'Código de verificación válido. Puede proceder con el retiro.',
+            'message': mensaje,
+            'es_compra': es_compra,
+            'es_venta': es_venta,
+            'es_venta_con_efectivo': es_venta_con_efectivo,
             'transaccion': {
                 'id': transaccion.id_transaccion,
                 'codigo_verificacion': transaccion.codigo_verificacion,
@@ -1086,15 +1207,82 @@ def confirmar_recepcion_divisas(request):
                 'error': 'Error al procesar las denominaciones recibidas'
             })
         
-        # Cambiar estado a PAGADA
-        from transacciones.models import EstadoTransaccion
-        estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
-        transaccion.estado = estado_pagada
-        transaccion.fecha_pago = timezone.now()
-        transaccion.save()
+        # Obtener el tauser
+        try:
+            tauser = Tauser.objects.get(id=tauser_id, es_activo=True)
+        except Tauser.DoesNotExist:
+            print("ERROR: Tauser no válido o inactivo")
+            return JsonResponse({
+                'success': False,
+                'error': 'Tauser no válido o inactivo'
+            })
+        
+        # Procesar todo dentro de una transacción atómica
+        from django.db import transaction as db_transaction
+        from tauser.models import Stock, StockDenominacion, HistorialStockDenominacion
+        from monedas.models import DenominacionMoneda
+        from decimal import Decimal
+        
+        with db_transaction.atomic():
+            # Obtener o crear el stock de la moneda origen para este tauser
+            moneda_origen = transaccion.moneda_origen
+            stock, stock_created = Stock.objects.get_or_create(
+                tauser=tauser,
+                moneda=moneda_origen,
+                defaults={
+                    'cantidad': Decimal('0'),
+                    'es_activo': True
+                }
+            )
+            
+            # Procesar las denominaciones recibidas y actualizar stock
+            # El método agregar_cantidad de StockDenominacion automáticamente actualiza el stock general
+            for item in denominaciones:
+                denominacion_id = item.get('denominacion_id')
+                cantidad_recibida = Decimal(str(item['cantidad']))
+                
+                # Obtener la denominación
+                try:
+                    denominacion = DenominacionMoneda.objects.get(id=denominacion_id, moneda=moneda_origen)
+                except DenominacionMoneda.DoesNotExist:
+                    print(f"ADVERTENCIA: Denominación {denominacion_id} no encontrada, saltando...")
+                    continue
+                
+                # Obtener o crear el stock por denominación
+                stock_denominacion, denom_created = StockDenominacion.objects.get_or_create(
+                    stock=stock,
+                    denominacion=denominacion,
+                    defaults={
+                        'cantidad': Decimal('0'),
+                        'es_activo': True
+                    }
+                )
+                
+                # Usar el método agregar_cantidad que automáticamente:
+                # 1. Actualiza la cantidad de la denominación
+                # 2. Actualiza el stock general
+                # 3. Registra en el historial
+                stock_denominacion.agregar_cantidad(
+                    cantidad_recibida,
+                    usuario=request.user,
+                    transaccion=transaccion,
+                    observaciones=f'Recepción de divisas - Transacción {transaccion.id_transaccion}'
+                )
+            
+            # Actualizar la transacción con el tauser, estado y observaciones
+            from transacciones.models import EstadoTransaccion
+            estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
+            transaccion.tauser = tauser
+            transaccion.estado = estado_pagada
+            transaccion.fecha_pago = timezone.now()
+            if transaccion.observaciones:
+                transaccion.observaciones += f"\nDivisas recibidas en {tauser.nombre} el {timezone.now()} por {request.user.email}"
+            else:
+                transaccion.observaciones = f"Divisas recibidas en {tauser.nombre} el {timezone.now()} por {request.user.email}"
+            transaccion.save()
         
         print("=== FIN confirmar_recepcion_divisas - ÉXITO ===")
-        print(f"Transacción {transaccion.id_transaccion} marcada como PAGADA")
+        print(f"Transacción {transaccion.id_transaccion} marcada como PAGADA y asignada al Tauser {tauser.nombre}")
         
         return JsonResponse({
             'success': True,

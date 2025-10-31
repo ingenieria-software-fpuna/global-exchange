@@ -440,11 +440,33 @@ def verificar_cambio_cotizacion(request, transaccion_id):
             if transaccion.cliente and not transaccion.cliente.usuarios_asociados.filter(id=request.user.id).exists():
                 return JsonResponse({'success': False, 'error': 'Sin permisos'})
         
-        # Verificar que esté pendiente o cancelada por cambio de tasa
-        if transaccion.estado.codigo not in ['PENDIENTE', 'CANCELADA']:
+        # Verificar estado según el tipo de operación
+        es_compra = transaccion.tipo_operacion.codigo == 'COMPRA'
+        es_venta = transaccion.tipo_operacion.codigo == 'VENTA'
+        
+        # Para COMPRAS que ya están PAGADAS: no verificar cambio de cotización
+        # La transacción ya fue pagada, solo necesita retiro físico (no hay cambio de cotización relevante)
+        if es_compra and transaccion.estado.codigo == EstadoTransaccion.PAGADA:
+            return JsonResponse({
+                'success': True,
+                'hay_cambio': False,
+                'message': 'Transacción pagada, no requiere verificación de cotización'
+            })
+        
+        # Para COMPRAS con estado ENTREGADA: ya fue procesada
+        if es_compra and transaccion.estado.codigo == EstadoTransaccion.ENTREGADA:
+            return JsonResponse({
+                'success': False,
+                'error': 'Esta transacción ya fue entregada al cliente.'
+            })
+        
+        # Para VENTAS con efectivo en PENDIENTE: verificar cambio de cotización antes de entregar divisas
+        # Para otras transacciones PENDIENTE: también verificar
+        # Para transacciones CANCELADAS: permitir verificar (por si se quiere recrear)
+        if transaccion.estado.codigo not in [EstadoTransaccion.PENDIENTE, EstadoTransaccion.CANCELADA]:
             return JsonResponse({
                 'success': False, 
-                'error': f'Transacción ya no se puede procesar. Estado actual: {transaccion.estado.codigo}'
+                'error': f'Transacción ya no se puede procesar. Estado actual: {transaccion.estado.nombre}'
             })
             
         # Verificar expiración

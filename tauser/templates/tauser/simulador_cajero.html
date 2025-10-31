@@ -568,24 +568,28 @@ document.addEventListener('DOMContentLoaded', function() {
     function procesarRespuestaVerificacion(data) {
         console.log('Procesando respuesta de verificación:', data);
         
-        // Detectar si es una venta con cobro en efectivo
-        let esVentaConEfectivo = false;
-        let esVenta = false;
-        try {
-            if (data.transaccion.tipo && data.transaccion.tipo.toLowerCase().includes('venta')) {
+        // Detectar tipo de transacción usando datos del backend (prioritario) o del frontend (fallback)
+        let esCompra = data.es_compra || false;
+        let esVenta = data.es_venta || false;
+        let esVentaConEfectivo = data.es_venta_con_efectivo || false;
+        
+        // Fallback: detectar desde el tipo de transacción
+        if (!esCompra && !esVenta && data.transaccion && data.transaccion.tipo) {
+            const tipoLower = data.transaccion.tipo.toLowerCase();
+            if (tipoLower.includes('compra')) {
+                esCompra = true;
+            } else if (tipoLower.includes('venta')) {
                 esVenta = true;
+                // Verificar si es venta con efectivo
                 if (data.transaccion.metodo_cobro && typeof data.transaccion.metodo_cobro === 'string') {
                     if (data.transaccion.metodo_cobro.toLowerCase().includes('efectivo')) {
                         esVentaConEfectivo = true;
                     }
                 }
             }
-        } catch (error) {
-            console.error('Error en detección de venta con efectivo:', error);
-            esVentaConEfectivo = false;
-            esVenta = false;
         }
         
+        console.log('Es compra:', esCompra);
         console.log('Es venta:', esVenta);
         console.log('Es venta con efectivo:', esVentaConEfectivo);
         
@@ -595,21 +599,27 @@ document.addEventListener('DOMContentLoaded', function() {
             mostrarFormularioIngresoDivisas(data);
             ingresoDivisas.style.display = 'block';
             verificacionEmail.style.display = 'none';
-            // NO mostrar botón de retiro para ventas
+            // NO mostrar botón de retiro para ventas (los guaraníes se envían vía método de pago)
             botonRetiro.style.display = 'none';
         } else if (esVenta) {
             console.log('Ejecutando flujo de venta (sin efectivo)');
             // Para ventas sin efectivo: mostrar información pero NO botón de retiro
+            // Los guaraníes se envían vía método de pago (cuenta bancaria, billetera, etc.)
             mostrarResultadoValidacion(data);
             verificacionEmail.style.display = 'none';
             // NO mostrar botón de retiro para ventas
             botonRetiro.style.display = 'none';
-        } else {
+        } else if (esCompra) {
             console.log('Ejecutando flujo normal de compra');
             // Para compras: mostrar información y botón de retiro
             mostrarResultadoValidacion(data);
             verificacionEmail.style.display = 'none';
             botonRetiro.style.display = 'block';
+        } else {
+            console.log('Tipo de transacción no identificado, mostrando información genérica');
+            mostrarResultadoValidacion(data);
+            verificacionEmail.style.display = 'none';
+            botonRetiro.style.display = 'none';
         }
     }
     formValidar.addEventListener('submit', function(e) {
@@ -1107,29 +1117,81 @@ document.addEventListener('DOMContentLoaded', function() {
         const transaccion = data.transaccion;
         const tauser = data.tauser;
         
-        contenidoValidacion.innerHTML = `
-            <div class="row">
-                <div class="col-md-6">
-                    <h6 class="text-muted">Información de la Transacción</h6>
-                    <p><strong>ID:</strong> ${transaccion.id}</p>
-                    <p><strong>Tipo:</strong> ${transaccion.tipo}</p>
-                    <p><strong>Cliente:</strong> ${transaccion.cliente}</p>
-                    <p><strong>Fecha de Creación:</strong> ${transaccion.fecha_creacion}</p>
-                    <p><strong>Fecha de Pago:</strong> ${transaccion.fecha_pago || 'No disponible'}</p>
+        // Detectar si es compra o venta
+        const esCompra = data.es_compra || (transaccion.tipo && transaccion.tipo.toLowerCase().includes('compra'));
+        const esVenta = data.es_venta || (transaccion.tipo && transaccion.tipo.toLowerCase().includes('venta'));
+        
+        if (esCompra) {
+            // Para COMPRAS: mostrar información de retiro de divisas
+            contenidoValidacion.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Información de la Transacción</h6>
+                        <p><strong>ID:</strong> ${transaccion.id}</p>
+                        <p><strong>Tipo:</strong> ${transaccion.tipo}</p>
+                        <p><strong>Cliente:</strong> ${transaccion.cliente}</p>
+                        <p><strong>Fecha de Creación:</strong> ${transaccion.fecha_creacion}</p>
+                        <p><strong>Fecha de Pago:</strong> ${transaccion.fecha_pago || 'No disponible'}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Detalles del Retiro</h6>
+                        <p><strong>Moneda:</strong> ${transaccion.moneda_destino.nombre} (${transaccion.moneda_destino.codigo})</p>
+                        <p><strong>Monto a Retirar:</strong> <span class="fw-bold text-success">${transaccion.monto_a_retirar_formateado}</span></p>
+                        <p><strong>Punto de Retiro:</strong> ${tauser.nombre}</p>
+                        <p><strong>Dirección:</strong> ${tauser.direccion}</p>
+                    </div>
                 </div>
-                <div class="col-md-6">
-                    <h6 class="text-muted">Detalles del Retiro</h6>
-                    <p><strong>Moneda:</strong> ${transaccion.moneda_destino.nombre} (${transaccion.moneda_destino.codigo})</p>
-                    <p><strong>Monto a Retirar:</strong> <span class="fw-bold text-success">${transaccion.monto_a_retirar_formateado}</span></p>
-                    <p><strong>Punto de Retiro:</strong> ${tauser.nombre}</p>
-                    <p><strong>Dirección:</strong> ${tauser.direccion}</p>
+                <div class="alert alert-success mt-3">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>¡Transacción verificada exitosamente!</strong> Puede proceder con el retiro de sus divisas.
                 </div>
-            </div>
-            <div class="alert alert-success mt-3">
-                <i class="fas fa-check-circle me-2"></i>
-                <strong>¡Transacción verificada exitosamente!</strong> Puede proceder con el retiro.
-            </div>
-        `;
+            `;
+        } else if (esVenta) {
+            // Para VENTAS: mostrar información pero NO mencionar retiro
+            // Los guaraníes se envían vía método de pago (cuenta bancaria, billetera, etc.), NO se retiran del Tauser
+            const metodoPago = transaccion.metodo_pago || data.transaccion?.metodo_pago || 'el método seleccionado';
+            contenidoValidacion.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Información de la Transacción</h6>
+                        <p><strong>ID:</strong> ${transaccion.id}</p>
+                        <p><strong>Tipo:</strong> ${transaccion.tipo}</p>
+                        <p><strong>Cliente:</strong> ${transaccion.cliente}</p>
+                        <p><strong>Fecha de Creación:</strong> ${transaccion.fecha_creacion}</p>
+                        <p><strong>Fecha de Pago:</strong> ${transaccion.fecha_pago || 'No disponible'}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Detalles de la Transacción</h6>
+                        <p><strong>Moneda:</strong> ${transaccion.moneda_destino.nombre} (${transaccion.moneda_destino.codigo})</p>
+                        <p><strong>Monto:</strong> <span class="fw-bold text-success">${transaccion.monto_a_retirar_formateado}</span></p>
+                        <p><strong>Punto de Atención:</strong> ${tauser.nombre}</p>
+                        <p><strong>Dirección:</strong> ${tauser.direccion}</p>
+                    </div>
+                </div>
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Transacción verificada exitosamente.</strong> Los guaraníes serán enviados vía <strong>${metodoPago}</strong> según el método de pago seleccionado.
+                </div>
+            `;
+        } else {
+            // Fallback para otros casos
+            contenidoValidacion.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Información de la Transacción</h6>
+                        <p><strong>ID:</strong> ${transaccion.id}</p>
+                        <p><strong>Tipo:</strong> ${transaccion.tipo}</p>
+                        <p><strong>Cliente:</strong> ${transaccion.cliente}</p>
+                        <p><strong>Fecha de Creación:</strong> ${transaccion.fecha_creacion}</p>
+                        <p><strong>Fecha de Pago:</strong> ${transaccion.fecha_pago || 'No disponible'}</p>
+                    </div>
+                </div>
+                <div class="alert alert-success mt-3">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>¡Transacción verificada exitosamente!</strong>
+                </div>
+            `;
+        }
         
         resultadoValidacion.style.display = 'block';
     }

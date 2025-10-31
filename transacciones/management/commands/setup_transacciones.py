@@ -60,7 +60,21 @@ class Command(BaseCommand):
             {
                 'codigo': EstadoTransaccion.PAGADA,
                 'nombre': 'Pagada',
-                'descripcion': 'La transacción ha sido pagada y completada exitosamente',
+                'descripcion': 'La transacción ha sido pagada. Para compras, el cliente debe retirar las divisas. Para ventas con otros métodos, está completa.',
+                'es_final': False,
+                'activo': True
+            },
+            {
+                'codigo': EstadoTransaccion.ENTREGADA,
+                'nombre': 'Entregada',
+                'descripcion': 'Las divisas han sido entregadas al cliente en una transacción de compra',
+                'es_final': True,
+                'activo': True
+            },
+            {
+                'codigo': EstadoTransaccion.RETIRADO,
+                'nombre': 'Retirado',
+                'descripcion': 'El cliente ha retirado sus guaraníes en una transacción de venta',
                 'es_final': True,
                 'activo': True
             },
