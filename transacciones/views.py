@@ -11,6 +11,7 @@ from django.db import transaction
 from django.db.models import Q, Count
 from decimal import Decimal, ROUND_HALF_UP
 import json
+import re
 from datetime import datetime, date
 
 from .models import Transaccion, TipoOperacion, EstadoTransaccion
@@ -1729,12 +1730,47 @@ def iniciar_venta(request):
                 return redirect('transacciones:vender_divisas')
         
         metodo_pago = None
+        datos_metodo_pago = {}
         if metodo_pago_id:
             try:
                 metodo_pago = MetodoPago.objects.get(id=metodo_pago_id, es_activo=True)
             except MetodoPago.DoesNotExist:
                 messages.error(request, 'Método de pago seleccionado no válido.')
                 return redirect('transacciones:vender_divisas')
+        
+        # Capturar y validar los campos dinámicos del método de pago seleccionado
+        if metodo_pago:
+            campos_recibidos = []
+            for campo in metodo_pago.get_campos_activos():
+                key = f"campos_metodo_pago[{campo.id}]"
+                valor = request.POST.get(key, '')
+                valor_normalizado = valor.strip() if isinstance(valor, str) else valor
+                
+                if campo.es_obligatorio and not valor_normalizado:
+                    messages.error(request, f'Complete el campo requerido: {campo.etiqueta}.')
+                    return redirect('transacciones:vender_divisas')
+                
+                if valor_normalizado and campo.regex_validacion:
+                    if not re.match(campo.regex_validacion, valor_normalizado):
+                        messages.error(
+                            request,
+                            f'El valor ingresado en "{campo.etiqueta}" no cumple con el formato requerido.'
+                        )
+                        return redirect('transacciones:vender_divisas')
+                
+                campos_recibidos.append({
+                    'id': campo.id,
+                    'nombre': campo.nombre,
+                    'etiqueta': campo.etiqueta,
+                    'valor': valor_normalizado,
+                    'tipo': campo.tipo,
+                })
+            
+            datos_metodo_pago = {
+                'metodo_pago_id': metodo_pago.id,
+                'metodo_pago_nombre': metodo_pago.nombre,
+                'campos': campos_recibidos,
+            }
         
         # Calcular la transacción
         resultado_calculo = calcular_venta_completa(
@@ -1794,6 +1830,7 @@ def iniciar_venta(request):
                 monto_comision=Decimal(str(data.get('comision_total', 0))),  # Monto total de comisión
                 porcentaje_descuento=Decimal(str(data.get('descuento_pct', 0))),  # Porcentaje de descuento del cliente
                 monto_descuento=Decimal(str(data.get('descuento_aplicado', 0))),  # Monto de descuento aplicado
+                datos_metodo_pago=datos_metodo_pago,
                 estado=estado_pendiente,
                 ip_cliente=get_client_ip(request)
             )

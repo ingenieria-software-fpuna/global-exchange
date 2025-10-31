@@ -4,9 +4,15 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.utils import timezone
 from decimal import Decimal
+from unittest.mock import patch
+import json
 
 from .models import Tauser, Stock, StockDenominacion, HistorialStock, HistorialStockDenominacion
 from monedas.models import Moneda, DenominacionMoneda
+from metodo_cobro.models import MetodoCobro
+from metodo_pago.models import MetodoPago
+from transacciones.models import Transaccion, TipoOperacion, EstadoTransaccion
+from clientes.models import Cliente, TipoCliente
 
 Usuario = get_user_model()
 
@@ -400,3 +406,173 @@ class StockViewsTest(TestCase):
         self.assertIsNotNone(historial)
         self.assertEqual(historial.tipo_movimiento, 'ENTRADA')
         self.assertEqual(historial.cantidad_movida, 10)
+
+
+class ConfirmarRecepcionDivisasDepositoTest(TestCase):
+    """Valida que la confirmación de recepción registre el depósito en el simulador."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.usuario = Usuario.objects.create_user(
+            email='operador@example.com',
+            password='operador123',
+            nombre='Operador',
+            apellido='Tauser',
+            cedula='1231231',
+            fecha_nacimiento='1990-01-01'
+        )
+        self.client.force_login(self.usuario)
+        
+        # Monedas
+        self.moneda_extranjera = Moneda.objects.create(
+            codigo='USD',
+            nombre='Dólar Estadounidense',
+            simbolo='$',
+            es_activa=True,
+            decimales=2
+        )
+        self.moneda_pyg = Moneda.objects.create(
+            codigo='PYG',
+            nombre='Guaraní',
+            simbolo='₲',
+            es_activa=True,
+            decimales=0
+        )
+        
+        # Denominación recibida
+        self.denominacion = DenominacionMoneda.objects.create(
+            moneda=self.moneda_extranjera,
+            valor=Decimal('100.00'),
+            tipo='BILLETE',
+            es_activa=True
+        )
+        
+        # Tauser
+        self.tauser = Tauser.objects.create(
+            nombre='Tauser Central',
+            direccion='Av. Principal 123',
+            horario_atencion='Lun-Vie 9:00-18:00',
+            es_activo=True
+        )
+        
+        # Métodos
+        self.metodo_cobro = MetodoCobro.objects.create(
+            nombre='Efectivo en Tauser',
+            descripcion='Entrega de divisas en el tauser',
+            comision=Decimal('0'),
+            es_activo=True,
+            requiere_retiro_fisico=True
+        )
+        self.metodo_cobro.monedas_permitidas.add(self.moneda_extranjera)
+        
+        self.metodo_pago = MetodoPago.objects.create(
+            nombre='Billetera electrónica',
+            descripcion='Depósito en billetera digital',
+            comision=Decimal('1.00'),
+            es_activo=True,
+            requiere_retiro_fisico=False
+        )
+        self.metodo_pago.monedas_permitidas.add(self.moneda_pyg)
+        
+        # Tipos y estados
+        self.tipo_venta = TipoOperacion.objects.create(
+            codigo=TipoOperacion.VENTA,
+            nombre='Venta de Divisas',
+            descripcion='El cliente vende divisas y recibe PYG',
+            activo=True
+        )
+        self.estado_pendiente = EstadoTransaccion.objects.create(
+            codigo=EstadoTransaccion.PENDIENTE,
+            nombre='Pendiente',
+            descripcion='Pendiente de procesamiento',
+            activo=True
+        )
+        self.estado_pagada = EstadoTransaccion.objects.create(
+            codigo=EstadoTransaccion.PAGADA,
+            nombre='Pagada',
+            descripcion='Pagada',
+            activo=True
+        )
+        
+        # Cliente
+        tipo_cliente = TipoCliente.objects.create(
+            nombre='Corporativo',
+            descripcion='Cliente corporativo',
+            descuento=Decimal('0'),
+            activo=True
+        )
+        self.cliente = Cliente.objects.create(
+            nombre_comercial='Cliente Demo',
+            ruc='1234567',
+            direccion='Calle Falsa 123',
+            correo_electronico='cliente@example.com',
+            tipo_cliente=tipo_cliente
+        )
+        self.cliente.usuarios_asociados.add(self.usuario)
+        
+        # Transacción de venta pendiente
+        self.transaccion = Transaccion.objects.create(
+            cliente=self.cliente,
+            usuario=self.usuario,
+            tipo_operacion=self.tipo_venta,
+            moneda_origen=self.moneda_extranjera,
+            moneda_destino=self.moneda_pyg,
+            monto_origen=Decimal('100.00'),
+            monto_destino=Decimal('700000'),
+            metodo_cobro=self.metodo_cobro,
+            metodo_pago=self.metodo_pago,
+            tasa_cambio=Decimal('7000'),
+            estado=self.estado_pendiente,
+            datos_metodo_pago={
+                'metodo_pago_id': self.metodo_pago.id,
+                'metodo_pago_nombre': self.metodo_pago.nombre,
+                'campos': [
+                    {
+                        'id': 1,
+                        'nombre': 'numero_telefono',
+                        'etiqueta': 'Número de Teléfono',
+                        'valor': '+595981234567',
+                        'tipo': 'phone',
+                    }
+                ]
+            }
+        )
+        # Garantizar que tengamos código de verificación
+        self.transaccion.refresh_from_db()
+    
+    @patch('tauser.views.PasarelaService')
+    def test_confirmar_recepcion_registra_deposito(self, mock_pasarela_cls):
+        """El depósito se registra en el simulador cuando todo es correcto."""
+        mock_service = mock_pasarela_cls.return_value
+        mock_service.procesar_pago.return_value = {
+            'success': True,
+            'data': {
+                'id_pago': 'deposit-123',
+                'estado': 'exito',
+                'fecha': '2025-01-01T00:00:00Z'
+            }
+        }
+        
+        payload = {
+            'codigo_verificacion': self.transaccion.codigo_verificacion,
+            'tauser_id': str(self.tauser.id),
+            'total_recibido': '100.00',
+            'denominaciones': json.dumps([{
+                'denominacion_id': self.denominacion.id,
+                'cantidad': 1,
+                'valor': 100.0
+            }])
+        }
+        
+        response = self.client.post(reverse('tauser:confirmar_recepcion_divisas'), data=payload)
+        self.assertEqual(response.status_code, 200)
+        resultado = response.json()
+        self.assertTrue(resultado['success'])
+        self.assertIn('deposito', resultado)
+        self.assertEqual(resultado['deposito']['estado'], 'exito')
+        
+        self.transaccion.refresh_from_db()
+        self.assertEqual(self.transaccion.estado.codigo, EstadoTransaccion.PAGADA)
+        self.assertEqual(self.transaccion.registro_deposito.get('estado'), 'exito')
+        self.assertEqual(self.transaccion.registro_deposito.get('id_pago_externo'), 'deposit-123')
+        mock_service.procesar_pago.assert_called_once()

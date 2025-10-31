@@ -10,10 +10,92 @@ from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.db import transaction
 from django.core.paginator import Paginator
+import logging
 
 
 from .models import Tauser, Stock, HistorialStock, StockDenominacion, HistorialStockDenominacion
 from .forms import TauserForm, StockForm
+from pagos.services import PasarelaService
+
+
+logger = logging.getLogger(__name__)
+
+
+def generar_referencia_deposito(transaccion_id: str) -> str:
+    """
+    Genera una referencia para depósitos simulados evitando patrones rechazados por la pasarela.
+    """
+    base = ''.join(ch for ch in transaccion_id if ch.isalnum())
+    if len(base) < 6:
+        base = (base + 'ABCDEFGH123456789')[0:12]
+    referencia = f"DEP{base[-12:]}".upper()
+    
+    # Asegurar longitud mínima de 6 caracteres y evitar '000'
+    if len(referencia) < 6:
+        referencia = (referencia + '123456')[:6]
+    while '000' in referencia:
+        referencia = referencia.replace('000', '111')
+    return referencia[:20]
+
+
+def preparar_datos_deposito(transaccion):
+    """
+    Estructura los datos necesarios para registrar el depósito en el simulador.
+    """
+    metodo_pago = transaccion.metodo_pago
+    if not metodo_pago or metodo_pago.requiere_retiro_fisico:
+        return {'requiere_deposito': False}
+    
+    datos_metodo = transaccion.datos_metodo_pago or {}
+    campos = datos_metodo.get('campos', [])
+    campos_dict = {
+        campo.get('nombre'): campo.get('valor')
+        for campo in campos
+        if campo.get('nombre')
+    }
+    
+    metodo_nombre = (metodo_pago.nombre or '').lower()
+    datos_pasarela = {
+        'transaccion_id': transaccion.id_transaccion,
+        'tipo_operacion': 'deposito',
+    }
+    metadata = {
+        'metodo_pago_id': metodo_pago.id,
+        'metodo_pago_nombre': metodo_pago.nombre,
+        'campos': campos,
+    }
+    
+    if 'billetera' in metodo_nombre:
+        numero_billetera = campos_dict.get('numero_telefono') or campos_dict.get('numero_billetera')
+        if not numero_billetera:
+            raise ValueError('Falta el número de billetera para realizar el depósito.')
+        datos_pasarela['numero_billetera'] = numero_billetera
+        metadata['destino'] = {
+            'tipo': 'billetera',
+            'numero_billetera': numero_billetera,
+        }
+    elif 'cuenta bancaria' in metodo_nombre or 'cuenta' in metodo_nombre:
+        numero_cuenta = campos_dict.get('numero_cuenta')
+        if not numero_cuenta:
+            raise ValueError('Falta el número de cuenta bancaria para realizar el depósito.')
+        referencia = generar_referencia_deposito(transaccion.id_transaccion)
+        datos_pasarela['numero_comprobante'] = referencia
+        metadata['destino'] = {
+            'tipo': 'transferencia',
+            'numero_cuenta': numero_cuenta,
+            'banco': campos_dict.get('banco'),
+            'titular': campos_dict.get('titular'),
+            'documento': campos_dict.get('documento'),
+        }
+        metadata['referencia_transferencia'] = referencia
+    else:
+        raise ValueError('El método de pago seleccionado no soporta depósitos automáticos.')
+    
+    return {
+        'requiere_deposito': True,
+        'datos_pasarela': datos_pasarela,
+        'metadata': metadata,
+    }
 
 
 class TauserListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
@@ -1243,7 +1325,7 @@ def confirmar_recepcion_divisas(request):
         from transacciones.models import Transaccion, EstadoTransaccion
         try:
             transaccion = Transaccion.objects.select_related(
-                'cliente', 'tipo_operacion', 'estado', 'moneda_origen', 'metodo_cobro'
+                'cliente', 'tipo_operacion', 'estado', 'moneda_origen', 'moneda_destino', 'metodo_cobro', 'metodo_pago'
             ).get(codigo_verificacion=codigo_verificacion)
             print(f"Transacción encontrada: {transaccion.id_transaccion}")
         except Transaccion.DoesNotExist:
@@ -1273,6 +1355,14 @@ def confirmar_recepcion_divisas(request):
             return JsonResponse({
                 'success': False,
                 'error': f'La transacción no está en estado pendiente. Estado actual: {transaccion.estado.nombre}'
+            })
+        
+        registro_deposito_actual = transaccion.registro_deposito if isinstance(transaccion.registro_deposito, dict) else {}
+        if registro_deposito_actual.get('estado') == 'exito':
+            print("ERROR: Depósito ya registrado previamente en el simulador")
+            return JsonResponse({
+                'success': False,
+                'error': 'El depósito ya fue registrado previamente en el simulador para esta transacción.'
             })
         
         # Verificar el monto recibido
@@ -1315,6 +1405,7 @@ def confirmar_recepcion_divisas(request):
         from monedas.models import DenominacionMoneda
         from decimal import Decimal
         
+        deposito_info = None
         with db_transaction.atomic():
             # Obtener o crear el stock de la moneda origen para este tauser
             moneda_origen = transaccion.moneda_origen
@@ -1361,6 +1452,60 @@ def confirmar_recepcion_divisas(request):
                     observaciones=f'Recepción de divisas - Transacción {transaccion.id_transaccion}'
                 )
             
+            try:
+                if transaccion.metodo_pago and not transaccion.metodo_pago.requiere_retiro_fisico:
+                    datos_deposito = preparar_datos_deposito(transaccion)
+                    if datos_deposito.get('requiere_deposito'):
+                        datos_pasarela = datos_deposito['datos_pasarela'].copy()
+                        datos_pasarela.update({
+                            'procesado_por': request.user.email,
+                            'tauser_id': tauser.id,
+                            'tauser_nombre': tauser.nombre,
+                        })
+                        pasarela_service = PasarelaService()
+                        resultado_deposito = pasarela_service.procesar_pago(
+                            monto=float(transaccion.monto_destino),
+                            metodo_cobro=transaccion.metodo_pago.nombre,
+                            moneda=transaccion.moneda_destino.codigo,
+                            escenario="exito",
+                            datos_adicionales=datos_pasarela
+                        )
+                        if not resultado_deposito.get('success'):
+                            raise ValueError(resultado_deposito.get('error', 'No se pudo registrar el depósito en el simulador.'))
+                        
+                        respuesta_pasarela = resultado_deposito.get('data', {})
+                        estado_pasarela = (respuesta_pasarela.get('estado') or '').lower()
+                        if estado_pasarela != 'exito':
+                            motivo = respuesta_pasarela.get('motivo_rechazo', 'El simulador no confirmó el depósito.')
+                            raise ValueError(motivo)
+                        
+                        deposito_info = {
+                            'estado': respuesta_pasarela.get('estado'),
+                            'id_pago_externo': respuesta_pasarela.get('id_pago'),
+                            'respuesta': respuesta_pasarela,
+                            'payload_enviado': {
+                                'monto': float(transaccion.monto_destino),
+                                'moneda': transaccion.moneda_destino.codigo,
+                                'metodo_pasarela': (transaccion.metodo_pago.nombre or '').lower(),
+                                'datos_pasarela': datos_pasarela,
+                            },
+                            'metadata': datos_deposito['metadata'],
+                            'registrado_en': timezone.now().isoformat(),
+                        }
+                else:
+                    deposito_info = {
+                        'estado': 'omitido',
+                        'motivo': 'El método de pago requiere retiro físico o no está configurado.'
+                    }
+            except Exception as deposito_error:
+                logger.error(
+                    "Error registrando depósito en simulador para transacción %s: %s",
+                    transaccion.id_transaccion,
+                    deposito_error,
+                    exc_info=True
+                )
+                raise
+            
             # Actualizar la transacción con el tauser, estado y observaciones
             from transacciones.models import EstadoTransaccion
             estado_pagada = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PAGADA)
@@ -1371,6 +1516,13 @@ def confirmar_recepcion_divisas(request):
                 transaccion.observaciones += f"\nDivisas recibidas en {tauser.nombre} el {timezone.now()} por {request.user.email}"
             else:
                 transaccion.observaciones = f"Divisas recibidas en {tauser.nombre} el {timezone.now()} por {request.user.email}"
+            if deposito_info:
+                transaccion.registro_deposito = deposito_info
+                if deposito_info.get('estado') == 'exito':
+                    transaccion.observaciones += (
+                        f"\nDepósito registrado en simulador (ID {deposito_info.get('id_pago_externo')}) "
+                        f"el {timezone.now()} por {request.user.email}"
+                    )
             transaccion.save()
         
         print("=== FIN confirmar_recepcion_divisas - ÉXITO ===")
@@ -1385,7 +1537,8 @@ def confirmar_recepcion_divisas(request):
                 'fecha_pago': transaccion.fecha_pago.strftime('%d/%m/%Y %H:%M') if transaccion.fecha_pago else None,
                 'total_recibido': total_calculado,
                 'denominaciones_recibidas': len(denominaciones)
-            }
+            },
+            'deposito': deposito_info or {}
         })
         
     except Exception as e:
