@@ -525,8 +525,9 @@ def verificar_cambio_cotizacion(request, transaccion_id):
             # Determinar si es compra o venta y usar la función correcta
             if transaccion.moneda_origen.codigo == 'PYG':
                 # COMPRA: PYG → otra moneda
+                # El cliente quiere recibir una cantidad específica de divisa (monto_destino)
                 nueva_cotizacion = calcular_transaccion_completa(
-                    monto=transaccion.monto_origen,
+                    monto=transaccion.monto_destino,  # Cantidad de divisa extranjera que quiere
                     moneda_origen=transaccion.moneda_origen,
                     moneda_destino=transaccion.moneda_destino,
                     cliente=transaccion.cliente,
@@ -535,6 +536,7 @@ def verificar_cambio_cotizacion(request, transaccion_id):
                 )
             else:
                 # VENTA: otra moneda → PYG
+                # El cliente quiere vender una cantidad específica de divisa (monto_origen)
                 nueva_cotizacion = calcular_venta_completa(
                     monto=transaccion.monto_origen,
                     moneda_origen=transaccion.moneda_origen,
@@ -553,20 +555,20 @@ def verificar_cambio_cotizacion(request, transaccion_id):
             # Extraer datos del resultado
             datos = nueva_cotizacion['data']
             
-            # Preparar datos para el modal
+            # Preparar datos para el modal (ya formateados usando moneda_format)
             response_data = {
                 'success': True,
                 'hay_cambio': True,
                 'moneda_nombre': transaccion.moneda_destino.nombre,
-                'moneda_simbolo': transaccion.moneda_destino.simbolo,
-                # Datos originales
-                'tasa_original': f"{transaccion.tasa_cambio:,.2f}",
-                'monto_origen_original': f"{transaccion.monto_origen:,.0f}",
-                'monto_destino_original': f"{transaccion.monto_destino:,.2f}",
-                # Datos nuevos
-                'tasa_nueva': f"{datos['precio_usado']:,.2f}",
-                'monto_origen_nuevo': f"{datos['total']:,.0f}",
-                'monto_destino_nuevo': f"{datos['resultado']:,.2f}",
+                'moneda_codigo': transaccion.moneda_destino.codigo,
+                # Datos originales (formateados)
+                'tasa_original': moneda_format(transaccion.tasa_cambio, transaccion.moneda_origen.codigo),
+                'monto_origen_original': moneda_format(transaccion.monto_origen, transaccion.moneda_origen.codigo),
+                'monto_destino_original': moneda_format(transaccion.monto_destino, transaccion.moneda_destino.codigo),
+                # Datos nuevos (formateados)
+                'tasa_nueva': moneda_format(datos['precio_usado'], transaccion.moneda_origen.codigo),
+                'monto_origen_nuevo': moneda_format(datos['total'], transaccion.moneda_origen.codigo),
+                'monto_destino_nuevo': moneda_format(datos['resultado'], transaccion.moneda_destino.codigo),
                 # Datos para crear nueva transacción
                 'nueva_transaccion_datos': {
                     'monto_origen': str(datos['total']),
@@ -615,8 +617,9 @@ def crear_con_nueva_cotizacion(request, transaccion_id):
         # Recalcular los datos completos para obtener información adicional
         if transaccion_original.moneda_origen.codigo == 'PYG':
             # COMPRA: PYG → otra moneda
+            # El cliente quiere recibir una cantidad específica de divisa (monto_destino)
             nueva_cotizacion = calcular_transaccion_completa(
-                monto=transaccion_original.monto_origen,
+                monto=transaccion_original.monto_destino,  # Cantidad de divisa extranjera que quiere
                 moneda_origen=transaccion_original.moneda_origen,
                 moneda_destino=transaccion_original.moneda_destino,
                 cliente=transaccion_original.cliente,
@@ -625,6 +628,7 @@ def crear_con_nueva_cotizacion(request, transaccion_id):
             )
         else:
             # VENTA: otra moneda → PYG
+            # El cliente quiere vender una cantidad específica de divisa (monto_origen)
             nueva_cotizacion = calcular_venta_completa(
                 monto=transaccion_original.monto_origen,
                 moneda_origen=transaccion_original.moneda_origen,
@@ -653,8 +657,8 @@ def crear_con_nueva_cotizacion(request, transaccion_id):
         # Calcular porcentaje de comisión correctamente según el tipo de operación
         if transaccion_original.moneda_origen.codigo == 'PYG':
             # COMPRA: PYG → otra moneda
-            # El porcentaje se calcula sobre el monto en PYG que el cliente paga
-            monto_base_comision = transaccion_original.monto_origen
+            # El porcentaje se calcula sobre el monto en PYG que el cliente paga (subtotal, sin comisiones)
+            monto_base_comision = Decimal(str(datos_completos['subtotal']))
         else:
             # VENTA: otra moneda → PYG  
             # El porcentaje se calcula sobre el monto en PYG que el cliente recibe (subtotal)
@@ -676,8 +680,8 @@ def crear_con_nueva_cotizacion(request, transaccion_id):
                 tipo_operacion=transaccion_original.tipo_operacion,
                 moneda_origen=transaccion_original.moneda_origen,
                 moneda_destino=transaccion_original.moneda_destino,
-                monto_origen=transaccion_original.monto_origen,
-                monto_destino=Decimal(str(datos_completos['resultado'])),
+                monto_origen=Decimal(str(datos_completos['total'])),  # Nuevo monto a pagar con nueva tasa
+                monto_destino=Decimal(str(datos_completos['resultado'])),  # Cantidad de divisa que recibirá
                 tasa_cambio=Decimal(str(datos_completos['precio_usado'])),
                 # Agregar campos de comisiones y descuentos
                 porcentaje_comision=porcentaje_comision,
@@ -1145,9 +1149,11 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
                     'valor': float(precio_usado),
                 },
                 
-                # Tasas para mostrar en el preview
+                # Tasas para mostrar en el preview (formateadas con código de moneda)
                 'tasa_base': float(Decimal(str(tasa_destino.precio_base)) + Decimal(str(tasa_destino.comision_venta))),
+                'tasa_base_formateada': moneda_format(Decimal(str(tasa_destino.precio_base)) + Decimal(str(tasa_destino.comision_venta)), moneda_destino.codigo),
                 'tasa_ajustada': float(precio_usado),
+                'tasa_ajustada_formateada': moneda_format(precio_usado, moneda_destino.codigo),
                 
                 # Cálculos
                 'subtotal': float(subtotal),
@@ -1337,9 +1343,11 @@ def calcular_venta_completa(monto, moneda_origen, moneda_destino, cliente=None, 
                 },
                 'tasa_destino': None,  # Para ventas, la tasa relevante es la de origen
                 
-                # Tasas para mostrar en el preview
+                # Tasas para mostrar en el preview (formateadas con código de moneda)
                 'tasa_base': float(Decimal(str(tasa_origen.precio_base)) - Decimal(str(tasa_origen.comision_compra))),
+                'tasa_base_formateada': moneda_format(Decimal(str(tasa_origen.precio_base)) - Decimal(str(tasa_origen.comision_compra)), moneda_destino.codigo),
                 'tasa_ajustada': float(precio_usado),
+                'tasa_ajustada_formateada': moneda_format(precio_usado, moneda_destino.codigo),
                 
                 # Cálculos
                 'subtotal': float(subtotal),
