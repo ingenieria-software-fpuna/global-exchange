@@ -65,7 +65,8 @@ def init_database():
         "ALTER TABLE pagos ADD COLUMN IF NOT EXISTS numero_tarjeta VARCHAR(20);",
         "ALTER TABLE pagos ADD COLUMN IF NOT EXISTS numero_billetera VARCHAR(20);",
         "ALTER TABLE pagos ADD COLUMN IF NOT EXISTS numero_comprobante VARCHAR(50);",
-        "ALTER TABLE pagos ADD COLUMN IF NOT EXISTS motivo_rechazo VARCHAR(200);"
+        "ALTER TABLE pagos ADD COLUMN IF NOT EXISTS motivo_rechazo VARCHAR(200);",
+        "ALTER TABLE pagos ADD COLUMN IF NOT EXISTS id_transaccion VARCHAR(255);"
     ]
     
     for query in new_columns:
@@ -87,6 +88,7 @@ class PagoRequest(BaseModel):
     moneda: str
     escenario: EstadoPago = EstadoPago.exito
     webhook_url: Optional[str] = None
+    id_transaccion: Optional[str] = None  # ID de la transacción desde el sistema principal
     # Campos específicos por método de pago
     numero_tarjeta: Optional[str] = None  # Para tarjeta y tarjeta_credito_local
     numero_billetera: Optional[str] = None  # Para billetera
@@ -178,8 +180,8 @@ def iniciar_pago(pago: PagoRequest, background_tasks: BackgroundTasks):
     
     insert_query = """
     INSERT INTO pagos (id_pago, monto, metodo, moneda, estado, webhook_url, 
-                      numero_tarjeta, numero_billetera, numero_comprobante, motivo_rechazo, fecha)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                      numero_tarjeta, numero_billetera, numero_comprobante, motivo_rechazo, id_transaccion, fecha)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     
     cursor.execute(insert_query, (
@@ -193,6 +195,7 @@ def iniciar_pago(pago: PagoRequest, background_tasks: BackgroundTasks):
         pago.numero_billetera,
         pago.numero_comprobante,
         motivo_rechazo,
+        pago.id_transaccion,
         fecha_actual
     ))
     
@@ -227,6 +230,29 @@ def consultar_pago(id_pago: str):
     
     if not pago:
         raise HTTPException(status_code=404, detail="Pago no encontrado")
+    
+    return PagoResponse(
+        id_pago=pago['id_pago'], 
+        estado=EstadoPago(pago['estado']), 
+        fecha=pago['fecha'],
+        motivo_rechazo=pago['motivo_rechazo']
+    )
+
+@app.get("/pago/transaccion/{id_transaccion}", response_model=PagoResponse, summary="Consultar pago por ID de transacción", tags=["Pagos"])
+def consultar_pago_por_transaccion(id_transaccion: str):
+    """Consultar el estado de un pago usando el ID de transacción del sistema principal"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    select_query = "SELECT * FROM pagos WHERE id_transaccion = %s ORDER BY fecha DESC LIMIT 1"
+    cursor.execute(select_query, (id_transaccion,))
+    pago = cursor.fetchone()
+    
+    cursor.close()
+    conn.close()
+    
+    if not pago:
+        raise HTTPException(status_code=404, detail="Pago no encontrado para esta transacción")
     
     return PagoResponse(
         id_pago=pago['id_pago'], 
