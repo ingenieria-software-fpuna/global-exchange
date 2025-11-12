@@ -36,7 +36,7 @@
                 <option value="{{ cliente.id }}" data-descuento="{{ cliente.tipo_cliente.descuento }}" 
                         {% if cliente_preseleccionado and cliente.id|stringformat:"s" == cliente_preseleccionado %}selected{% endif %}>
                   {{ cliente.nombre_comercial }}{% if cliente.tipo_cliente.activo %} — {{ cliente.tipo_cliente.nombre }} 
-                  ({{ cliente.tipo_cliente.descuento }}% descuento){% endif %}
+                  {% endif %}
                 </option>
               {% empty %}
                 <option value="" disabled>No hay clientes asociados</option>
@@ -63,7 +63,7 @@
                 {% if "efectivo" not in metodo.nombre|lower %}
                 <option value="{{ metodo.id }}" data-comision="{{ metodo.comision }}">
                   {{ metodo.nombre }} 
-                  {% if metodo.comision > 0 %}({{ metodo.comision }}% comisión){% else %}(sin comisión){% endif %}
+                 
                 </option>
                 {% endif %}
               {% empty %}
@@ -434,7 +434,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const option = document.createElement('option');
                     option.value = metodo.id;
                     option.setAttribute('data-comision', metodo.comision);
-                    option.textContent = `${metodo.nombre} ${metodo.comision > 0 ? `(${metodo.comision}% comisión)` : '(sin comisión)'}`;
+                    option.textContent = metodo.nombre;
                     metodoCobro.appendChild(option);
                 });
             } else {
@@ -501,11 +501,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
                         <div class="col-6">
                             <small class="text-muted">Tasa base:</small><br>
-                            <strong>₲ ${data.tasa_base.toLocaleString()}</strong>
+                            <strong>${data.tasa_base_formateada || 'PYG ' + data.tasa_base.toLocaleString()}</strong>
                         </div>
                         <div class="col-6">
                             <small class="text-muted">${data.descuento_pct > 0 ? `Tasa ajustada (con ${data.descuento_pct}% descuento):` : 'Tasa aplicada:'}</small><br>
-                            <strong>₲ ${data.tasa_ajustada.toLocaleString()}</strong>
+                            <strong>${data.tasa_ajustada_formateada || 'PYG ' + data.tasa_ajustada.toLocaleString()}</strong>
                         </div>
                     
 

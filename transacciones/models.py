@@ -484,12 +484,11 @@ class Transaccion(models.Model):
             monto_base = subtotal_display  # Monto base para mostrar
             total_cliente = self.monto_origen  # Total que paga (incluye comisiones)
         
-        # Formatear montos
+        # Formatear montos usando el filtro moneda_format
+        from monedas.templatetags.moneda_extras import moneda_format
+        
         def formatear_monto(valor, moneda):
-            if moneda.codigo == 'PYG':
-                return f"₲ {valor:,.0f}"
-            else:
-                return f"{moneda.simbolo} {valor:,.2f}"
+            return moneda_format(valor, moneda.codigo)
         
         return {
             # Básicos

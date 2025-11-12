@@ -156,7 +156,7 @@
                 {% else %}
                 <label class="text-muted small">Tasa base ({{ resumen_detallado.tasa_cambio_tipo }}):</label>
                 {% endif %}
-                <div class="fw-bold">₲ {{ resumen_detallado.tasa_base|floatformat:4 }}</div>
+                <div class="fw-bold">{{ resumen_detallado.tasa_base|moneda_format:transaccion.moneda_origen.codigo }}</div>
               </div>
               
               {% if resumen_detallado.cliente and resumen_detallado.cliente.descuento > 0 %}
@@ -166,7 +166,7 @@
                 {% else %}
                 <label class="text-muted small">Tasa ajustada (con descuento):</label>
                 {% endif %}
-                <div class="fw-bold text-success">₲ {{ resumen_detallado.tasa_ajustada|floatformat:4 }}</div>
+                <div class="fw-bold text-success">{{ resumen_detallado.tasa_ajustada|moneda_format:transaccion.moneda_origen.codigo }}</div>
               </div>
               {% else %}
               <div class="mb-2">
@@ -175,7 +175,7 @@
                 {% else %}
                 <label class="text-muted small">Tasa utilizada ({{ resumen_detallado.tasa_cambio_tipo }}):</label>
                 {% endif %}
-                <div class="fw-bold">₲ {{ resumen_detallado.tasa_cambio|floatformat:4 }}</div>
+                <div class="fw-bold">{{ resumen_detallado.tasa_cambio|moneda_format:transaccion.moneda_origen.codigo }}</div>
               </div>
               {% endif %}
               
@@ -700,15 +700,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function mostrarModalCambioCotizacion(data) {
-        // Rellenar los datos del modal
+        // Los valores ya vienen formateados desde el backend usando la misma lógica que moneda_format
         document.getElementById('modal-moneda').textContent = data.moneda_nombre;
-        document.getElementById('modal-tasa-original').textContent = data.tasa_original + ' Gs.';
-        document.getElementById('modal-monto-origen-original').textContent = data.monto_origen_original + ' Gs.';
-        document.getElementById('modal-monto-destino-original').textContent = data.monto_destino_original + ' ' + data.moneda_simbolo;
+        document.getElementById('modal-tasa-original').textContent = data.tasa_original;
+        document.getElementById('modal-monto-origen-original').textContent = data.monto_origen_original;
+        document.getElementById('modal-monto-destino-original').textContent = data.monto_destino_original;
         
-        document.getElementById('modal-tasa-nueva').textContent = data.tasa_nueva + ' Gs.';
-        document.getElementById('modal-monto-origen-nuevo').textContent = data.monto_origen_nuevo + ' Gs.';
-        document.getElementById('modal-monto-destino-nuevo').textContent = data.monto_destino_nuevo + ' ' + data.moneda_simbolo;
+        document.getElementById('modal-tasa-nueva').textContent = data.tasa_nueva;
+        document.getElementById('modal-monto-origen-nuevo').textContent = data.monto_origen_nuevo;
+        document.getElementById('modal-monto-destino-nuevo').textContent = data.monto_destino_nuevo;
         
         // Guardar datos para crear nueva transacción
         btnContinuarNuevaCotizacion.setAttribute('data-transaccion-datos', JSON.stringify(data.nueva_transaccion_datos));
