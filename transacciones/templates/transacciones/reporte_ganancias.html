@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% load static %}
+{% load moneda_extras %}
+
+{% block title %}Reporte de Ganancias - Global Exchange{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-card {
+        background-color: #f8f9fa;
+        border-left: 4px solid #366092;
+    }
+    .stat-card {
+        border-left: 4px solid #28a745;
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .ganancia-total {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 30px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    .moneda-card {
+        border-left: 4px solid #ffc107;
+        transition: transform 0.2s;
+    }
+    .moneda-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .export-btn {
+        margin-left: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'auth:dashboard' %}">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-chart-line me-1"></i>Reporte de Ganancias
+            </li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-chart-line text-success me-2"></i>
+            Reporte de Ganancias
+        </h1>
+        <div>
+            <a href="{% url 'transacciones:exportar_ganancias_excel' %}?{{ request.GET.urlencode }}" 
+               class="btn btn-success export-btn">
+                <i class="fas fa-file-excel me-2"></i>Exportar Excel
+            </a>
+            <a href="{% url 'transacciones:exportar_ganancias_pdf' %}?{{ request.GET.urlencode }}" 
+               class="btn btn-danger export-btn">
+                <i class="fas fa-file-pdf me-2"></i>Exportar PDF
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card filter-card mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">
+                <i class="fas fa-filter me-2"></i>Filtros
+            </h5>
+            <form method="get" id="filterForm">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label for="{{ form.periodo.id_for_label }}" class="form-label">{{ form.periodo.label }}</label>
+                        {{ form.periodo }}
+                    </div>
+                    <div class="col-md-3">
+                        <label for="{{ form.fecha_desde.id_for_label }}" class="form-label">{{ form.fecha_desde.label }}</label>
+                        {{ form.fecha_desde }}
+                    </div>
+                    <div class="col-md-3">
+                        <label for="{{ form.fecha_hasta.id_for_label }}" class="form-label">{{ form.fecha_hasta.label }}</label>
+                        {{ form.fecha_hasta }}
+                    </div>
+                    <div class="col-md-3">
+                        <label for="{{ form.tipo_operacion.id_for_label }}" class="form-label">{{ form.tipo_operacion.label }}</label>
+                        {{ form.tipo_operacion }}
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-3">
+                        <label for="{{ form.moneda.id_for_label }}" class="form-label">{{ form.moneda.label }}</label>
+                        {{ form.moneda }}
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-search me-2"></i>Filtrar
+                        </button>
+                        <a href="{% url 'transacciones:reporte_ganancias' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-redo me-2"></i>Limpiar
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Ganancia Total Global -->
+    <div class="ganancia-total mb-4">
+        <h3 class="mb-2">
+            <i class="fas fa-globe-americas me-2"></i>Ganancia Total Global
+        </h3>
+        <h1 class="display-3 mb-0">
+            {{ total_ganancia_pyg|moneda_format:"PYG" }}
+        </h1>
+        <p class="mt-2 mb-0">
+            <small>Todas las ganancias convertidas a {{ moneda_base.nombre }}</small>
+        </p>
+    </div>
+
+    <!-- Estadísticas Generales -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Total Transacciones</h6>
+                    <h3 class="text-success">{{ estadisticas.total_transacciones }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Total Comisiones</h6>
+                    <h3 class="text-success">{{ estadisticas.total_comisiones|floatformat:0 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Total Descuentos</h6>
+                    <h3 class="text-warning">{{ estadisticas.total_descuentos|floatformat:0 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Promedio Comisión</h6>
+                    <h3 class="text-info">{{ estadisticas.promedio_comision|floatformat:0 }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ganancias por Tipo de Operación -->
+    {% if ganancias_por_tipo %}
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>Ganancias por Tipo de Operación</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for codigo, data in ganancias_por_tipo.items %}
+                <div class="col-md-6 mb-3">
+                    <div class="card border-success">
+                        <div class="card-body">
+                            <h5 class="card-title text-success">
+                                <i class="fas fa-{% if codigo == 'COMPRA' %}shopping-cart{% else %}money-bill-wave{% endif %} me-2"></i>
+                                {{ data.tipo.nombre }}
+                            </h5>
+                            <p class="mb-1">
+                                <strong>Ganancia Neta:</strong> 
+                                <span class="text-success fs-4">{{ data.ganancia_neta|floatformat:0 }}</span>
+                            </p>
+                            <p class="mb-0 text-muted">
+                                <small>{{ data.cantidad }} transacciones</small>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Ganancias por Moneda -->
+    <div class="card">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="fas fa-coins me-2"></i>Desglose de Ganancias por Moneda</h5>
+        </div>
+        <div class="card-body">
+            {% if ganancias_por_moneda %}
+            <div class="row">
+                {% for codigo, data in ganancias_por_moneda.items %}
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="card moneda-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-money-bill-wave text-warning me-2"></i>
+                                {{ data.moneda.nombre }}
+                            </h5>
+                            <hr>
+                            <div class="mb-2">
+                                <small class="text-muted">Total Comisiones:</small>
+                                <p class="mb-0 fw-bold text-success">
+                                    {{ data.total_comision|moneda_format:codigo }}
+                                </p>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">Total Descuentos:</small>
+                                <p class="mb-0 fw-bold text-danger">
+                                    {{ data.total_descuento|moneda_format:codigo }}
+                                </p>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">Ganancia Neta ({{ codigo }}):</small>
+                                <p class="mb-0 fw-bold text-primary fs-5">
+                                    {{ data.ganancia_neta|moneda_format:codigo }}
+                                </p>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">Equivalente en PYG:</small>
+                                <p class="mb-0 fw-bold text-success fs-5">
+                                    {{ data.ganancia_pyg|moneda_format:"PYG" }}
+                                </p>
+                            </div>
+                            <hr>
+                            <small class="text-muted">
+                                <i class="fas fa-chart-bar me-1"></i>
+                                {{ data.cantidad_transacciones }} transacciones
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-5">
+                <i class="fas fa-inbox fa-4x mb-3"></i>
+                <p>No hay ganancias registradas para el período seleccionado</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Información adicional -->
+    {% if fecha_desde and fecha_hasta %}
+    <div class="alert alert-info mt-4">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Período del reporte:</strong> 
+        Desde {{ fecha_desde|date:"d/m/Y" }} hasta {{ fecha_hasta|date:"d/m/Y" }}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const periodoSelect = document.getElementById('id_periodo');
+    const fechaDesde = document.getElementById('id_fecha_desde');
+    const fechaHasta = document.getElementById('id_fecha_hasta');
+    
+    periodoSelect.addEventListener('change', function() {
+        if (this.value === 'personalizado') {
+            fechaDesde.disabled = false;
+            fechaHasta.disabled = false;
+            fechaDesde.required = true;
+            fechaHasta.required = true;
+        } else {
+            fechaDesde.disabled = true;
+            fechaHasta.disabled = true;
+            fechaDesde.required = false;
+            fechaHasta.required = false;
+        }
+    });
+    
+    // Inicializar estado
+    if (periodoSelect.value !== 'personalizado') {
+        fechaDesde.disabled = true;
+        fechaHasta.disabled = true;
+    }
+});
+</script>
+{% endblock %}
