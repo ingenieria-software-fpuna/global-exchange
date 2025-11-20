@@ -1,4 +1,4 @@
-from django import forms
+﻿from django import forms
 from django.core.validators import RegexValidator
 
 
@@ -143,3 +143,96 @@ class TransferenciaBancariaForm(forms.Form):
             'placeholder': 'Observaciones adicionales...'
         })
     )
+
+class FiltroReporteForm(forms.Form):
+    """Formulario para filtros de reportes de transacciones y ganancias"""
+    
+    PERIODO_CHOICES = [
+        ('', 'Seleccione un período'),
+        ('hoy', 'Hoy'),
+        ('ayer', 'Ayer'),
+        ('semana', 'Última semana'),
+        ('mes', 'Último mes'),
+        ('trimestre', 'Último trimestre'),
+        ('anio', 'Último año'),
+        ('personalizado', 'Período personalizado'),
+    ]
+    
+    periodo = forms.ChoiceField(
+        choices=PERIODO_CHOICES,
+        required=False,
+        label="Período",
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'id_periodo'
+        })
+    )
+    
+    fecha_desde = forms.DateField(
+        required=False,
+        label="Fecha desde",
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date',
+            'id': 'id_fecha_desde'
+        })
+    )
+    
+    fecha_hasta = forms.DateField(
+        required=False,
+        label="Fecha hasta",
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date',
+            'id': 'id_fecha_hasta'
+        })
+    )
+    
+    tipo_operacion = forms.ModelChoiceField(
+        queryset=TipoOperacion.objects.filter(activo=True),
+        required=False,
+        empty_label="Todos los tipos",
+        label="Tipo de operación",
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )
+    
+    estado = forms.ModelChoiceField(
+        queryset=EstadoTransaccion.objects.filter(activo=True),
+        required=False,
+        empty_label="Todos los estados",
+        label="Estado",
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )
+    
+    moneda = forms.ModelChoiceField(
+        queryset=Moneda.objects.filter(es_activa=True),
+        required=False,
+        empty_label="Todas las monedas",
+        label="Moneda",
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        periodo = cleaned_data.get('periodo')
+        fecha_desde = cleaned_data.get('fecha_desde')
+        fecha_hasta = cleaned_data.get('fecha_hasta')
+        
+        if periodo == 'personalizado':
+            if not fecha_desde or not fecha_hasta:
+                raise forms.ValidationError(
+                    'Debe especificar fecha desde y fecha hasta para período personalizado'
+                )
+            if fecha_desde > fecha_hasta:
+                raise forms.ValidationError(
+                    'La fecha desde no puede ser mayor que la fecha hasta'
+                )
+        
+        return cleaned_data
+

@@ -337,6 +337,8 @@ class Transaccion(models.Model):
         ]
         permissions = [
             ('can_operate', 'Puede realizar operaciones de compra y venta'),
+            ('view_reporte_transacciones', 'Puede ver reporte de transacciones'),
+            ('view_reporte_ganancias', 'Puede ver reporte de ganancias'),
         ]
 
     def __str__(self):

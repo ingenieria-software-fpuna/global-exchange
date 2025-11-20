@@ -113,6 +113,8 @@ def permissions_context(request):
         context['can_edit_transacciones'] = request.user.has_perm('transacciones.change_transaccion')
         context['can_delete_transacciones'] = request.user.has_perm('transacciones.delete_transaccion')
         context['can_operate'] = request.user.has_perm('transacciones.can_operate')  # Permiso para comprar/vender
+        context['can_view_reporte_transacciones'] = request.user.has_perm('transacciones.view_reporte_transacciones')
+        context['can_view_reporte_ganancias'] = request.user.has_perm('transacciones.view_reporte_ganancias')
         
         # Permisos específicos para configuración
         context['can_view_configuracion'] = request.user.has_perm('configuracion.change_configuracionsistema')

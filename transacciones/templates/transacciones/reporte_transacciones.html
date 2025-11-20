@@ -1,0 +1,452 @@
+{% extends "base.html" %}
+{% load static %}
+{% load moneda_extras %}
+
+{% block title %}Reporte de Transacciones - Global Exchange{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'auth:dashboard' %}">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-file-alt me-1"></i>Reporte de Transacciones
+            </li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-start mb-3">
+        <a href="{% url 'auth:dashboard' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Volver al Dashboard
+        </a>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-file-alt text-primary me-2"></i>
+            Reporte de Transacciones
+        </h1>
+        <div>
+            <a href="{% url 'transacciones:exportar_transacciones_excel' %}?{{ request.GET.urlencode }}" 
+               class="btn btn-success">
+                <i class="fas fa-file-excel me-2"></i>Exportar Excel
+            </a>
+            <a href="{% url 'transacciones:exportar_transacciones_pdf' %}?{{ request.GET.urlencode }}" 
+               class="btn btn-danger ms-2">
+                <i class="fas fa-file-pdf me-2"></i>Exportar PDF
+            </a>
+        </div>
+    </div>
+
+    <!-- Estadísticas rápidas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="card-title">Total</h5>
+                            <h2>{{ estadisticas.total }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-list fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="card-title">Pagadas</h5>
+                            <h2>{{ estadisticas.pagadas }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-check-circle fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="card-title">Pendientes</h5>
+                            <h2>{{ estadisticas.pendientes }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="card-title">Canceladas</h5>
+                            <h2>{{ estadisticas.canceladas }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-times-circle fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráfico opcional -->
+    {% if estadisticas.total > 0 %}
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Transacciones en el período seleccionado
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="transaccionesChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Por Tipo de Operación</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="tiposChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Filtros -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label for="id_periodo" class="form-label">Período</label>
+                    {{ form.periodo }}
+                </div>
+                <div class="col-md-3">
+                    <label for="id_fecha_desde" class="form-label">Fecha Desde</label>
+                    {{ form.fecha_desde }}
+                </div>
+                <div class="col-md-3">
+                    <label for="id_fecha_hasta" class="form-label">Fecha Hasta</label>
+                    {{ form.fecha_hasta }}
+                </div>
+                <div class="col-md-3">
+                    <label for="id_tipo_operacion" class="form-label">Tipo</label>
+                    {{ form.tipo_operacion }}
+                </div>
+                <div class="col-md-3">
+                    <label for="id_estado" class="form-label">Estado</label>
+                    {{ form.estado }}
+                </div>
+                <div class="col-md-3">
+                    <label for="id_moneda" class="form-label">Moneda</label>
+                    {{ form.moneda }}
+                </div>
+                <div class="col-md-6 d-flex justify-content-end align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-search me-1"></i>Filtrar
+                    </button>
+                    <a href="{% url 'transacciones:reporte_transacciones' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times me-1"></i>Limpiar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabla de transacciones -->
+    {% if transacciones %}
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID Transacción</th>
+                            <th>Fecha</th>
+                            <th>Usuario</th>
+                            <th>Cliente</th>
+                            <th>Tipo</th>
+                            <th>Estado</th>
+                            <th>Moneda Origen</th>
+                            <th>Monto Origen</th>
+                            <th>Moneda Destino</th>
+                            <th>Monto Destino</th>
+                            <th class="text-center">Retiro</th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transaccion in transacciones %}
+                        <tr>
+                            <td><strong>{{ transaccion.id_transaccion }}</strong></td>
+                            <td><small class="text-muted">{{ transaccion.fecha_creacion|date:"d/m/Y H:i" }}</small></td>
+                            <td>
+                                {% if transaccion.usuario %}
+                                    {{ transaccion.usuario.nombre }} {{ transaccion.usuario.apellido|default:"" }}
+                                {% else %}
+                                    <em class="text-muted">-</em>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if transaccion.cliente %}
+                                    {{ transaccion.cliente.nombre_comercial }}
+                                {% else %}
+                                    <em class="text-muted">Casual</em>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ transaccion.tipo_operacion.nombre }}</span>
+                            </td>
+                            <td>
+                                {% if transaccion.estado.codigo == 'PAGADA' %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-check me-1"></i>{{ transaccion.estado.nombre }}
+                                </span>
+                                {% elif transaccion.estado.codigo == 'PENDIENTE' %}
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-clock me-1"></i>{{ transaccion.estado.nombre }}
+                                </span>
+                                {% elif transaccion.estado.codigo == 'CANCELADA' %}
+                                <span class="badge bg-danger">
+                                    <i class="fas fa-times me-1"></i>{{ transaccion.estado.nombre }}
+                                </span>
+                                {% elif transaccion.estado.codigo == 'ANULADA' %}
+                                <span class="badge bg-secondary">
+                                    <i class="fas fa-ban me-1"></i>{{ transaccion.estado.nombre }}
+                                </span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ transaccion.estado.nombre }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ transaccion.moneda_origen.codigo }}</td>
+                            <td class="text-end">
+                                {{ transaccion.monto_origen|moneda_format:transaccion.moneda_origen.codigo }}
+                            </td>
+                            <td>{{ transaccion.moneda_destino.codigo }}</td>
+                            <td class="text-end">
+                                {{ transaccion.monto_destino|moneda_format:transaccion.moneda_destino.codigo }}
+                            </td>
+                            <td class="text-center">
+                                {% if transaccion.requiere_retiro_fisico %}
+                                    {% if transaccion.tauser %}
+                                        <span class="badge bg-success" title="Retirado en {{ transaccion.tauser.nombre }}">
+                                            <i class="fas fa-check me-1"></i>Retirado
+                                        </span>
+                                        <br>
+                                        <small class="text-muted">{{ transaccion.tauser.nombre }}</small>
+                                    {% else %}
+                                        <span class="badge bg-warning" title="Pendiente de retiro">
+                                            <i class="fas fa-clock me-1"></i>Pendiente
+                                        </span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-secondary" title="No requiere retiro físico">
+                                        <i class="fas fa-times me-1"></i>No aplica
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'transacciones:resumen_transaccion' transaccion.id_transaccion %}"
+                                       class="btn btn-sm btn-outline-primary" title="Ver resumen">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if is_paginated %}
+            <nav aria-label="Navegación de páginas" class="mt-3">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page=1{% if request.GET.periodo %}&periodo={{ request.GET.periodo }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.tipo_operacion %}&tipo_operacion={{ request.GET.tipo_operacion }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.moneda %}&moneda={{ request.GET.moneda }}{% endif %}"><i class="fas fa-angle-double-left"></i></a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.periodo %}&periodo={{ request.GET.periodo }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.tipo_operacion %}&tipo_operacion={{ request.GET.tipo_operacion }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.moneda %}&moneda={{ request.GET.moneda }}{% endif %}"><i class="fas fa-angle-left"></i></a></li>
+                    {% endif %}
+                    <li class="page-item active"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+                    {% if page_obj.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.periodo %}&periodo={{ request.GET.periodo }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.tipo_operacion %}&tipo_operacion={{ request.GET.tipo_operacion }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.moneda %}&moneda={{ request.GET.moneda }}{% endif %}"><i class="fas fa-angle-right"></i></a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.periodo %}&periodo={{ request.GET.periodo }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.tipo_operacion %}&tipo_operacion={{ request.GET.tipo_operacion }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.moneda %}&moneda={{ request.GET.moneda }}{% endif %}"><i class="fas fa-angle-double-right"></i></a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        No se encontraron transacciones que coincidan con los filtros seleccionados.
+    </div>
+    {% endif %}
+</div>
+
+{% if estadisticas.total > 0 %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Gráfico de líneas - Transacciones por día
+    const ctx = document.getElementById('transaccionesChart');
+    if (ctx) {
+        const datosGrafico = JSON.parse('{{ datos_grafico|escapejs }}');
+
+        // Verificar si hay datos para mostrar
+        const totalTransacciones = datosGrafico.cantidades.reduce((a, b) => a + b, 0);
+
+        if (totalTransacciones === 0) {
+            // Mostrar mensaje si no hay datos
+            ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+            const ctxContext = ctx.getContext('2d');
+            ctxContext.font = '16px Arial';
+            ctxContext.fillStyle = '#6c757d';
+            ctxContext.textAlign = 'center';
+            ctxContext.fillText('No hay transacciones en el período seleccionado', ctx.width / 2, ctx.height / 2);
+        } else {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: datosGrafico.fechas.map(fecha => {
+                        const d = new Date(fecha + 'T00:00:00');
+                        return d.toLocaleDateString('es-PY', { day: '2-digit', month: '2-digit' });
+                    }),
+                    datasets: [{
+                        label: 'Transacciones por día',
+                        data: datosGrafico.cantidades,
+                        borderColor: 'rgb(54, 162, 235)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.2,
+                        pointBackgroundColor: 'rgb(54, 162, 235)',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    const fecha = datosGrafico.fechas[context[0].dataIndex];
+                                    const d = new Date(fecha + 'T00:00:00');
+                                    return d.toLocaleDateString('es-PY', {
+                                        weekday: 'long',
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                    });
+                                },
+                                label: function(context) {
+                                    const cantidad = context.parsed.y;
+                                    return cantidad === 1 ? '1 transacción' : `${cantidad} transacciones`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Fecha'
+                            },
+                            ticks: {
+                                maxTicksLimit: 10
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Cantidad de Transacciones'
+                            },
+                            ticks: {
+                                stepSize: 1,
+                                callback: function(value) {
+                                    if (Number.isInteger(value)) {
+                                        return value;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    // Gráfico de dona - Tipos de operación
+    const ctxTipos = document.getElementById('tiposChart');
+    if (ctxTipos) {
+        const compras = {{ estadisticas.compras|default:0 }};
+        const ventas = {{ estadisticas.ventas|default:0 }};
+
+        new Chart(ctxTipos, {
+            type: 'doughnut',
+            data: {
+                labels: ['Compras', 'Ventas'],
+                datasets: [{
+                    data: [compras, ventas],
+                    backgroundColor: [
+                        'rgba(40, 167, 69, 0.8)',
+                        'rgba(255, 193, 7, 0.8)'
+                    ],
+                    borderColor: [
+                        'rgba(40, 167, 69, 1)',
+                        'rgba(255, 193, 7, 1)'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endif %}
+{% endblock %}
