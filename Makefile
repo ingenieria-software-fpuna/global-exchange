@@ -1,4 +1,4 @@
-.PHONY: db-up db-clean app-run app-migrate check-admin-group app-setup user user-fast app-reset help docs-html docs-clean docs-live app-test create-currencies stripe-up stripe-down stripe-logs stripe-secret stripe-trigger sqlproxy-up sqlproxy-down sqlproxy-build sqlproxy-logs sqlproxy-clean setup-esi inutilizar inutilizar-range inutilizar-docs
+.PHONY: db-up db-clean app-run app-migrate check-admin-group app-setup user user-fast app-reset help docs-html docs-clean docs-live app-test create-currencies stripe-up stripe-down stripe-logs stripe-secret stripe-trigger sqlproxy-up sqlproxy-down sqlproxy-build sqlproxy-logs sqlproxy-clean setup-esi inutilizar inutilizar-range inutilizar-docs assign-report-permissions
 
 #-------------- Operaciones de base de datos ----------------#
 db-up:
@@ -81,6 +81,10 @@ create-transactions:
 	@echo "Creando transacciones de ejemplo..."
 	poetry run python scripts/create_transacciones_test.py
 
+assign-report-permissions:
+	@echo "Asignando permisos de reportes al grupo Administradores..."
+	poetry run python scripts/asignar_permisos_reportes.py
+
 setup-esi:
 	@echo "Configurando ESI desde .env..."
 	poetry run python scripts/setup_esi_from_env.py
@@ -150,6 +154,9 @@ endif
 	@echo ""
 	@echo "→ Creando transacciones de ejemplo..."
 	@make create-transactions
+	@echo ""
+	@echo "→ Asignando permisos de reportes..."
+	@make assign-report-permissions
 	@echo ""
 	@echo "→ Configurando ESI para facturación..."
 	@make setup-esi
@@ -266,11 +273,18 @@ sqlproxy-build:
 sqlproxy-up:
 	@echo "Levantando servicios de SQL-Proxy..."
 	@echo "→ Creando directorios de logs..."
+ifeq ($(OS),Windows_NT)
+	@if not exist "sql-proxy\volumes\nginx\logs" mkdir "sql-proxy\volumes\nginx\logs"
+	@if not exist "sql-proxy\volumes\web-sched\logs" mkdir "sql-proxy\volumes\web-sched\logs"
+	@if not exist "sql-proxy\volumes\web\logs" mkdir "sql-proxy\volumes\web\logs"
+	@if not exist "sql-proxy\volumes\web\kude" mkdir "sql-proxy\volumes\web\kude"
+else
 	@mkdir -p sql-proxy/volumes/nginx/logs
 	@mkdir -p sql-proxy/volumes/web-sched/logs
 	@mkdir -p sql-proxy/volumes/web/logs
 	@mkdir -p sql-proxy/volumes/web/kude
 	@chmod -R a+rw sql-proxy/volumes/nginx/logs sql-proxy/volumes/web-sched/logs sql-proxy/volumes/web/logs sql-proxy/volumes/web/kude 2>/dev/null || true
+endif
 	@echo "→ Iniciando contenedores..."
 	docker compose -f docker-compose-dev.yml up -d sql-proxy-db sql-proxy-web sql-proxy-scheduler sql-proxy-nginx
 	@echo ""
