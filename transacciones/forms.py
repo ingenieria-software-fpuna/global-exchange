@@ -1,6 +1,9 @@
 ﻿from django import forms
 from django.core.validators import RegexValidator
 
+from .models import TipoOperacion, EstadoTransaccion
+from monedas.models import Moneda
+
 
 class BilleteraElectronicaForm(forms.Form):
     """Formulario para datos de billetera electrónica"""
@@ -147,27 +150,6 @@ class TransferenciaBancariaForm(forms.Form):
 class FiltroReporteForm(forms.Form):
     """Formulario para filtros de reportes de transacciones y ganancias"""
     
-    PERIODO_CHOICES = [
-        ('', 'Seleccione un período'),
-        ('hoy', 'Hoy'),
-        ('ayer', 'Ayer'),
-        ('semana', 'Última semana'),
-        ('mes', 'Último mes'),
-        ('trimestre', 'Último trimestre'),
-        ('anio', 'Último año'),
-        ('personalizado', 'Período personalizado'),
-    ]
-    
-    periodo = forms.ChoiceField(
-        choices=PERIODO_CHOICES,
-        required=False,
-        label="Período",
-        widget=forms.Select(attrs={
-            'class': 'form-select',
-            'id': 'id_periodo'
-        })
-    )
-    
     fecha_desde = forms.DateField(
         required=False,
         label="Fecha desde",
@@ -220,15 +202,10 @@ class FiltroReporteForm(forms.Form):
     
     def clean(self):
         cleaned_data = super().clean()
-        periodo = cleaned_data.get('periodo')
         fecha_desde = cleaned_data.get('fecha_desde')
         fecha_hasta = cleaned_data.get('fecha_hasta')
         
-        if periodo == 'personalizado':
-            if not fecha_desde or not fecha_hasta:
-                raise forms.ValidationError(
-                    'Debe especificar fecha desde y fecha hasta para período personalizado'
-                )
+        if fecha_desde and fecha_hasta:
             if fecha_desde > fecha_hasta:
                 raise forms.ValidationError(
                     'La fecha desde no puede ser mayor que la fecha hasta'

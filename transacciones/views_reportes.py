@@ -27,54 +27,18 @@ from monedas.templatetags.moneda_extras import moneda_format
 from configuracion.models import ConfiguracionSistema
 
 
-def calcular_fechas_periodo(periodo, fecha_desde=None, fecha_hasta=None):
-    """
-    Calcula las fechas desde y hasta según el período seleccionado.
-    """
-    hoy = timezone.now().date()
-    
-    if periodo == 'hoy':
-        fecha_desde = hoy
-        fecha_hasta = hoy
-    elif periodo == 'ayer':
-        fecha_desde = hoy - timedelta(days=1)
-        fecha_hasta = hoy - timedelta(days=1)
-    elif periodo == 'semana':
-        fecha_desde = hoy - timedelta(days=7)
-        fecha_hasta = hoy
-    elif periodo == 'mes':
-        fecha_desde = hoy - timedelta(days=30)
-        fecha_hasta = hoy
-    elif periodo == 'trimestre':
-        fecha_desde = hoy - timedelta(days=90)
-        fecha_hasta = hoy
-    elif periodo == 'anio':
-        fecha_desde = hoy - timedelta(days=365)
-        fecha_hasta = hoy
-    elif periodo == 'personalizado':
-        # Se usan las fechas proporcionadas
-        pass
-    else:
-        # Sin filtro de fecha
-        fecha_desde = None
-        fecha_hasta = None
-    
-    return fecha_desde, fecha_hasta
+
 
 
 def aplicar_filtros_transacciones(queryset, form_data):
     """
     Aplica filtros al queryset de transacciones según los datos del formulario.
     """
-    periodo = form_data.get('periodo')
     fecha_desde = form_data.get('fecha_desde')
     fecha_hasta = form_data.get('fecha_hasta')
     tipo_operacion = form_data.get('tipo_operacion')
     estado = form_data.get('estado')
     moneda = form_data.get('moneda')
-    
-    # Calcular fechas según período
-    fecha_desde, fecha_hasta = calcular_fechas_periodo(periodo, fecha_desde, fecha_hasta)
     
     # Aplicar filtros
     if fecha_desde:
@@ -95,6 +59,54 @@ def aplicar_filtros_transacciones(queryset, form_data):
         )
     
     return queryset, fecha_desde, fecha_hasta
+
+
+def calcular_ganancias_por_tipo(transacciones):
+    """
+    Calcula las ganancias por tipo de operación (Compra/Venta) en PYG.
+    Convierte todas las monedas a Guaraníes usando la tasa de cambio promedio.
+    
+    Args:
+        transacciones: QuerySet de transacciones a procesar
+        
+    Returns:
+        dict: Diccionario con estructura {codigo_tipo: {'tipo': TipoOperacion, 'ganancia_neta_pyg': Decimal, 'cantidad': int}}
+    """
+    ganancias_por_tipo = {}
+    
+    for tipo in TipoOperacion.objects.filter(activo=True):
+        trans_tipo = transacciones.filter(tipo_operacion=tipo)
+        ganancia_tipo_pyg = Decimal('0.00')
+        
+        # Calcular ganancia por cada moneda y convertir a PYG
+        for moneda in Moneda.objects.filter(es_activa=True):
+            trans_tipo_moneda = trans_tipo.filter(moneda_origen=moneda)
+            
+            if trans_tipo_moneda.exists():
+                ganancia = trans_tipo_moneda.aggregate(
+                    total_comision=Coalesce(Sum('monto_comision'), Decimal('0.00')),
+                    total_descuento=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
+                )
+                ganancia_neta = ganancia['total_comision'] - ganancia['total_descuento']
+                
+                if ganancia_neta > 0:
+                    # Convertir a PYG
+                    if moneda.codigo == 'PYG':
+                        ganancia_tipo_pyg += ganancia_neta
+                    else:
+                        tasa_promedio = trans_tipo_moneda.aggregate(
+                            tasa_avg=Coalesce(Sum('tasa_cambio') / Count('id'), Decimal('1.00'))
+                        )['tasa_avg']
+                        ganancia_tipo_pyg += ganancia_neta * tasa_promedio
+        
+        if ganancia_tipo_pyg > 0:
+            ganancias_por_tipo[tipo.codigo] = {
+                'tipo': tipo,
+                'ganancia_neta_pyg': ganancia_tipo_pyg,
+                'cantidad': trans_tipo.count(),
+            }
+    
+    return ganancias_por_tipo
 
 
 @login_required
@@ -222,6 +234,8 @@ def reporte_ganancias(request):
     # Calcular ganancias por moneda
     ganancias_por_moneda = {}
     total_ganancia_pyg = Decimal('0.00')
+    total_comisiones_pyg = Decimal('0.00')
+    total_descuentos_pyg = Decimal('0.00')
     
     # Obtener configuración del sistema
     try:
@@ -245,6 +259,8 @@ def reporte_ganancias(request):
             # Convertir a moneda base (PYG) usando la última tasa
             if moneda.codigo == 'PYG':
                 ganancia_pyg = ganancia_neta
+                comision_pyg = ganancia['total_comision']
+                descuento_pyg = ganancia['total_descuento']
             else:
                 # Obtener tasa de cambio promedio del período
                 tasa_promedio = transacciones_moneda.aggregate(
@@ -252,6 +268,8 @@ def reporte_ganancias(request):
                 )['tasa_avg']
                 
                 ganancia_pyg = ganancia_neta * tasa_promedio
+                comision_pyg = ganancia['total_comision'] * tasa_promedio
+                descuento_pyg = ganancia['total_descuento'] * tasa_promedio
             
             ganancias_por_moneda[moneda.codigo] = {
                 'moneda': moneda,
@@ -263,37 +281,18 @@ def reporte_ganancias(request):
             }
             
             total_ganancia_pyg += ganancia_pyg
+            total_comisiones_pyg += comision_pyg
+            total_descuentos_pyg += descuento_pyg
     
     # Estadísticas generales
     estadisticas = {
         'total_transacciones': transacciones.count(),
-        'total_comisiones': transacciones.aggregate(
-            total=Coalesce(Sum('monto_comision'), Decimal('0.00'))
-        )['total'],
-        'total_descuentos': transacciones.aggregate(
-            total=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
-        )['total'],
-        'promedio_comision': transacciones.aggregate(
-            promedio=Coalesce(Sum('monto_comision') / Count('id'), Decimal('0.00'))
-        )['promedio'],
+        'total_comisiones_pyg': total_comisiones_pyg,
+        'total_descuentos_pyg': total_descuentos_pyg,
     }
     
-    # Desglose por tipo de operación
-    ganancias_por_tipo = {}
-    for tipo in TipoOperacion.objects.filter(activo=True):
-        trans_tipo = transacciones.filter(tipo_operacion=tipo)
-        ganancia = trans_tipo.aggregate(
-            total_comision=Coalesce(Sum('monto_comision'), Decimal('0.00')),
-            total_descuento=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
-        )
-        ganancia_neta = ganancia['total_comision'] - ganancia['total_descuento']
-        
-        if ganancia_neta > 0:
-            ganancias_por_tipo[tipo.codigo] = {
-                'tipo': tipo,
-                'ganancia_neta': ganancia_neta,
-                'cantidad': trans_tipo.count(),
-            }
+    # Desglose por tipo de operación (convertido a PYG)
+    ganancias_por_tipo = calcular_ganancias_por_tipo(transacciones)
     
     context = {
         'form': form,
@@ -557,11 +556,22 @@ def exportar_ganancias_excel(request):
         estado__codigo__in=['PAGADA', 'ENTREGADA', 'RETIRADO']
     ).select_related('tipo_operacion', 'moneda_origen', 'moneda_destino')
     
+    fecha_desde = None
+    fecha_hasta = None
+    
     if form.is_valid():
         transacciones, fecha_desde, fecha_hasta = aplicar_filtros_transacciones(
             transacciones, 
             form.cleaned_data
         )
+    
+    # Calcular estadísticas (igual que en la vista principal)
+    total_ganancia_pyg = Decimal('0.00')
+    total_comisiones_pyg = Decimal('0.00')
+    total_descuentos_pyg = Decimal('0.00')
+    
+    # Calcular por tipo de operación (reutilizando función auxiliar)
+    ganancias_por_tipo = calcular_ganancias_por_tipo(transacciones)
     
     # Crear libro de Excel
     wb = Workbook()
@@ -581,22 +591,32 @@ def exportar_ganancias_excel(request):
     title_cell.font = Font(size=14, bold=True, color="366092")
     title_cell.alignment = Alignment(horizontal='center')
     
+    # Período si existe
+    current_row = 2
+    if fecha_desde and fecha_hasta:
+        ws.merge_cells(f'A{current_row}:E{current_row}')
+        periodo_cell = ws.cell(row=current_row, column=1)
+        periodo_cell.value = f"Período: {fecha_desde.strftime('%d/%m/%Y')} - {fecha_hasta.strftime('%d/%m/%Y')}"
+        periodo_cell.alignment = Alignment(horizontal='center')
+        current_row += 1
+    
+    current_row += 1
+    
     # Encabezados por moneda
-    ws.cell(row=3, column=1).value = "Moneda"
-    ws.cell(row=3, column=2).value = "Total Comisiones"
-    ws.cell(row=3, column=3).value = "Total Descuentos"
-    ws.cell(row=3, column=4).value = "Ganancia Neta"
-    ws.cell(row=3, column=5).value = "Ganancia en PYG"
+    ws.cell(row=current_row, column=1).value = "Moneda"
+    ws.cell(row=current_row, column=2).value = "Total Comisiones"
+    ws.cell(row=current_row, column=3).value = "Total Descuentos"
+    ws.cell(row=current_row, column=4).value = "Ganancia Neta"
+    ws.cell(row=current_row, column=5).value = "Ganancia en PYG"
     
     for col_num in range(1, 6):
-        cell = ws.cell(row=3, column=col_num)
+        cell = ws.cell(row=current_row, column=col_num)
         cell.fill = header_fill
         cell.font = header_font
         cell.alignment = Alignment(horizontal='center')
     
     # Calcular ganancias por moneda
-    row_num = 4
-    total_ganancia_pyg = Decimal('0.00')
+    row_num = current_row + 1
     
     for moneda in Moneda.objects.filter(es_activa=True):
         transacciones_moneda = transacciones.filter(moneda_origen=moneda)
@@ -612,11 +632,15 @@ def exportar_ganancias_excel(request):
             # Convertir a PYG
             if moneda.codigo == 'PYG':
                 ganancia_pyg = ganancia_neta
+                comision_pyg = ganancia['total_comision']
+                descuento_pyg = ganancia['total_descuento']
             else:
                 tasa_promedio = transacciones_moneda.aggregate(
                     tasa_avg=Coalesce(Sum('tasa_cambio') / Count('id'), Decimal('1.00'))
                 )['tasa_avg']
                 ganancia_pyg = ganancia_neta * tasa_promedio
+                comision_pyg = ganancia['total_comision'] * tasa_promedio
+                descuento_pyg = ganancia['total_descuento'] * tasa_promedio
             
             ws.cell(row=row_num, column=1).value = moneda.codigo
             ws.cell(row=row_num, column=2).value = float(ganancia['total_comision'])
@@ -625,16 +649,62 @@ def exportar_ganancias_excel(request):
             ws.cell(row=row_num, column=5).value = float(ganancia_pyg)
             
             total_ganancia_pyg += ganancia_pyg
+            total_comisiones_pyg += comision_pyg
+            total_descuentos_pyg += descuento_pyg
             row_num += 1
     
     # Fila de total
-    ws.cell(row=row_num, column=1).value = "TOTAL GLOBAL (PYG)"
+    ws.cell(row=row_num, column=1).value = "TOTAL (PYG)"
+    ws.cell(row=row_num, column=2).value = float(total_comisiones_pyg)
+    ws.cell(row=row_num, column=3).value = float(total_descuentos_pyg)
+    ws.cell(row=row_num, column=4).value = ""
     ws.cell(row=row_num, column=5).value = float(total_ganancia_pyg)
     
     for col_num in range(1, 6):
         cell = ws.cell(row=row_num, column=col_num)
         cell.fill = total_fill
         cell.font = total_font
+        cell.alignment = Alignment(horizontal='center')
+    
+    row_num += 2
+    
+    # Estadísticas generales
+    ws.merge_cells(f'A{row_num}:E{row_num}')
+    stats_cell = ws.cell(row=row_num, column=1)
+    stats_cell.value = "ESTADÍSTICAS GENERALES"
+    stats_cell.font = Font(size=12, bold=True)
+    stats_cell.alignment = Alignment(horizontal='center')
+    row_num += 1
+    
+    stats_data = [
+        ['Total Transacciones', transacciones.count()],
+        ['Total Comisiones (PYG)', float(total_comisiones_pyg)],
+        ['Total Descuentos (PYG)', float(total_descuentos_pyg)],
+        ['Ganancia Total (PYG)', float(total_ganancia_pyg)],
+    ]
+    
+    for stat in stats_data:
+        ws.cell(row=row_num, column=1).value = stat[0]
+        ws.cell(row=row_num, column=1).font = Font(bold=True)
+        ws.cell(row=row_num, column=2).value = stat[1]
+        row_num += 1
+    
+    # Ganancias por tipo de operación
+    if ganancias_por_tipo:
+        row_num += 1
+        ws.merge_cells(f'A{row_num}:E{row_num}')
+        tipo_cell = ws.cell(row=row_num, column=1)
+        tipo_cell.value = "GANANCIAS POR TIPO DE OPERACIÓN"
+        tipo_cell.font = Font(size=12, bold=True)
+        tipo_cell.alignment = Alignment(horizontal='center')
+        row_num += 1
+        
+        for codigo, data in ganancias_por_tipo.items():
+            ws.cell(row=row_num, column=1).value = data['tipo'].nombre
+            ws.cell(row=row_num, column=1).font = Font(bold=True)
+            ws.cell(row=row_num, column=2).value = float(data['ganancia_neta_pyg'])
+            ws.cell(row=row_num, column=3).value = data['cantidad']
+            row_num += 1
     
     # Ajustar ancho de columnas
     ws.column_dimensions['A'].width = 15
@@ -677,6 +747,14 @@ def exportar_ganancias_pdf(request):
             form.cleaned_data
         )
     
+    # Calcular estadísticas (igual que en la vista)
+    total_ganancia_pyg = Decimal('0.00')
+    total_comisiones_pyg = Decimal('0.00')
+    total_descuentos_pyg = Decimal('0.00')
+    
+    # Calcular por tipo de operación (reutilizando función auxiliar)
+    ganancias_por_tipo = calcular_ganancias_por_tipo(transacciones)
+    
     # Crear PDF
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
@@ -705,7 +783,6 @@ def exportar_ganancias_pdf(request):
     
     # Calcular ganancias
     data = [['Moneda', 'Comisiones', 'Descuentos', 'Ganancia Neta', 'Ganancia PYG']]
-    total_ganancia_pyg = Decimal('0.00')
     
     for moneda in Moneda.objects.filter(es_activa=True):
         transacciones_moneda = transacciones.filter(moneda_origen=moneda)
@@ -720,11 +797,15 @@ def exportar_ganancias_pdf(request):
         if ganancia_neta > 0:
             if moneda.codigo == 'PYG':
                 ganancia_pyg = ganancia_neta
+                comision_pyg = ganancia['total_comision']
+                descuento_pyg = ganancia['total_descuento']
             else:
                 tasa_promedio = transacciones_moneda.aggregate(
                     tasa_avg=Coalesce(Sum('tasa_cambio') / Count('id'), Decimal('1.00'))
                 )['tasa_avg']
                 ganancia_pyg = ganancia_neta * tasa_promedio
+                comision_pyg = ganancia['total_comision'] * tasa_promedio
+                descuento_pyg = ganancia['total_descuento'] * tasa_promedio
             
             data.append([
                 moneda.codigo,
@@ -735,17 +816,19 @@ def exportar_ganancias_pdf(request):
             ])
             
             total_ganancia_pyg += ganancia_pyg
+            total_comisiones_pyg += comision_pyg
+            total_descuentos_pyg += descuento_pyg
     
     # Fila de total
     data.append([
         'TOTAL (PYG)',
-        '',
-        '',
+        f"{total_comisiones_pyg:,.0f}",
+        f"{total_descuentos_pyg:,.0f}",
         '',
         f"{total_ganancia_pyg:,.2f}"
     ])
     
-    # Crear tabla
+    # Crear tabla de ganancias por moneda
     table = Table(data)
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0d6efd')),
@@ -761,6 +844,60 @@ def exportar_ganancias_pdf(request):
     ]))
     
     elements.append(table)
+    elements.append(Spacer(1, 30))
+    
+    # Estadísticas generales
+    elements.append(Paragraph("Estadísticas Generales", styles['Heading2']))
+    elements.append(Spacer(1, 12))
+    
+    stats_data = [
+        ['Métrica', 'Valor'],
+        ['Total Transacciones', str(transacciones.count())],
+        ['Total Comisiones (PYG)', f"{total_comisiones_pyg:,.0f}"],
+        ['Total Descuentos (PYG)', f"{total_descuentos_pyg:,.0f}"],
+        ['Ganancia Total (PYG)', f"{total_ganancia_pyg:,.0f}"]
+    ]
+    
+    stats_table = Table(stats_data)
+    stats_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#366092')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ]))
+    
+    elements.append(stats_table)
+    
+    # Ganancias por tipo de operación
+    if ganancias_por_tipo:
+        elements.append(Spacer(1, 30))
+        elements.append(Paragraph("Ganancias por Tipo de Operación", styles['Heading2']))
+        elements.append(Spacer(1, 12))
+        
+        tipo_data = [['Tipo de Operación', 'Ganancia Neta (PYG)', 'Transacciones']]
+        for codigo, data_tipo in ganancias_por_tipo.items():
+            tipo_data.append([
+                data_tipo['tipo'].nombre,
+                f"{data_tipo['ganancia_neta_pyg']:,.0f}",
+                str(data_tipo['cantidad'])
+            ])
+        
+        tipo_table = Table(tipo_data)
+        tipo_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#366092')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(tipo_table)
     
     # Construir PDF
     doc.build(elements)
