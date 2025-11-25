@@ -237,7 +237,7 @@ def reporte_transacciones(request):
 @permission_required('transacciones.view_reporte_ganancias', raise_exception=True)
 def reporte_ganancias(request):
     """
-    Vista principal del reporte de ganancias con filtros.
+    Vista principal del tablero de control de ganancias con filtros.
     """
     form = FiltroReporteForm(request.GET or None)
     
@@ -616,7 +616,7 @@ def exportar_transacciones_pdf(request):
 @permission_required('transacciones.view_reporte_ganancias', raise_exception=True)
 def exportar_ganancias_excel(request):
     """
-    Exporta el reporte de ganancias a Excel.
+    Exporta el tablero de control de ganancias a Excel.
     """
     form = FiltroReporteForm(request.GET or None)
     transacciones = Transaccion.objects.filter(
@@ -654,7 +654,7 @@ def exportar_ganancias_excel(request):
     # Título
     ws.merge_cells('A1:E1')
     title_cell = ws['A1']
-    title_cell.value = "REPORTE DE GANANCIAS"
+    title_cell.value = "TABLERO DE CONTROL DE GANANCIAS"
     title_cell.font = Font(size=14, bold=True, color="366092")
     title_cell.alignment = Alignment(horizontal='center')
     
@@ -798,7 +798,7 @@ def exportar_ganancias_excel(request):
 @permission_required('transacciones.view_reporte_ganancias', raise_exception=True)
 def exportar_ganancias_pdf(request):
     """
-    Exporta el reporte de ganancias a PDF.
+    Exporta el tablero de control de ganancias a PDF.
     """
     form = FiltroReporteForm(request.GET or None)
     transacciones = Transaccion.objects.filter(
@@ -839,7 +839,7 @@ def exportar_ganancias_pdf(request):
     )
     
     # Título
-    elements.append(Paragraph("Reporte de Ganancias", title_style))
+    elements.append(Paragraph("Tablero de Control de Ganancias", title_style))
     elements.append(Spacer(1, 12))
     
     # Período
