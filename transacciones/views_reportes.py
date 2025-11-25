@@ -192,6 +192,17 @@ def reporte_transacciones(request):
     except EmptyPage:
         transacciones_paginadas = paginator.page(paginator.num_pages)
     
+    # Calcular ganancia en PYG para cada transacción
+    for transaccion in transacciones_paginadas:
+        ganancia_moneda = transaccion.monto_comision - transaccion.monto_descuento
+        
+        # Convertir a PYG si es necesario
+        if transaccion.moneda_origen.codigo == 'PYG':
+            transaccion.ganancia_pyg = ganancia_moneda
+        else:
+            # Usar la tasa de cambio de la transacción
+            transaccion.ganancia_pyg = ganancia_moneda * transaccion.tasa_cambio
+    
     context = {
         'form': form,
         'transacciones': transacciones_paginadas,
@@ -347,7 +358,7 @@ def exportar_transacciones_excel(request):
     headers = [
         'ID Transacción', 'Fecha', 'Usuario', 'Cliente', 'Tipo', 'Estado',
         'Moneda Origen', 'Monto Origen', 'Moneda Destino', 'Monto Destino',
-        'Tasa Cambio', 'Requiere Retiro', 'TAUSER'
+        'Tasa Cambio', 'Requiere Retiro', 'TAUSER', 'Ganancia (PYG)'
     ]
     
     for col_num, header in enumerate(headers, 1):
@@ -360,6 +371,13 @@ def exportar_transacciones_excel(request):
     
     # Datos
     for row_num, trans in enumerate(transacciones, 2):
+        # Calcular ganancia en PYG
+        ganancia_moneda = trans.monto_comision - trans.monto_descuento
+        if trans.moneda_origen.codigo == 'PYG':
+            ganancia_pyg = ganancia_moneda
+        else:
+            ganancia_pyg = ganancia_moneda * trans.tasa_cambio
+        
         ws.cell(row=row_num, column=1).value = trans.id_transaccion
         ws.cell(row=row_num, column=2).value = trans.fecha_creacion.strftime('%Y-%m-%d %H:%M')
         ws.cell(row=row_num, column=3).value = f"{trans.usuario.nombre} {trans.usuario.apellido}".strip() if trans.usuario else '-'
@@ -373,9 +391,10 @@ def exportar_transacciones_excel(request):
         ws.cell(row=row_num, column=11).value = float(trans.tasa_cambio)
         ws.cell(row=row_num, column=12).value = 'Sí' if trans.requiere_retiro_fisico else 'No'
         ws.cell(row=row_num, column=13).value = trans.tauser.nombre if trans.tauser else '-'
+        ws.cell(row=row_num, column=14).value = float(ganancia_pyg)
         
         # Aplicar bordes
-        for col_num in range(1, 14):
+        for col_num in range(1, 15):
             ws.cell(row=row_num, column=col_num).border = border
     
     # Ajustar ancho de columnas
@@ -480,7 +499,7 @@ def exportar_transacciones_pdf(request):
     elements.append(Spacer(1, 20))
     
     # Datos de la tabla
-    data = [['ID', 'Fecha', 'Usuario', 'Cliente', 'Tipo', 'Estado', 'Origen', 'Destino']]
+    data = [['ID', 'Fecha', 'Usuario', 'Cliente', 'Tipo', 'Estado', 'Origen', 'Destino', 'Ganancia (PYG)']]
     
     for trans in transacciones[:100]:  # Limitar a 100 registros en PDF
         usuario_nombre = f"{trans.usuario.nombre} {trans.usuario.apellido}".strip() if trans.usuario else '-'
@@ -490,6 +509,14 @@ def exportar_transacciones_pdf(request):
         monto_origen_fmt = moneda_format(trans.monto_origen, trans.moneda_origen.codigo)
         monto_destino_fmt = moneda_format(trans.monto_destino, trans.moneda_destino.codigo)
         
+        # Calcular ganancia en PYG
+        ganancia_moneda = trans.monto_comision - trans.monto_descuento
+        if trans.moneda_origen.codigo == 'PYG':
+            ganancia_pyg = ganancia_moneda
+        else:
+            ganancia_pyg = ganancia_moneda * trans.tasa_cambio
+        ganancia_pyg_fmt = moneda_format(ganancia_pyg, 'PYG')
+        
         data.append([
             trans.id_transaccion,  # ID completo sin cortar
             trans.fecha_creacion.strftime('%d/%m/%Y'),
@@ -498,20 +525,22 @@ def exportar_transacciones_pdf(request):
             trans.tipo_operacion.codigo,
             trans.estado.codigo,
             monto_origen_fmt,
-            monto_destino_fmt
+            monto_destino_fmt,
+            ganancia_pyg_fmt
         ])
     
     # Crear tabla con anchos de columna específicos
     # Ancho total de página A4 horizontal: aproximadamente 800 puntos disponibles
     col_widths = [
-        140,  # ID (UUID completo necesita más espacio)
-        70,   # Fecha
-        90,   # Usuario
-        90,   # Cliente
-        60,   # Tipo
-        70,   # Estado
-        120,  # Origen
-        120,  # Destino
+        120,  # ID (UUID - reducido un poco)
+        60,   # Fecha
+        80,   # Usuario
+        80,   # Cliente
+        50,   # Tipo
+        60,   # Estado
+        90,   # Origen
+        90,   # Destino
+        80,   # Ganancia (PYG)
     ]
     
     table = Table(data, colWidths=col_widths)
