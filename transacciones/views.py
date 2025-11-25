@@ -1103,8 +1103,9 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
             # El descuento se aplica sobre la comisión de venta
             comision_original = Decimal(str(tasa_destino.comision_venta))
             comision_con_descuento = comision_venta_ajustada
-            # El descuento aplicado es la diferencia entre la comisión original y la ajustada
-            descuento_aplicado = comision_original - comision_con_descuento
+            descuento_en_comision = comision_original - comision_con_descuento
+            # El descuento aplicado es: (descuento por unidad) × (cantidad de divisa)
+            descuento_aplicado = descuento_en_comision * cantidad_divisa_deseada
         
         # 7. Valores para mostrar
         subtotal = subtotal_pyg  # Monto base antes de comisiones de métodos
