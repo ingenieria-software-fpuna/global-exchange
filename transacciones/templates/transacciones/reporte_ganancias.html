@@ -179,10 +179,9 @@
                     <thead class="table-light">
                         <tr>
                             <th>Moneda</th>
-                            <th class="text-end">Total Comisiones</th>
-                            <th class="text-end">Total Descuentos</th>
-                            <th class="text-end">Ganancia Neta</th>
-                            <th class="text-end">Equivalente en PYG</th>
+                            <th class="text-end">Total Comisiones (PYG)</th>
+                            <th class="text-end">Total Descuentos (PYG)</th>
+                            <th class="text-end">Ganancia Neta (PYG)</th>
                             <th class="text-center">Transacciones</th>
                         </tr>
                     </thead>
@@ -195,16 +194,13 @@
                                 <small class="text-muted">{{ data.moneda.nombre }}</small>
                             </td>
                             <td class="text-end text-success">
-                                {{ data.total_comision|moneda_format:codigo }}
+                                {{ data.comision_pyg|moneda_format:"PYG" }}
                             </td>
                             <td class="text-end text-danger">
-                                {{ data.total_descuento|moneda_format:codigo }}
+                                {{ data.descuento_pyg|moneda_format:"PYG" }}
                             </td>
                             <td class="text-end">
-                                <strong class="text-primary">{{ data.ganancia_neta|moneda_format:codigo }}</strong>
-                            </td>
-                            <td class="text-end">
-                                <strong class="text-success">{{ data.ganancia_pyg|moneda_format:"PYG" }}</strong>
+                                <strong class="text-primary">{{ data.ganancia_pyg|moneda_format:"PYG" }}</strong>
                             </td>
                             <td class="text-center">
                                 <span class="badge bg-info">{{ data.cantidad_transacciones }}</span>

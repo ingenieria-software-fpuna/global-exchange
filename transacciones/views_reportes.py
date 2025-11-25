@@ -23,6 +23,7 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 from .models import Transaccion, TipoOperacion, EstadoTransaccion
 from .forms import FiltroReporteForm
 from monedas.models import Moneda
+from tasa_cambio.models import TasaCambio
 from monedas.templatetags.moneda_extras import moneda_format
 from configuracion.models import ConfiguracionSistema
 
@@ -202,14 +203,11 @@ def reporte_transacciones(request):
     
     # Calcular ganancia en PYG para cada transacción
     for transaccion in transacciones_paginadas:
-        # Convertir comisión y descuento a PYG
-        if transaccion.moneda_origen.codigo == 'PYG':
-            transaccion.comision_pyg = transaccion.monto_comision
-            transaccion.descuento_pyg = transaccion.monto_descuento
-        else:
-            # Usar la tasa de cambio de la transacción
-            transaccion.comision_pyg = transaccion.monto_comision * transaccion.tasa_cambio
-            transaccion.descuento_pyg = transaccion.monto_descuento * transaccion.tasa_cambio
+        # TANTO LA COMISIÓN COMO EL DESCUENTO SIEMPRE ESTÁN EN PYG (por diseño del sistema)
+        # En COMPRA: moneda_origen=PYG, comisión/descuento en PYG
+        # En VENTA: moneda_destino=PYG, comisión/descuento en PYG
+        transaccion.comision_pyg = transaccion.monto_comision
+        transaccion.descuento_pyg = transaccion.monto_descuento
         
         # Solo calcular ganancia para transacciones completadas
         if transaccion.estado.codigo in ['PAGADA', 'ENTREGADA', 'RETIRADO']:
@@ -271,37 +269,33 @@ def reporte_ganancias(request):
         moneda_base = Moneda.objects.filter(codigo='PYG').first()
     
     for moneda in Moneda.objects.filter(es_activa=True):
-        # Ganancias = comisiones - descuentos
-        transacciones_moneda = transacciones.filter(moneda_origen=moneda)
-        
-        ganancia = transacciones_moneda.aggregate(
-            total_comision=Coalesce(Sum('monto_comision'), Decimal('0.00')),
-            total_descuento=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
+        # Filtrar transacciones donde la moneda es origen O destino (igual que reporte de transacciones)
+        transacciones_moneda = transacciones.filter(
+            Q(moneda_origen=moneda) | Q(moneda_destino=moneda)
         )
         
-        ganancia_neta = ganancia['total_comision'] - ganancia['total_descuento']
+        if transacciones_moneda.count() == 0:
+            continue
         
-        if ganancia_neta > 0:
-            # Convertir a moneda base (PYG) usando la última tasa
-            if moneda.codigo == 'PYG':
-                ganancia_pyg = ganancia_neta
-                comision_pyg = ganancia['total_comision']
-                descuento_pyg = ganancia['total_descuento']
-            else:
-                # Obtener tasa de cambio promedio del período
-                tasa_promedio = transacciones_moneda.aggregate(
-                    tasa_avg=Coalesce(Sum('tasa_cambio') / Count('id'), Decimal('1.00'))
-                )['tasa_avg']
-                
-                ganancia_pyg = ganancia_neta * tasa_promedio
-                comision_pyg = ganancia['total_comision'] * tasa_promedio
-                descuento_pyg = ganancia['total_descuento'] * tasa_promedio
-            
+        # Calcular conversión a PYG sumando cada transacción
+        # TANTO LA COMISIÓN COMO EL DESCUENTO SIEMPRE ESTÁN EN PYG (por diseño del sistema)
+        comision_pyg = Decimal('0.00')
+        descuento_pyg = Decimal('0.00')
+        
+        for trans in transacciones_moneda:
+            comision_pyg += trans.monto_comision
+            descuento_pyg += trans.monto_descuento
+        
+        ganancia_pyg = comision_pyg - descuento_pyg
+        
+        if ganancia_pyg != Decimal('0.00'):  # Mostrar incluso si es negativo
             ganancias_por_moneda[moneda.codigo] = {
                 'moneda': moneda,
-                'total_comision': ganancia['total_comision'],
-                'total_descuento': ganancia['total_descuento'],
-                'ganancia_neta': ganancia_neta,
+                'total_comision': None,  # No aplica porque mezclamos origen/destino
+                'total_descuento': None,  # No aplica porque mezclamos origen/destino
+                'ganancia_neta': None,   # No aplica porque mezclamos origen/destino
+                'comision_pyg': comision_pyg,
+                'descuento_pyg': descuento_pyg,
                 'ganancia_pyg': ganancia_pyg,
                 'cantidad_transacciones': transacciones_moneda.count(),
             }
@@ -386,13 +380,9 @@ def exportar_transacciones_excel(request):
     
     # Datos
     for row_num, trans in enumerate(transacciones, 2):
-        # Convertir comisión y descuento a PYG
-        if trans.moneda_origen.codigo == 'PYG':
-            comision_pyg = trans.monto_comision
-            descuento_pyg = trans.monto_descuento
-        else:
-            comision_pyg = trans.monto_comision * trans.tasa_cambio
-            descuento_pyg = trans.monto_descuento * trans.tasa_cambio
+        # TANTO LA COMISIÓN COMO EL DESCUENTO SIEMPRE ESTÁN EN PYG
+        comision_pyg = trans.monto_comision
+        descuento_pyg = trans.monto_descuento
         
         # Calcular ganancia en PYG solo para transacciones completadas
         if trans.estado.codigo in ['PAGADA', 'ENTREGADA', 'RETIRADO']:
@@ -533,13 +523,9 @@ def exportar_transacciones_pdf(request):
         monto_origen_fmt = moneda_format(trans.monto_origen, trans.moneda_origen.codigo)
         monto_destino_fmt = moneda_format(trans.monto_destino, trans.moneda_destino.codigo)
         
-        # Convertir comisión y descuento a PYG
-        if trans.moneda_origen.codigo == 'PYG':
-            comision_pyg = trans.monto_comision
-            descuento_pyg = trans.monto_descuento
-        else:
-            comision_pyg = trans.monto_comision * trans.tasa_cambio
-            descuento_pyg = trans.monto_descuento * trans.tasa_cambio
+        # TANTO LA COMISIÓN COMO EL DESCUENTO SIEMPRE ESTÁN EN PYG
+        comision_pyg = trans.monto_comision
+        descuento_pyg = trans.monto_descuento
         
         comision_pyg_fmt = moneda_format(comision_pyg, 'PYG')
         descuento_pyg_fmt = moneda_format(descuento_pyg, 'PYG')
