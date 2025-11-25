@@ -373,7 +373,7 @@ def exportar_transacciones_excel(request):
     headers = [
         'ID Transacción', 'Fecha', 'Usuario', 'Cliente', 'Tipo', 'Estado',
         'Moneda Origen', 'Monto Origen', 'Moneda Destino', 'Monto Destino',
-        'Tasa Cambio', 'Requiere Retiro', 'TAUSER', 'Ganancia (PYG)'
+        'Tasa Cambio', 'Requiere Retiro', 'TAUSER', 'Comisión (PYG)', 'Descuento (PYG)', 'Ganancia (PYG)'
     ]
     
     for col_num, header in enumerate(headers, 1):
@@ -386,13 +386,17 @@ def exportar_transacciones_excel(request):
     
     # Datos
     for row_num, trans in enumerate(transacciones, 2):
+        # Convertir comisión y descuento a PYG
+        if trans.moneda_origen.codigo == 'PYG':
+            comision_pyg = trans.monto_comision
+            descuento_pyg = trans.monto_descuento
+        else:
+            comision_pyg = trans.monto_comision * trans.tasa_cambio
+            descuento_pyg = trans.monto_descuento * trans.tasa_cambio
+        
         # Calcular ganancia en PYG solo para transacciones completadas
         if trans.estado.codigo in ['PAGADA', 'ENTREGADA', 'RETIRADO']:
-            ganancia_moneda = trans.monto_comision - trans.monto_descuento
-            if trans.moneda_origen.codigo == 'PYG':
-                ganancia_pyg = ganancia_moneda
-            else:
-                ganancia_pyg = ganancia_moneda * trans.tasa_cambio
+            ganancia_pyg = comision_pyg - descuento_pyg
         else:
             ganancia_pyg = Decimal('0.00')
         
@@ -409,10 +413,12 @@ def exportar_transacciones_excel(request):
         ws.cell(row=row_num, column=11).value = float(trans.tasa_cambio)
         ws.cell(row=row_num, column=12).value = 'Sí' if trans.requiere_retiro_fisico else 'No'
         ws.cell(row=row_num, column=13).value = trans.tauser.nombre if trans.tauser else '-'
-        ws.cell(row=row_num, column=14).value = float(ganancia_pyg)
+        ws.cell(row=row_num, column=14).value = float(comision_pyg)
+        ws.cell(row=row_num, column=15).value = float(descuento_pyg)
+        ws.cell(row=row_num, column=16).value = float(ganancia_pyg)
         
         # Aplicar bordes
-        for col_num in range(1, 15):
+        for col_num in range(1, 17):
             ws.cell(row=row_num, column=col_num).border = border
     
     # Ajustar ancho de columnas
@@ -517,7 +523,7 @@ def exportar_transacciones_pdf(request):
     elements.append(Spacer(1, 20))
     
     # Datos de la tabla
-    data = [['ID', 'Fecha', 'Usuario', 'Cliente', 'Tipo', 'Estado', 'Monto origen', 'Monto destino', 'Ganancia (PYG)']]
+    data = [['ID', 'Fecha', 'Usuario', 'Cliente', 'Tipo', 'Estado', 'Monto origen', 'Monto destino', 'Comisión (PYG)', 'Descuento (PYG)', 'Ganancia (PYG)']]
     
     for trans in transacciones[:100]:  # Limitar a 100 registros en PDF
         usuario_nombre = f"{trans.usuario.nombre} {trans.usuario.apellido}".strip() if trans.usuario else '-'
@@ -527,13 +533,20 @@ def exportar_transacciones_pdf(request):
         monto_origen_fmt = moneda_format(trans.monto_origen, trans.moneda_origen.codigo)
         monto_destino_fmt = moneda_format(trans.monto_destino, trans.moneda_destino.codigo)
         
+        # Convertir comisión y descuento a PYG
+        if trans.moneda_origen.codigo == 'PYG':
+            comision_pyg = trans.monto_comision
+            descuento_pyg = trans.monto_descuento
+        else:
+            comision_pyg = trans.monto_comision * trans.tasa_cambio
+            descuento_pyg = trans.monto_descuento * trans.tasa_cambio
+        
+        comision_pyg_fmt = moneda_format(comision_pyg, 'PYG')
+        descuento_pyg_fmt = moneda_format(descuento_pyg, 'PYG')
+        
         # Calcular ganancia en PYG solo para transacciones completadas
         if trans.estado.codigo in ['PAGADA', 'ENTREGADA', 'RETIRADO']:
-            ganancia_moneda = trans.monto_comision - trans.monto_descuento
-            if trans.moneda_origen.codigo == 'PYG':
-                ganancia_pyg = ganancia_moneda
-            else:
-                ganancia_pyg = ganancia_moneda * trans.tasa_cambio
+            ganancia_pyg = comision_pyg - descuento_pyg
         else:
             ganancia_pyg = Decimal('0.00')
         ganancia_pyg_fmt = moneda_format(ganancia_pyg, 'PYG')
@@ -547,21 +560,25 @@ def exportar_transacciones_pdf(request):
             trans.estado.codigo,
             monto_origen_fmt,
             monto_destino_fmt,
+            comision_pyg_fmt,
+            descuento_pyg_fmt,
             ganancia_pyg_fmt
         ])
     
     # Crear tabla con anchos de columna específicos
     # Ancho total de página A4 horizontal: aproximadamente 800 puntos disponibles
     col_widths = [
-        120,  # ID (UUID - reducido un poco)
-        60,   # Fecha
-        80,   # Usuario
-        80,   # Cliente
-        50,   # Tipo
-        60,   # Estado
-        90,   # Origen
-        90,   # Destino
-        80,   # Ganancia (PYG)
+        100,  # ID (UUID - más reducido)
+        55,   # Fecha
+        70,   # Usuario
+        70,   # Cliente
+        45,   # Tipo
+        50,   # Estado
+        75,   # Origen
+        75,   # Destino
+        70,   # Comisión (PYG)
+        70,   # Descuento (PYG)
+        70,   # Ganancia (PYG)
     ]
     
     table = Table(data, colWidths=col_widths)
