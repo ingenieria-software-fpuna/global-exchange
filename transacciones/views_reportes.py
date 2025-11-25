@@ -202,16 +202,18 @@ def reporte_transacciones(request):
     
     # Calcular ganancia en PYG para cada transacción
     for transaccion in transacciones_paginadas:
+        # Convertir comisión y descuento a PYG
+        if transaccion.moneda_origen.codigo == 'PYG':
+            transaccion.comision_pyg = transaccion.monto_comision
+            transaccion.descuento_pyg = transaccion.monto_descuento
+        else:
+            # Usar la tasa de cambio de la transacción
+            transaccion.comision_pyg = transaccion.monto_comision * transaccion.tasa_cambio
+            transaccion.descuento_pyg = transaccion.monto_descuento * transaccion.tasa_cambio
+        
         # Solo calcular ganancia para transacciones completadas
         if transaccion.estado.codigo in ['PAGADA', 'ENTREGADA', 'RETIRADO']:
-            ganancia_moneda = transaccion.monto_comision - transaccion.monto_descuento
-            
-            # Convertir a PYG si es necesario
-            if transaccion.moneda_origen.codigo == 'PYG':
-                transaccion.ganancia_pyg = ganancia_moneda
-            else:
-                # Usar la tasa de cambio de la transacción
-                transaccion.ganancia_pyg = ganancia_moneda * transaccion.tasa_cambio
+            transaccion.ganancia_pyg = transaccion.comision_pyg - transaccion.descuento_pyg
         else:
             # Transacciones canceladas/anuladas/pendientes no tienen ganancia
             transaccion.ganancia_pyg = Decimal('0.00')
