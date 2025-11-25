@@ -194,14 +194,19 @@ def reporte_transacciones(request):
     
     # Calcular ganancia en PYG para cada transacción
     for transaccion in transacciones_paginadas:
-        ganancia_moneda = transaccion.monto_comision - transaccion.monto_descuento
-        
-        # Convertir a PYG si es necesario
-        if transaccion.moneda_origen.codigo == 'PYG':
-            transaccion.ganancia_pyg = ganancia_moneda
+        # Solo calcular ganancia para transacciones completadas
+        if transaccion.estado.codigo in ['PAGADA', 'ENTREGADA', 'RETIRADO']:
+            ganancia_moneda = transaccion.monto_comision - transaccion.monto_descuento
+            
+            # Convertir a PYG si es necesario
+            if transaccion.moneda_origen.codigo == 'PYG':
+                transaccion.ganancia_pyg = ganancia_moneda
+            else:
+                # Usar la tasa de cambio de la transacción
+                transaccion.ganancia_pyg = ganancia_moneda * transaccion.tasa_cambio
         else:
-            # Usar la tasa de cambio de la transacción
-            transaccion.ganancia_pyg = ganancia_moneda * transaccion.tasa_cambio
+            # Transacciones canceladas/anuladas/pendientes no tienen ganancia
+            transaccion.ganancia_pyg = Decimal('0.00')
     
     context = {
         'form': form,
@@ -371,12 +376,15 @@ def exportar_transacciones_excel(request):
     
     # Datos
     for row_num, trans in enumerate(transacciones, 2):
-        # Calcular ganancia en PYG
-        ganancia_moneda = trans.monto_comision - trans.monto_descuento
-        if trans.moneda_origen.codigo == 'PYG':
-            ganancia_pyg = ganancia_moneda
+        # Calcular ganancia en PYG solo para transacciones completadas
+        if trans.estado.codigo in ['PAGADA', 'ENTREGADA', 'RETIRADO']:
+            ganancia_moneda = trans.monto_comision - trans.monto_descuento
+            if trans.moneda_origen.codigo == 'PYG':
+                ganancia_pyg = ganancia_moneda
+            else:
+                ganancia_pyg = ganancia_moneda * trans.tasa_cambio
         else:
-            ganancia_pyg = ganancia_moneda * trans.tasa_cambio
+            ganancia_pyg = Decimal('0.00')
         
         ws.cell(row=row_num, column=1).value = trans.id_transaccion
         ws.cell(row=row_num, column=2).value = trans.fecha_creacion.strftime('%Y-%m-%d %H:%M')
@@ -509,12 +517,15 @@ def exportar_transacciones_pdf(request):
         monto_origen_fmt = moneda_format(trans.monto_origen, trans.moneda_origen.codigo)
         monto_destino_fmt = moneda_format(trans.monto_destino, trans.moneda_destino.codigo)
         
-        # Calcular ganancia en PYG
-        ganancia_moneda = trans.monto_comision - trans.monto_descuento
-        if trans.moneda_origen.codigo == 'PYG':
-            ganancia_pyg = ganancia_moneda
+        # Calcular ganancia en PYG solo para transacciones completadas
+        if trans.estado.codigo in ['PAGADA', 'ENTREGADA', 'RETIRADO']:
+            ganancia_moneda = trans.monto_comision - trans.monto_descuento
+            if trans.moneda_origen.codigo == 'PYG':
+                ganancia_pyg = ganancia_moneda
+            else:
+                ganancia_pyg = ganancia_moneda * trans.tasa_cambio
         else:
-            ganancia_pyg = ganancia_moneda * trans.tasa_cambio
+            ganancia_pyg = Decimal('0.00')
         ganancia_pyg_fmt = moneda_format(ganancia_pyg, 'PYG')
         
         data.append([
