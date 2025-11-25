@@ -3,6 +3,8 @@ from django.core.validators import RegexValidator
 
 from .models import TipoOperacion, EstadoTransaccion
 from monedas.models import Moneda
+from clientes.models import Cliente
+from usuarios.models import Usuario
 
 
 class BilleteraElectronicaForm(forms.Form):
@@ -195,6 +197,26 @@ class FiltroReporteForm(forms.Form):
         required=False,
         empty_label="Todas las monedas",
         label="Moneda",
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )
+    
+    cliente = forms.ModelChoiceField(
+        queryset=Cliente.objects.filter(activo=True).order_by('nombre_comercial'),
+        required=False,
+        empty_label="Todos los clientes",
+        label="Cliente",
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )
+    
+    usuario = forms.ModelChoiceField(
+        queryset=Usuario.objects.filter(es_activo=True).order_by('nombre', 'apellido'),
+        required=False,
+        empty_label="Todos los usuarios",
+        label="Usuario",
         widget=forms.Select(attrs={
             'class': 'form-select'
         })

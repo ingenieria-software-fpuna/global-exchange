@@ -39,6 +39,8 @@ def aplicar_filtros_transacciones(queryset, form_data):
     tipo_operacion = form_data.get('tipo_operacion')
     estado = form_data.get('estado')
     moneda = form_data.get('moneda')
+    cliente = form_data.get('cliente')
+    usuario = form_data.get('usuario')
     
     # Aplicar filtros
     if fecha_desde:
@@ -57,6 +59,12 @@ def aplicar_filtros_transacciones(queryset, form_data):
         queryset = queryset.filter(
             Q(moneda_origen=moneda) | Q(moneda_destino=moneda)
         )
+    
+    if cliente:
+        queryset = queryset.filter(cliente=cliente)
+    
+    if usuario:
+        queryset = queryset.filter(usuario=usuario)
     
     return queryset, fecha_desde, fecha_hasta
 
@@ -507,7 +515,7 @@ def exportar_transacciones_pdf(request):
     elements.append(Spacer(1, 20))
     
     # Datos de la tabla
-    data = [['ID', 'Fecha', 'Usuario', 'Cliente', 'Tipo', 'Estado', 'Origen', 'Destino', 'Ganancia (PYG)']]
+    data = [['ID', 'Fecha', 'Usuario', 'Cliente', 'Tipo', 'Estado', 'Monto origen', 'Monto destino', 'Ganancia (PYG)']]
     
     for trans in transacciones[:100]:  # Limitar a 100 registros en PDF
         usuario_nombre = f"{trans.usuario.nombre} {trans.usuario.apellido}".strip() if trans.usuario else '-'
