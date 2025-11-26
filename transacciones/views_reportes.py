@@ -265,8 +265,9 @@ def reporte_ganancias(request):
     except:
         moneda_base = Moneda.objects.filter(codigo='PYG').first()
     
-    for moneda in Moneda.objects.filter(es_activa=True):
-        # Filtrar transacciones donde la moneda es origen O destino (igual que reporte de transacciones)
+    for moneda in Moneda.objects.filter(es_activa=True).exclude(codigo='PYG'):
+        # Para cada moneda extranjera, buscar transacciones donde es la divisa operada
+        # (no PYG, que siempre está presente)
         transacciones_moneda = transacciones.filter(
             Q(moneda_origen=moneda) | Q(moneda_destino=moneda)
         )
@@ -663,12 +664,18 @@ def exportar_ganancias_excel(request):
         cell.font = header_font
         cell.alignment = Alignment(horizontal='center')
     
-    # Calcular ganancias por moneda
+    # Calcular ganancias por moneda (solo divisas extranjeras, no PYG)
     row_num = current_row + 1
     
-    for moneda in Moneda.objects.filter(es_activa=True):
-        transacciones_moneda = transacciones.filter(moneda_origen=moneda)
+    for moneda in Moneda.objects.filter(es_activa=True).exclude(codigo='PYG'):
+        transacciones_moneda = transacciones.filter(
+            Q(moneda_origen=moneda) | Q(moneda_destino=moneda)
+        )
         
+        if transacciones_moneda.count() == 0:
+            continue
+        
+        # TANTO LA COMISIÓN COMO EL DESCUENTO SIEMPRE ESTÁN EN PYG
         ganancia = transacciones_moneda.aggregate(
             total_comision=Coalesce(Sum('monto_comision'), Decimal('0.00')),
             total_descuento=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
@@ -676,29 +683,17 @@ def exportar_ganancias_excel(request):
         
         ganancia_neta = ganancia['total_comision'] - ganancia['total_descuento']
         
-        if ganancia_neta > 0:
-            # Convertir a PYG
-            if moneda.codigo == 'PYG':
-                ganancia_pyg = ganancia_neta
-                comision_pyg = ganancia['total_comision']
-                descuento_pyg = ganancia['total_descuento']
-            else:
-                tasa_promedio = transacciones_moneda.aggregate(
-                    tasa_avg=Coalesce(Sum('tasa_cambio') / Count('id'), Decimal('1.00'))
-                )['tasa_avg']
-                ganancia_pyg = ganancia_neta * tasa_promedio
-                comision_pyg = ganancia['total_comision'] * tasa_promedio
-                descuento_pyg = ganancia['total_descuento'] * tasa_promedio
-            
+        if ganancia['total_comision'] > 0 or ganancia['total_descuento'] > 0:
+            # Los valores ya están en PYG
             ws.cell(row=row_num, column=1).value = moneda.codigo
             ws.cell(row=row_num, column=2).value = float(ganancia['total_comision'])
             ws.cell(row=row_num, column=3).value = float(ganancia['total_descuento'])
             ws.cell(row=row_num, column=4).value = float(ganancia_neta)
-            ws.cell(row=row_num, column=5).value = float(ganancia_pyg)
+            ws.cell(row=row_num, column=5).value = float(ganancia_neta)  # Ya está en PYG
             
-            total_ganancia_pyg += ganancia_pyg
-            total_comisiones_pyg += comision_pyg
-            total_descuentos_pyg += descuento_pyg
+            total_ganancia_pyg += ganancia_neta
+            total_comisiones_pyg += ganancia['total_comision']
+            total_descuentos_pyg += ganancia['total_descuento']
             row_num += 1
     
     # Fila de total
@@ -747,11 +742,23 @@ def exportar_ganancias_excel(request):
         tipo_cell.alignment = Alignment(horizontal='center')
         row_num += 1
         
+        # Encabezados para tipos de operación
+        headers_tipo = ['Tipo de Operación', 'Comisiones (PYG)', 'Descuentos (PYG)', 'Ganancia Neta (PYG)', 'Transacciones']
+        for col_num, header in enumerate(headers_tipo, 1):
+            cell = ws.cell(row=row_num, column=col_num)
+            cell.value = header
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center')
+        row_num += 1
+        
         for codigo, data in ganancias_por_tipo.items():
             ws.cell(row=row_num, column=1).value = data['tipo'].nombre
             ws.cell(row=row_num, column=1).font = Font(bold=True)
-            ws.cell(row=row_num, column=2).value = float(data['ganancia_neta_pyg'])
-            ws.cell(row=row_num, column=3).value = data['cantidad']
+            ws.cell(row=row_num, column=2).value = float(data['comisiones_pyg'])
+            ws.cell(row=row_num, column=3).value = float(data['descuentos_pyg'])
+            ws.cell(row=row_num, column=4).value = float(data['ganancia_neta_pyg'])
+            ws.cell(row=row_num, column=5).value = data['cantidad']
             row_num += 1
     
     # Ajustar ancho de columnas
@@ -829,12 +836,18 @@ def exportar_ganancias_pdf(request):
         elements.append(Paragraph(periodo_text, styles['Normal']))
         elements.append(Spacer(1, 12))
     
-    # Calcular ganancias
+    # Calcular ganancias (solo divisas extranjeras, no PYG)
     data = [['Moneda', 'Comisiones', 'Descuentos', 'Ganancia Neta', 'Ganancia PYG']]
     
-    for moneda in Moneda.objects.filter(es_activa=True):
-        transacciones_moneda = transacciones.filter(moneda_origen=moneda)
+    for moneda in Moneda.objects.filter(es_activa=True).exclude(codigo='PYG'):
+        transacciones_moneda = transacciones.filter(
+            Q(moneda_origen=moneda) | Q(moneda_destino=moneda)
+        )
         
+        if transacciones_moneda.count() == 0:
+            continue
+        
+        # TANTO LA COMISIÓN COMO EL DESCUENTO SIEMPRE ESTÁN EN PYG
         ganancia = transacciones_moneda.aggregate(
             total_comision=Coalesce(Sum('monto_comision'), Decimal('0.00')),
             total_descuento=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
@@ -842,30 +855,19 @@ def exportar_ganancias_pdf(request):
         
         ganancia_neta = ganancia['total_comision'] - ganancia['total_descuento']
         
-        if ganancia_neta > 0:
-            if moneda.codigo == 'PYG':
-                ganancia_pyg = ganancia_neta
-                comision_pyg = ganancia['total_comision']
-                descuento_pyg = ganancia['total_descuento']
-            else:
-                tasa_promedio = transacciones_moneda.aggregate(
-                    tasa_avg=Coalesce(Sum('tasa_cambio') / Count('id'), Decimal('1.00'))
-                )['tasa_avg']
-                ganancia_pyg = ganancia_neta * tasa_promedio
-                comision_pyg = ganancia['total_comision'] * tasa_promedio
-                descuento_pyg = ganancia['total_descuento'] * tasa_promedio
-            
+        if ganancia['total_comision'] > 0 or ganancia['total_descuento'] > 0:
+            # Los valores ya están en PYG
             data.append([
                 moneda.codigo,
                 f"{ganancia['total_comision']:,.2f}",
                 f"{ganancia['total_descuento']:,.2f}",
                 f"{ganancia_neta:,.2f}",
-                f"{ganancia_pyg:,.2f}"
+                f"{ganancia_neta:,.2f}"  # Ya está en PYG
             ])
             
-            total_ganancia_pyg += ganancia_pyg
-            total_comisiones_pyg += comision_pyg
-            total_descuentos_pyg += descuento_pyg
+            total_ganancia_pyg += ganancia_neta
+            total_comisiones_pyg += ganancia['total_comision']
+            total_descuentos_pyg += ganancia['total_descuento']
     
     # Fila de total
     data.append([
@@ -926,10 +928,12 @@ def exportar_ganancias_pdf(request):
         elements.append(Paragraph("Ganancias por Tipo de Operación", styles['Heading2']))
         elements.append(Spacer(1, 12))
         
-        tipo_data = [['Tipo de Operación', 'Ganancia Neta (PYG)', 'Transacciones']]
+        tipo_data = [['Tipo de Operación', 'Comisiones (PYG)', 'Descuentos (PYG)', 'Ganancia Neta (PYG)', 'Transacciones']]
         for codigo, data_tipo in ganancias_por_tipo.items():
             tipo_data.append([
                 data_tipo['tipo'].nombre,
+                f"{data_tipo['comisiones_pyg']:,.0f}",
+                f"{data_tipo['descuentos_pyg']:,.0f}",
                 f"{data_tipo['ganancia_neta_pyg']:,.0f}",
                 str(data_tipo['cantidad'])
             ])
