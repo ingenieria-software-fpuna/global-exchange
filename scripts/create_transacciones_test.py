@@ -114,21 +114,35 @@ def obtener_datos_requeridos():
     }
 
 
-def obtener_tasa_para_monedas(moneda_origen, moneda_destino, tasas_cambio):
-    """Obtener tasa de cambio entre dos monedas"""
+def obtener_datos_tasa_cambio(moneda_origen, moneda_destino, tasas_cambio, descuento_cliente=Decimal('0')):
+    """Obtener precio_base, tasa_cambio_base y tasa_cambio final entre dos monedas"""
     if moneda_origen.codigo == 'PYG':
-        # Comprando divisa extranjera con PYG
-        tasa = next((t for t in tasas_cambio if t.moneda.codigo == moneda_destino.codigo), None)
-        if tasa:
-            return tasa.precio_base + tasa.comision_venta
+        # Comprando divisa extranjera con PYG (COMPRA)
+        tasa_obj = next((t for t in tasas_cambio if t.moneda.codigo == moneda_destino.codigo), None)
+        if tasa_obj:
+            precio_base = tasa_obj.precio_base
+            # Tasa base incluye comisión de venta
+            tasa_cambio_base = precio_base + tasa_obj.comision_venta
+            # Tasa final aplica descuento del cliente
+            descuento_valor = (tasa_cambio_base * descuento_cliente / Decimal('100'))
+            tasa_cambio_final = tasa_cambio_base - descuento_valor
+            return precio_base, tasa_cambio_base, tasa_cambio_final
     else:
-        # Vendiendo divisa extranjera por PYG
-        tasa = next((t for t in tasas_cambio if t.moneda.codigo == moneda_origen.codigo), None)
-        if tasa:
-            return tasa.precio_base - tasa.comision_compra
+        # Vendiendo divisa extranjera por PYG (VENTA)
+        tasa_obj = next((t for t in tasas_cambio if t.moneda.codigo == moneda_origen.codigo), None)
+        if tasa_obj:
+            precio_base = tasa_obj.precio_base
+            # Tasa base incluye comisión de compra
+            tasa_cambio_base = precio_base - tasa_obj.comision_compra
+            # Tasa final aplica descuento del cliente (aumenta el valor que recibe)
+            descuento_valor = (tasa_obj.comision_compra * descuento_cliente / Decimal('100'))
+            tasa_cambio_final = tasa_cambio_base + descuento_valor
+            return precio_base, tasa_cambio_base, tasa_cambio_final
 
-    # Tasa por defecto si no se encuentra
-    return Decimal('7500')
+    # Valores por defecto si no se encuentra la tasa
+    precio_base_default = Decimal('7000')
+    tasa_cambio_base_default = Decimal('7500')
+    return precio_base_default, tasa_cambio_base_default, tasa_cambio_base_default
 
 
 def generar_fecha_realista():
@@ -245,8 +259,15 @@ def crear_transacciones_ejemplo(datos, cantidad=100):
                 # Monto en moneda extranjera (origen)
                 monto_origen = Decimal(str(random.randint(50, 2000)))  # 50 - 2000 USD/EUR/etc
 
-            # Obtener tasa de cambio
-            tasa_cambio = obtener_tasa_para_monedas(moneda_origen, moneda_destino, datos['tasas_cambio'])
+            # Obtener descuento del cliente primero
+            porcentaje_descuento = Decimal('0')
+            if cliente and cliente.tipo_cliente:
+                porcentaje_descuento = cliente.tipo_cliente.descuento
+
+            # Obtener precio_base, tasa_cambio_base y tasa_cambio final
+            precio_base, tasa_cambio_base, tasa_cambio = obtener_datos_tasa_cambio(
+                moneda_origen, moneda_destino, datos['tasas_cambio'], porcentaje_descuento
+            )
 
             # Calcular monto destino
             if moneda_origen.codigo == 'PYG':
@@ -263,19 +284,25 @@ def crear_transacciones_ejemplo(datos, cantidad=100):
             # Seleccionar Tauser (30% de transacciones con Tauser)
             tauser = random.choice(datos['tausers']) if random.random() < 0.3 else None
 
-            # Calcular comisiones básicas
+            # Calcular comisiones operativas (método de pago/cobro)
             porcentaje_comision = Decimal(random.randint(1, 3))
             monto_comision = (monto_origen * porcentaje_comision / 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
-            # Descuento del cliente
-            porcentaje_descuento = Decimal('0')
+            # Calcular descuento en PYG (ya tenemos porcentaje_descuento calculado arriba)
             monto_descuento = Decimal('0')
-            if cliente and cliente.tipo_cliente:
-                porcentaje_descuento = cliente.tipo_cliente.descuento
-                monto_descuento_bruto = (monto_comision * porcentaje_descuento / 100)
-                monto_descuento = monto_descuento_bruto.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
-                if monto_descuento_bruto > 0 and monto_descuento == 0:
-                    monto_descuento = Decimal('1')
+            if porcentaje_descuento > 0:
+                # El descuento se calcula sobre la comisión del cambio (tasa_cambio_base - precio_base)
+                if moneda_origen.codigo == 'PYG':
+                    # COMPRA: descuento sobre la comisión de venta
+                    comision_cambio = tasa_cambio_base - precio_base
+                    monto_descuento = (monto_destino * comision_cambio * porcentaje_descuento / 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+                else:
+                    # VENTA: descuento sobre la comisión de compra
+                    comision_cambio = precio_base - tasa_cambio_base
+                    monto_descuento = (monto_origen * comision_cambio * porcentaje_descuento / 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+                
+                if monto_descuento < 0:
+                    monto_descuento = Decimal('0')
 
             # Generar fecha realista
             fecha_creacion = generar_fecha_realista()
@@ -299,6 +326,8 @@ def crear_transacciones_ejemplo(datos, cantidad=100):
                 metodo_cobro=metodo_cobro,
                 metodo_pago=metodo_pago,
                 tasa_cambio=tasa_cambio,
+                tasa_cambio_base=tasa_cambio_base,  # Nuevo campo
+                precio_base=precio_base,  # Nuevo campo
                 porcentaje_comision=porcentaje_comision,
                 monto_comision=monto_comision,
                 porcentaje_descuento=porcentaje_descuento,
