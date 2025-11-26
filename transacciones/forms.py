@@ -193,7 +193,10 @@ class FiltroReporteForm(forms.Form):
     )
     
     moneda = forms.ModelChoiceField(
-        queryset=Moneda.objects.filter(es_activa=True),
+        queryset=Moneda.objects.filter(
+            es_activa=True,
+            tasas_cambio__es_activa=True
+        ).distinct(),
         required=False,
         empty_label="Todas las monedas",
         label="Moneda",
