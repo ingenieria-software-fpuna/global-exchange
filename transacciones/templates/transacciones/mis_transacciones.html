@@ -146,7 +146,11 @@
                         <option value="">Todos</option>
                         {% for tipo in tipos_operacion %}
                         <option value="{{ tipo.pk }}" {% if filtros.tipo == tipo.pk|stringformat:"s" %}selected{% endif %}>
-                            {{ tipo.nombre }}
+                            {% if tipo.codigo == 'VENTA' %}
+                            Compra de Divisas
+                            {% else %}
+                            Venta de Divisas
+                            {% endif %}
                         </option>
                         {% endfor %}
                     </select>
@@ -219,7 +223,11 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <span class="badge bg-info">{{ transaccion.tipo_operacion.nombre }}</span>
+                                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
+                                <span class="badge bg-info">Compra de Divisas</span>
+                                {% else %}
+                                <span class="badge bg-info">Venta de Divisas</span>
+                                {% endif %}
                             </td>
                             <td>
                                 {% if transaccion.estado.codigo == 'PAGADA' %}
