@@ -177,7 +177,7 @@ def generar_factura_desde_transaccion(transaccion):
         fch_ins, fch_upd,
         de_id) VALUES
         ('1', '{descripcion_servicio}', '1', '{monto}', '0',
-        '1', '100', '5',
+        '3', '0', '0',
         '', '', '', '', '', '',
         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
         {de_id});
