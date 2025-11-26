@@ -153,6 +153,14 @@
                         {{ data.tipo.nombre }}
                     </h5>
                     <p class="mb-1">
+                        <strong>Comisiones:</strong> 
+                        <span class="text-info">{{ data.comisiones_pyg|moneda_format:"PYG" }}</span>
+                    </p>
+                    <p class="mb-1">
+                        <strong>Descuentos:</strong> 
+                        <span class="text-warning">{{ data.descuentos_pyg|moneda_format:"PYG" }}</span>
+                    </p>
+                    <p class="mb-1">
                         <strong>Ganancia Neta:</strong> 
                         <span class="text-success fs-4">{{ data.ganancia_neta_pyg|moneda_format:"PYG" }}</span>
                     </p>

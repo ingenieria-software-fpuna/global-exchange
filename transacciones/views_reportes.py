@@ -73,45 +73,34 @@ def aplicar_filtros_transacciones(queryset, form_data):
 def calcular_ganancias_por_tipo(transacciones):
     """
     Calcula las ganancias por tipo de operación (Compra/Venta) en PYG.
-    Convierte todas las monedas a Guaraníes usando la tasa de cambio promedio.
     
     Args:
         transacciones: QuerySet de transacciones a procesar
         
     Returns:
-        dict: Diccionario con estructura {codigo_tipo: {'tipo': TipoOperacion, 'ganancia_neta_pyg': Decimal, 'cantidad': int}}
+        dict: Diccionario con estructura {codigo_tipo: {'tipo': TipoOperacion, 'ganancia_neta_pyg': Decimal, 
+              'comisiones_pyg': Decimal, 'descuentos_pyg': Decimal, 'cantidad': int}}
     """
     ganancias_por_tipo = {}
     
     for tipo in TipoOperacion.objects.filter(activo=True):
         trans_tipo = transacciones.filter(tipo_operacion=tipo)
-        ganancia_tipo_pyg = Decimal('0.00')
         
-        # Calcular ganancia por cada moneda y convertir a PYG
-        for moneda in Moneda.objects.filter(es_activa=True):
-            trans_tipo_moneda = trans_tipo.filter(moneda_origen=moneda)
+        if trans_tipo.exists():
+            totales = trans_tipo.aggregate(
+                total_comision=Coalesce(Sum('monto_comision'), Decimal('0.00')),
+                total_descuento=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
+            )
             
-            if trans_tipo_moneda.exists():
-                ganancia = trans_tipo_moneda.aggregate(
-                    total_comision=Coalesce(Sum('monto_comision'), Decimal('0.00')),
-                    total_descuento=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
-                )
-                ganancia_neta = ganancia['total_comision'] - ganancia['total_descuento']
-                
-                if ganancia_neta > 0:
-                    # Convertir a PYG
-                    if moneda.codigo == 'PYG':
-                        ganancia_tipo_pyg += ganancia_neta
-                    else:
-                        tasa_promedio = trans_tipo_moneda.aggregate(
-                            tasa_avg=Coalesce(Sum('tasa_cambio') / Count('id'), Decimal('1.00'))
-                        )['tasa_avg']
-                        ganancia_tipo_pyg += ganancia_neta * tasa_promedio
-        
-        if ganancia_tipo_pyg > 0:
+            comisiones_pyg = totales['total_comision']
+            descuentos_pyg = totales['total_descuento']
+            ganancia_neta_pyg = comisiones_pyg - descuentos_pyg
+            
             ganancias_por_tipo[tipo.codigo] = {
                 'tipo': tipo,
-                'ganancia_neta_pyg': ganancia_tipo_pyg,
+                'comisiones_pyg': comisiones_pyg,
+                'descuentos_pyg': descuentos_pyg,
+                'ganancia_neta_pyg': ganancia_neta_pyg,
                 'cantidad': trans_tipo.count(),
             }
     
@@ -257,9 +246,17 @@ def reporte_ganancias(request):
     
     # Calcular ganancias por moneda
     ganancias_por_moneda = {}
-    total_ganancia_pyg = Decimal('0.00')
-    total_comisiones_pyg = Decimal('0.00')
-    total_descuentos_pyg = Decimal('0.00')
+    
+    # Calcular totales UNA SOLA VEZ sobre todas las transacciones
+    # (no por moneda para evitar contar transacciones dos veces)
+    totales_generales = transacciones.aggregate(
+        total_comision=Coalesce(Sum('monto_comision'), Decimal('0.00')),
+        total_descuento=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
+    )
+    
+    total_comisiones_pyg = totales_generales['total_comision']
+    total_descuentos_pyg = totales_generales['total_descuento']
+    total_ganancia_pyg = total_comisiones_pyg - total_descuentos_pyg
     
     # Obtener configuración del sistema
     try:
@@ -299,10 +296,8 @@ def reporte_ganancias(request):
                 'ganancia_pyg': ganancia_pyg,
                 'cantidad_transacciones': transacciones_moneda.count(),
             }
-            
-            total_ganancia_pyg += ganancia_pyg
-            total_comisiones_pyg += comision_pyg
-            total_descuentos_pyg += descuento_pyg
+            # NO sumamos a los totales aquí porque ya se calcularon arriba
+            # (cada transacción aparece en múltiples monedas, causaría duplicación)
     
     # Estadísticas generales
     estadisticas = {
