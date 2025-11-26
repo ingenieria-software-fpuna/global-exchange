@@ -274,18 +274,18 @@ def reporte_ganancias(request):
         if transacciones_moneda.count() == 0:
             continue
         
-        # Calcular conversión a PYG sumando cada transacción
         # TANTO LA COMISIÓN COMO EL DESCUENTO SIEMPRE ESTÁN EN PYG (por diseño del sistema)
-        comision_pyg = Decimal('0.00')
-        descuento_pyg = Decimal('0.00')
+        totales_moneda = transacciones_moneda.aggregate(
+            comision_pyg=Coalesce(Sum('monto_comision'), Decimal('0.00')),
+            descuento_pyg=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
+        )
         
-        for trans in transacciones_moneda:
-            comision_pyg += trans.monto_comision
-            descuento_pyg += trans.monto_descuento
-        
+        comision_pyg = totales_moneda['comision_pyg']
+        descuento_pyg = totales_moneda['descuento_pyg']
         ganancia_pyg = comision_pyg - descuento_pyg
         
-        if ganancia_pyg != Decimal('0.00'):  # Mostrar incluso si es negativo
+        # Mostrar solo si hay comisiones o descuentos (ganancia puede ser 0, positiva o negativa)
+        if comision_pyg != Decimal('0.00') or descuento_pyg != Decimal('0.00'):
             ganancias_por_moneda[moneda.codigo] = {
                 'moneda': moneda,
                 'total_comision': None,  # No aplica porque mezclamos origen/destino

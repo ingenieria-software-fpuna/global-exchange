@@ -51,7 +51,6 @@
                         <div>
                             <h5 class="card-title">Ganancia Total</h5>
                             <h2>{{ total_ganancia_pyg|moneda_format:"PYG" }}</h2>
-                            <small>Convertido a {{ moneda_base.nombre }}</small>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-coins fa-2x opacity-75"></i>
@@ -81,8 +80,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h5 class="card-title">Total Comisiones</h5>
-                            <h2>{{ estadisticas.total_comisiones_pyg|moneda_format:"PYG" }}</h2>
-                            <small>Convertido a {{ moneda_base.nombre }}</small>
+                            <h2>{{ estadisticas.total_comisiones_pyg|moneda_format:"PYG" }}</h2>              
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-percentage fa-2x opacity-75"></i>
@@ -98,7 +96,6 @@
                         <div>
                             <h5 class="card-title">Total Descuentos</h5>
                             <h2>{{ estadisticas.total_descuentos_pyg|moneda_format:"PYG" }}</h2>
-                            <small>Convertido a {{ moneda_base.nombre }}</small>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-minus-circle fa-2x opacity-75"></i>
@@ -165,7 +162,7 @@
                         <span class="text-success fs-4">{{ data.ganancia_neta_pyg|moneda_format:"PYG" }}</span>
                     </p>
                     <p class="mb-0 text-muted">
-                        <small>{{ data.cantidad }} transacciones | Convertido a {{ moneda_base.nombre }}</small>
+                        <small>{{ data.cantidad }} transacciones </small>
                     </p>
                 </div>
             </div>
