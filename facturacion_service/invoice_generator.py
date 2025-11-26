@@ -167,7 +167,14 @@ def generar_factura_desde_transaccion(transaccion):
 
         # Insertar item de la factura (servicio de cambio de divisas)
         descripcion_servicio = f"Cambio de divisas - {transaccion.tipo_operacion.nombre}"
-        monto = float(transaccion.monto_origen)
+        
+        # Usar monto en guaranies segun el tipo de operacion
+        if transaccion.tipo_operacion.codigo == "VENTA":
+            # Para VENTA usar el monto destino (Esto era el error)
+            monto = float(transaccion.monto_destino)
+        else:
+            # Para COMPRA usar el monto origen
+            monto = float(transaccion.monto_origen)
 
         insert_query = f"""
         INSERT INTO public.gCamItem
