@@ -241,15 +241,17 @@ def crear_transacciones_ejemplo(datos, cantidad=100):
             )[0]
             estado = next(e for e in datos['estados'] if e.codigo == estado_codigo)
 
-            # Configurar monedas según tipo de operación
+            # Configurar monedas según tipo de operación (PERSPECTIVA CASA DE CAMBIO)
             if tipo_operacion.codigo == 'COMPRA':
-                # Cliente compra divisa extranjera con PYG
-                moneda_origen = datos['pyg']
-                moneda_destino = random.choice([m for m in datos['monedas'] if m.codigo != 'PYG'])
-            else:
-                # Cliente vende divisa extranjera por PYG
+                # Casa de cambio COMPRA divisa extranjera del cliente
+                # Cliente entrega USD, recibe PYG
                 moneda_origen = random.choice([m for m in datos['monedas'] if m.codigo != 'PYG'])
                 moneda_destino = datos['pyg']
+            else:
+                # Casa de cambio VENDE divisa extranjera al cliente
+                # Cliente entrega PYG, recibe USD
+                moneda_origen = datos['pyg']
+                moneda_destino = random.choice([m for m in datos['monedas'] if m.codigo != 'PYG'])
 
             # Calcular montos realistas
             if moneda_origen.codigo == 'PYG':
