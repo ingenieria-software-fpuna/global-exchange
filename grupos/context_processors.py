@@ -194,6 +194,8 @@ def permissions_context(request):
         context['can_edit_transacciones'] = False
         context['can_delete_transacciones'] = False
         context['can_operate'] = False
+        context['can_view_reporte_transacciones'] = False
+        context['can_view_reporte_ganancias'] = False
         context['can_view_configuracion'] = False
         context['can_view_tauser'] = False
         context['can_create_tauser'] = False

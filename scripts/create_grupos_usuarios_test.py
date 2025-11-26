@@ -60,7 +60,13 @@ def crear_grupos_ejemplo():
             'nombre': 'Operador',
             'descripcion': 'Acceso de solo lectura a clientes, métodos de pago/cobro, tasas de cambio y transacciones',
             'apps_solo_lectura': ['clientes', 'tasa_cambio', 'transacciones'],
-            'permisos_excluidos': ['view_tipocliente', 'can_view_all_clients', 'can_view_sensitive_columns'],
+            'permisos_excluidos': [
+                'view_tipocliente', 
+                'can_view_all_clients', 
+                'can_view_sensitive_columns',
+                'view_reporte_transacciones',  # Excluir acceso a reportes
+                'view_reporte_ganancias'       # Excluir acceso a ganancias
+            ],
             'permisos_especiales': ['can_operate']  # Permiso para realizar operaciones de compra/venta
         },
         {
