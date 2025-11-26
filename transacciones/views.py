@@ -276,6 +276,8 @@ def iniciar_compra(request):
                 metodo_cobro=metodo_cobro,  # Para compras, usamos método de cobro
                 metodo_pago=metodo_pago,    # Para compatibilidad con dashboard antiguo
                 tasa_cambio=Decimal(str(data['precio_usado'])),  # Tasa ajustada con descuento
+                tasa_cambio_base=Decimal(str(data.get('tasa_cambio_base', data['precio_usado']))),  # Tasa sin descuento del cliente
+                precio_base=Decimal(str(data.get('precio_base', data['tasa_base']))),  # Precio de referencia
                 porcentaje_comision=porcentaje_comision_total,  # Porcentaje calculado correctamente
                 monto_comision=Decimal(str(data.get('comision_total', 0))),  # Monto total de comisión
                 porcentaje_descuento=Decimal(str(data.get('descuento_pct', 0))),  # Porcentaje de descuento del cliente
@@ -683,6 +685,8 @@ def crear_con_nueva_cotizacion(request, transaccion_id):
                 monto_origen=Decimal(str(datos_completos['total'])),  # Nuevo monto a pagar con nueva tasa
                 monto_destino=Decimal(str(datos_completos['resultado'])),  # Cantidad de divisa que recibirá
                 tasa_cambio=Decimal(str(datos_completos['precio_usado'])),
+                tasa_cambio_base=Decimal(str(datos_completos.get('tasa_cambio_base', datos_completos['precio_usado']))),
+                precio_base=Decimal(str(datos_completos.get('precio_base', datos_completos['precio_usado']))),
                 # Agregar campos de comisiones y descuentos
                 porcentaje_comision=porcentaje_comision,
                 monto_comision=monto_comision,
@@ -1155,6 +1159,8 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
                 'tasa_base_formateada': moneda_format(Decimal(str(tasa_destino.precio_base)) + Decimal(str(tasa_destino.comision_venta)), moneda_destino.codigo),
                 'tasa_ajustada': float(precio_usado),
                 'tasa_ajustada_formateada': moneda_format(precio_usado, moneda_destino.codigo),
+                'precio_base': float(tasa_destino.precio_base),  # Precio base para calcular comisión real
+                'tasa_cambio_base': float(Decimal(str(tasa_destino.precio_base)) + Decimal(str(tasa_destino.comision_venta))),  # Tasa sin descuento de cliente
                 
                 # Cálculos
                 'subtotal': float(subtotal),
@@ -1349,6 +1355,8 @@ def calcular_venta_completa(monto, moneda_origen, moneda_destino, cliente=None, 
                 'tasa_base_formateada': moneda_format(Decimal(str(tasa_origen.precio_base)) - Decimal(str(tasa_origen.comision_compra)), moneda_destino.codigo),
                 'tasa_ajustada': float(precio_usado),
                 'tasa_ajustada_formateada': moneda_format(precio_usado, moneda_destino.codigo),
+                'precio_base': float(tasa_origen.precio_base),  # Precio base para calcular comisión real
+                'tasa_cambio_base': float(Decimal(str(tasa_origen.precio_base)) - Decimal(str(tasa_origen.comision_compra))),  # Tasa sin descuento de cliente
                 
                 # Cálculos
                 'subtotal': float(subtotal),
@@ -1846,6 +1854,8 @@ def iniciar_venta(request):
                 metodo_cobro=metodo_cobro,  # Cómo recibimos la divisa extranjera
                 metodo_pago=metodo_pago,    # Cómo entregamos PYG
                 tasa_cambio=Decimal(str(data['precio_usado'])),  # Tasa ajustada con descuento
+                tasa_cambio_base=Decimal(str(data.get('tasa_cambio_base', data['precio_usado']))),  # Tasa sin descuento del cliente
+                precio_base=Decimal(str(data.get('precio_base', data['tasa_base']))),  # Precio de referencia
                 porcentaje_comision=porcentaje_comision_total,  # Porcentaje calculado correctamente
                 monto_comision=Decimal(str(data.get('comision_total', 0))),  # Monto total de comisión
                 porcentaje_descuento=Decimal(str(data.get('descuento_pct', 0))),  # Porcentaje de descuento del cliente

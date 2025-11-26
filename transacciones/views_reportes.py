@@ -28,6 +28,36 @@ from monedas.templatetags.moneda_extras import moneda_format
 from configuracion.models import ConfiguracionSistema
 
 
+def calcular_comision_real_cambio(transaccion):
+    """
+    Calcula la comisión real de cambio (no el costo operativo de métodos).
+    
+    Args:
+        transaccion: Instancia de Transaccion
+        
+    Returns:
+        Decimal: Comisión real en PYG
+    """
+    # Para transacciones con tasa_cambio_base y precio_base guardados
+    if transaccion.tasa_cambio_base and transaccion.precio_base:
+        # Determinar la cantidad de divisa operada (no PYG)
+        if transaccion.tipo_operacion.codigo == 'COMPRA':
+            # COMPRA: cliente paga PYG, recibe divisa
+            # Comisión = (tasa_cambio_base - precio_base) × cantidad_divisa_recibida
+            cantidad_divisa = transaccion.monto_destino
+            comision_por_unidad = transaccion.tasa_cambio_base - transaccion.precio_base
+        else:  # VENTA
+            # VENTA: cliente entrega divisa, recibe PYG
+            # Comisión = (precio_base - tasa_cambio_base) × cantidad_divisa_entregada
+            cantidad_divisa = transaccion.monto_origen
+            comision_por_unidad = transaccion.precio_base - transaccion.tasa_cambio_base
+        
+        return (comision_por_unidad * cantidad_divisa).quantize(Decimal('0.01'))
+    else:
+        # Fallback para transacciones antiguas sin estos campos
+        return transaccion.monto_comision
+
+
 
 
 
@@ -87,13 +117,14 @@ def calcular_ganancias_por_tipo(transacciones):
         trans_tipo = transacciones.filter(tipo_operacion=tipo)
         
         if trans_tipo.exists():
-            totales = trans_tipo.aggregate(
-                total_comision=Coalesce(Sum('monto_comision'), Decimal('0.00')),
-                total_descuento=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
-            )
+            # Calcular comisión real iterando
+            comisiones_pyg = Decimal('0.00')
+            descuentos_pyg = Decimal('0.00')
             
-            comisiones_pyg = totales['total_comision']
-            descuentos_pyg = totales['total_descuento']
+            for trans in trans_tipo:
+                comisiones_pyg += calcular_comision_real_cambio(trans)
+                descuentos_pyg += trans.monto_descuento
+            
             ganancia_neta_pyg = comisiones_pyg - descuentos_pyg
             
             ganancias_por_tipo[tipo.codigo] = {
@@ -192,10 +223,10 @@ def reporte_transacciones(request):
     
     # Calcular ganancia en PYG para cada transacción
     for transaccion in transacciones_paginadas:
-        # TANTO LA COMISIÓN COMO EL DESCUENTO SIEMPRE ESTÁN EN PYG (por diseño del sistema)
-        # En COMPRA: moneda_origen=PYG, comisión/descuento en PYG
-        # En VENTA: moneda_destino=PYG, comisión/descuento en PYG
-        transaccion.comision_pyg = transaccion.monto_comision
+        # CALCULAR COMISIÓN REAL DE CAMBIO (no el costo operativo de métodos)
+        transaccion.comision_pyg = calcular_comision_real_cambio(transaccion)
+        
+        # El descuento siempre está en PYG
         transaccion.descuento_pyg = transaccion.monto_descuento
         
         # Solo calcular ganancia para transacciones completadas
@@ -249,13 +280,14 @@ def reporte_ganancias(request):
     
     # Calcular totales UNA SOLA VEZ sobre todas las transacciones
     # (no por moneda para evitar contar transacciones dos veces)
-    totales_generales = transacciones.aggregate(
-        total_comision=Coalesce(Sum('monto_comision'), Decimal('0.00')),
-        total_descuento=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
-    )
+    # Necesitamos iterar para calcular comisión real
+    total_comisiones_pyg = Decimal('0.00')
+    total_descuentos_pyg = Decimal('0.00')
     
-    total_comisiones_pyg = totales_generales['total_comision']
-    total_descuentos_pyg = totales_generales['total_descuento']
+    for trans in transacciones:
+        total_comisiones_pyg += calcular_comision_real_cambio(trans)
+        total_descuentos_pyg += trans.monto_descuento
+    
     total_ganancia_pyg = total_comisiones_pyg - total_descuentos_pyg
     
     # Obtener configuración del sistema
@@ -275,14 +307,14 @@ def reporte_ganancias(request):
         if transacciones_moneda.count() == 0:
             continue
         
-        # TANTO LA COMISIÓN COMO EL DESCUENTO SIEMPRE ESTÁN EN PYG (por diseño del sistema)
-        totales_moneda = transacciones_moneda.aggregate(
-            comision_pyg=Coalesce(Sum('monto_comision'), Decimal('0.00')),
-            descuento_pyg=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
-        )
+        # Calcular comisión real iterando (no podemos usar aggregate aquí)
+        comision_pyg = Decimal('0.00')
+        descuento_pyg = Decimal('0.00')
         
-        comision_pyg = totales_moneda['comision_pyg']
-        descuento_pyg = totales_moneda['descuento_pyg']
+        for trans in transacciones_moneda:
+            comision_pyg += calcular_comision_real_cambio(trans)
+            descuento_pyg += trans.monto_descuento
+        
         ganancia_pyg = comision_pyg - descuento_pyg
         
         # Mostrar solo si hay comisiones o descuentos (ganancia puede ser 0, positiva o negativa)
@@ -376,8 +408,8 @@ def exportar_transacciones_excel(request):
     
     # Datos
     for row_num, trans in enumerate(transacciones, 2):
-        # TANTO LA COMISIÓN COMO EL DESCUENTO SIEMPRE ESTÁN EN PYG
-        comision_pyg = trans.monto_comision
+        # Calcular comisión real de cambio
+        comision_pyg = calcular_comision_real_cambio(trans)
         descuento_pyg = trans.monto_descuento
         
         # Calcular ganancia en PYG solo para transacciones completadas
@@ -520,7 +552,8 @@ def exportar_transacciones_pdf(request):
         monto_destino_fmt = moneda_format(trans.monto_destino, trans.moneda_destino.codigo)
         
         # TANTO LA COMISIÓN COMO EL DESCUENTO SIEMPRE ESTÁN EN PYG
-        comision_pyg = trans.monto_comision
+        # Calcular comisión real de cambio
+        comision_pyg = calcular_comision_real_cambio(trans)
         descuento_pyg = trans.monto_descuento
         
         comision_pyg_fmt = moneda_format(comision_pyg, 'PYG')
@@ -675,25 +708,27 @@ def exportar_ganancias_excel(request):
         if transacciones_moneda.count() == 0:
             continue
         
-        # TANTO LA COMISIÓN COMO EL DESCUENTO SIEMPRE ESTÁN EN PYG
-        ganancia = transacciones_moneda.aggregate(
-            total_comision=Coalesce(Sum('monto_comision'), Decimal('0.00')),
-            total_descuento=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
-        )
+        # Calcular comisión real iterando
+        comision_total = Decimal('0.00')
+        descuento_total = Decimal('0.00')
         
-        ganancia_neta = ganancia['total_comision'] - ganancia['total_descuento']
+        for trans in transacciones_moneda:
+            comision_total += calcular_comision_real_cambio(trans)
+            descuento_total += trans.monto_descuento
         
-        if ganancia['total_comision'] > 0 or ganancia['total_descuento'] > 0:
+        ganancia_neta = comision_total - descuento_total
+        
+        if comision_total > 0 or descuento_total > 0:
             # Los valores ya están en PYG
             ws.cell(row=row_num, column=1).value = moneda.codigo
-            ws.cell(row=row_num, column=2).value = float(ganancia['total_comision'])
-            ws.cell(row=row_num, column=3).value = float(ganancia['total_descuento'])
+            ws.cell(row=row_num, column=2).value = float(comision_total)
+            ws.cell(row=row_num, column=3).value = float(descuento_total)
             ws.cell(row=row_num, column=4).value = float(ganancia_neta)
             ws.cell(row=row_num, column=5).value = float(ganancia_neta)  # Ya está en PYG
             
             total_ganancia_pyg += ganancia_neta
-            total_comisiones_pyg += ganancia['total_comision']
-            total_descuentos_pyg += ganancia['total_descuento']
+            total_comisiones_pyg += comision_total
+            total_descuentos_pyg += descuento_total
             row_num += 1
     
     # Fila de total
@@ -847,20 +882,22 @@ def exportar_ganancias_pdf(request):
         if transacciones_moneda.count() == 0:
             continue
         
-        # TANTO LA COMISIÓN COMO EL DESCUENTO SIEMPRE ESTÁN EN PYG
-        ganancia = transacciones_moneda.aggregate(
-            total_comision=Coalesce(Sum('monto_comision'), Decimal('0.00')),
-            total_descuento=Coalesce(Sum('monto_descuento'), Decimal('0.00'))
-        )
+        # Calcular comisión real iterando
+        comision_total = Decimal('0.00')
+        descuento_total = Decimal('0.00')
         
-        ganancia_neta = ganancia['total_comision'] - ganancia['total_descuento']
+        for trans in transacciones_moneda:
+            comision_total += calcular_comision_real_cambio(trans)
+            descuento_total += trans.monto_descuento
         
-        if ganancia['total_comision'] > 0 or ganancia['total_descuento'] > 0:
+        ganancia_neta = comision_total - descuento_total
+        
+        if comision_total > 0 or descuento_total > 0:
             # Los valores ya están en PYG
             data.append([
                 moneda.codigo,
-                f"{ganancia['total_comision']:,.2f}",
-                f"{ganancia['total_descuento']:,.2f}",
+                f"{comision_total:,.2f}",
+                f"{descuento_total:,.2f}",
                 f"{ganancia_neta:,.2f}",
                 f"{ganancia_neta:,.2f}"  # Ya está en PYG
             ])
