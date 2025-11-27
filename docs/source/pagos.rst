@@ -186,6 +186,12 @@ Envía una solicitud de pago a la pasarela.
 - ``escenario`` (str): "exito", "fallo", "pendiente" (default: "exito")
 - ``datos_adicionales`` (dict, optional): Datos extra
 
+**Datos específicos por método:**
+
+- ``tarjeta`` / ``tarjeta_credito_local``: usar ``numero_tarjeta`` sin espacios.
+- ``billetera``: acepta ``telefono``, ``numero_telefono`` o ``numero_billetera``; el valor se envía como ``numero_billetera`` al simulador.
+- ``transferencia``: usar ``numero_comprobante``.
+
 **Retorna:**
 
 .. code-block:: python
@@ -418,13 +424,14 @@ Formulario para pagos con billetera electrónica.
 
 **Campos:**
 
-- ``telefono``: CharField - Número de teléfono asociado a la billetera
+- ``numero_telefono``: CharField - Número de teléfono asociado a la billetera
+- ``pin_autorizacion``: CharField - PIN de autorización de 4 a 6 dígitos
 
 .. code-block:: python
 
    form = BilleteraElectronicaForm(request.POST)
    if form.is_valid():
-       telefono = form.cleaned_data['telefono']
+       telefono = form.cleaned_data['numero_telefono']
 
 TarjetaDebitoForm
 ~~~~~~~~~~~~~~~~~

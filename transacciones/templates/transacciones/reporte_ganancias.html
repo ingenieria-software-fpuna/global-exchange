@@ -2,7 +2,7 @@
 {% load static %}
 {% load moneda_extras %}
 
-{% block title %}Reporte de Ganancias - Global Exchange{% endblock %}
+{% block title %}Tablero de Control de Ganancias - Global Exchange{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
@@ -14,7 +14,7 @@
                 </a>
             </li>
             <li class="breadcrumb-item active" aria-current="page">
-                <i class="fas fa-chart-line me-1"></i>Reporte de Ganancias
+                <i class="fas fa-chart-line me-1"></i>Tablero de Control de Ganancias
             </li>
         </ol>
     </nav>
@@ -27,8 +27,8 @@
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h2">
-            <i class="fas fa-chart-line text-primary me-2"></i>
-            Reporte de Ganancias
+            <i class="fas fa-chart-line text-success me-2"></i>
+            Tablero de Control de Ganancias
         </h1>
         <div>
             <a href="{% url 'transacciones:exportar_ganancias_excel' %}?{{ request.GET.urlencode }}" 
@@ -51,7 +51,6 @@
                         <div>
                             <h5 class="card-title">Ganancia Total</h5>
                             <h2>{{ total_ganancia_pyg|moneda_format:"PYG" }}</h2>
-                            <small>Convertido a {{ moneda_base.nombre }}</small>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-coins fa-2x opacity-75"></i>
@@ -81,11 +80,10 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h5 class="card-title">Total Comisiones</h5>
-                            <h2>{{ estadisticas.total_comisiones_pyg|moneda_format:"PYG" }}</h2>
-                            <small>Convertido a {{ moneda_base.nombre }}</small>
+                            <h2>{{ estadisticas.total_comisiones_pyg|moneda_format:"PYG" }}</h2>              
                         </div>
                         <div class="align-self-center">
-                            <i class="fas fa-percentage fa-2x opacity-75"></i>
+                            <i class="fas fa-hand-holding-dollar fa-2x opacity-75"></i>
                         </div>
                     </div>
                 </div>
@@ -98,7 +96,6 @@
                         <div>
                             <h5 class="card-title">Total Descuentos</h5>
                             <h2>{{ estadisticas.total_descuentos_pyg|moneda_format:"PYG" }}</h2>
-                            <small>Convertido a {{ moneda_base.nombre }}</small>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-minus-circle fa-2x opacity-75"></i>
@@ -150,14 +147,22 @@
                 <div class="card-body">
                     <h5 class="card-title">
                         <i class="fas fa-{% if codigo == 'COMPRA' %}shopping-cart{% else %}fas fa-hand-holding-usd me-1{% endif %} me-2 text-success"></i>
-                        {{ data.tipo.nombre }}
+                        {{ data.nombre_display }}
                     </h5>
+                    <p class="mb-1">
+                        <strong>Comisiones:</strong> 
+                        <span class="text-info">{{ data.comisiones_pyg|moneda_format:"PYG" }}</span>
+                    </p>
+                    <p class="mb-1">
+                        <strong>Descuentos:</strong> 
+                        <span class="text-warning">{{ data.descuentos_pyg|moneda_format:"PYG" }}</span>
+                    </p>
                     <p class="mb-1">
                         <strong>Ganancia Neta:</strong> 
                         <span class="text-success fs-4">{{ data.ganancia_neta_pyg|moneda_format:"PYG" }}</span>
                     </p>
                     <p class="mb-0 text-muted">
-                        <small>{{ data.cantidad }} transacciones | Convertido a {{ moneda_base.nombre }}</small>
+                        <small>{{ data.cantidad }} transacciones </small>
                     </p>
                 </div>
             </div>
@@ -179,10 +184,9 @@
                     <thead class="table-light">
                         <tr>
                             <th>Moneda</th>
-                            <th class="text-end">Total Comisiones</th>
-                            <th class="text-end">Total Descuentos</th>
-                            <th class="text-end">Ganancia Neta</th>
-                            <th class="text-end">Equivalente en PYG</th>
+                            <th class="text-end">Total Comisiones (PYG)</th>
+                            <th class="text-end">Total Descuentos (PYG)</th>
+                            <th class="text-end">Ganancia Neta (PYG)</th>
                             <th class="text-center">Transacciones</th>
                         </tr>
                     </thead>
@@ -195,16 +199,13 @@
                                 <small class="text-muted">{{ data.moneda.nombre }}</small>
                             </td>
                             <td class="text-end text-success">
-                                {{ data.total_comision|moneda_format:codigo }}
+                                {{ data.comision_pyg|moneda_format:"PYG" }}
                             </td>
                             <td class="text-end text-danger">
-                                {{ data.total_descuento|moneda_format:codigo }}
+                                {{ data.descuento_pyg|moneda_format:"PYG" }}
                             </td>
                             <td class="text-end">
-                                <strong class="text-primary">{{ data.ganancia_neta|moneda_format:codigo }}</strong>
-                            </td>
-                            <td class="text-end">
-                                <strong class="text-success">{{ data.ganancia_pyg|moneda_format:"PYG" }}</strong>
+                                <strong class="text-primary">{{ data.ganancia_pyg|moneda_format:"PYG" }}</strong>
                             </td>
                             <td class="text-center">
                                 <span class="badge bg-info">{{ data.cantidad_transacciones }}</span>

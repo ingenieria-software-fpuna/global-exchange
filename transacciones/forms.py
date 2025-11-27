@@ -3,6 +3,8 @@ from django.core.validators import RegexValidator
 
 from .models import TipoOperacion, EstadoTransaccion
 from monedas.models import Moneda
+from clientes.models import Cliente
+from usuarios.models import Usuario
 
 
 class BilleteraElectronicaForm(forms.Form):
@@ -180,6 +182,16 @@ class FiltroReporteForm(forms.Form):
         })
     )
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Personalizar las etiquetas del selector de tipo_operacion para mostrar perspectiva de la casa
+        if 'tipo_operacion' in self.fields:
+            self.fields['tipo_operacion'].label_from_instance = lambda obj: (
+                'Venta de Divisas' if obj.codigo == 'COMPRA' else 
+                'Compra de Divisas' if obj.codigo == 'VENTA' else 
+                obj.nombre
+            )
+    
     estado = forms.ModelChoiceField(
         queryset=EstadoTransaccion.objects.filter(activo=True),
         required=False,
@@ -191,10 +203,33 @@ class FiltroReporteForm(forms.Form):
     )
     
     moneda = forms.ModelChoiceField(
-        queryset=Moneda.objects.filter(es_activa=True),
+        queryset=Moneda.objects.filter(
+            es_activa=True,
+            tasas_cambio__es_activa=True
+        ).distinct(),
         required=False,
         empty_label="Todas las monedas",
         label="Moneda",
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )
+    
+    cliente = forms.ModelChoiceField(
+        queryset=Cliente.objects.filter(activo=True).order_by('nombre_comercial'),
+        required=False,
+        empty_label="Todos los clientes",
+        label="Cliente",
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )
+    
+    usuario = forms.ModelChoiceField(
+        queryset=Usuario.objects.filter(es_activo=True).order_by('nombre', 'apellido'),
+        required=False,
+        empty_label="Todos los usuarios",
+        label="Usuario",
         widget=forms.Select(attrs={
             'class': 'form-select'
         })
