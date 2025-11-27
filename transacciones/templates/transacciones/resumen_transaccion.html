@@ -158,7 +158,7 @@
                 {% else %}
                    <label class="text-muted small">Tasa de compra base:</label>
                 {% endif %}
-                <div class="fw-bold">{{ resumen_detallado.tasa_base|moneda_format:transaccion.moneda_origen.codigo }}</div>
+                <div class="fw-bold">{{ resumen_detallado.tasa_base|moneda_format:'PYG' }}</div>
               </div>
               
               {% if resumen_detallado.cliente and resumen_detallado.cliente.descuento > 0 %}
@@ -188,7 +188,7 @@
                 {% else %}
                 <label class="text-muted small">Comisión por recibir {{ transaccion.moneda_origen.codigo }}:</label>
                 {% endif %}
-                <div class="text-danger">+ {{ resumen_detallado.comision_cobro|moneda_format:transaccion.moneda_origen.codigo }} ({{ resumen_detallado.metodo_cobro.comision }}%)</div>
+                <div class="text-danger">+ {{ resumen_detallado.comision_cobro|moneda_format:'PYG' }} ({{ resumen_detallado.metodo_cobro.comision }}%)</div>
               </div>
               {% endif %}
               
@@ -199,7 +199,7 @@
                 {% else %}
                 <label class="text-muted small">Comisión pago ({{ transaccion.metodo_pago.nombre }}):</label>
                 {% endif %}
-                <div class="text-danger">+ {{ resumen_detallado.comision_pago|moneda_format:transaccion.moneda_origen.codigo }} ({{ resumen_detallado.metodo_pago.comision }}%)</div>
+                <div class="text-danger">- {{ resumen_detallado.comision_pago|moneda_format:'PYG' }} ({{ resumen_detallado.metodo_pago.comision }}%)</div>
               </div>
               {% endif %}
               
