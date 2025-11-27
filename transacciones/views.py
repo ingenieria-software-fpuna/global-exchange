@@ -252,8 +252,7 @@ def iniciar_compra(request):
         
         # Crear la transacción
         with transaction.atomic():
-            # Cliente COMPRA divisas → Casa de cambio VENDE divisas
-            tipo_venta = TipoOperacion.objects.get(codigo=TipoOperacion.VENTA)
+            tipo_compra = TipoOperacion.objects.get(codigo=TipoOperacion.COMPRA)
             estado_pendiente = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PENDIENTE)
             
             # Usar los datos de la nueva función de cálculo
@@ -269,7 +268,7 @@ def iniciar_compra(request):
             nueva_transaccion = Transaccion(
                 cliente=cliente,
                 usuario=request.user,
-                tipo_operacion=tipo_venta,  # Casa de cambio VENDE divisas al cliente
+                tipo_operacion=tipo_compra,
                 moneda_origen=moneda_origen,
                 moneda_destino=moneda_destino,
                 monto_origen=total_a_pagar_pyg,  # Lo que el cliente pagará en PYG
@@ -1833,8 +1832,7 @@ def iniciar_venta(request):
         
         # Crear la transacción
         with transaction.atomic():
-            # Cliente VENDE divisas → Casa de cambio COMPRA divisas
-            tipo_compra = TipoOperacion.objects.get(codigo=TipoOperacion.COMPRA)
+            tipo_venta = TipoOperacion.objects.get(codigo=TipoOperacion.VENTA)
             estado_pendiente = EstadoTransaccion.objects.get(codigo=EstadoTransaccion.PENDIENTE)
             
             # Usar los datos de la función de cálculo de venta
@@ -1848,7 +1846,7 @@ def iniciar_venta(request):
             nueva_transaccion = Transaccion(
                 cliente=cliente,
                 usuario=request.user,
-                tipo_operacion=tipo_compra,  # Casa de cambio COMPRA divisas del cliente
+                tipo_operacion=tipo_venta,
                 moneda_origen=moneda_origen,
                 moneda_destino=moneda_destino,
                 monto_origen=monto,  # Divisa extranjera que el cliente vende

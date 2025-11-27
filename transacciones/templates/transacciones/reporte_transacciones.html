@@ -223,7 +223,7 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <span class="badge bg-info">{{ transaccion.tipo_operacion.nombre }}</span>
+                                <span class="badge bg-info">{{ transaccion.tipo_operacion_display }}</span>
                             </td>
                             <td>
                                 {% if transaccion.estado.codigo == 'PAGADA' %}

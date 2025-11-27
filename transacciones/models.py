@@ -455,61 +455,63 @@ class Transaccion(models.Model):
         """Retorna un diccionario con el resumen financiero detallado con la NUEVA lógica"""
         from decimal import Decimal
         
-        # Usar los valores de comisión y descuento guardados en la BD
-        comision_total = self.monto_comision if self.monto_comision else Decimal('0')
-        descuento_aplicado = self.monto_descuento if self.monto_descuento else Decimal('0')
-        descuento_pct = self.porcentaje_descuento if self.porcentaje_descuento else Decimal('0')
-        
-        # Dividir la comisión total entre cobro y pago según los porcentajes de cada método
+        # Calcular comisiones según el tipo de operación
         comision_cobro = Decimal('0')
         comision_pago = Decimal('0')
         
-        if comision_total > 0:
-            porcentaje_cobro = Decimal(str(self.metodo_cobro.comision)) if self.metodo_cobro and self.metodo_cobro.comision > 0 else Decimal('0')
-            porcentaje_pago = Decimal(str(self.metodo_pago.comision)) if self.metodo_pago and self.metodo_pago.comision > 0 else Decimal('0')
-            porcentaje_total = porcentaje_cobro + porcentaje_pago
+        if self.tipo_operacion.codigo == 'VENTA':
+            # Para VENTAS: las comisiones se calculan sobre el PYG bruto (subtotal)
+            # Necesitamos recalcular el PYG bruto desde la divisa vendida
+            monto_pyg_bruto = self.monto_origen * self.tasa_cambio
             
-            if porcentaje_total > 0:
-                # Distribuir la comisión proporcionalmente
-                comision_cobro = (comision_total * porcentaje_cobro / porcentaje_total).quantize(Decimal('0.01'))
-                comision_pago = (comision_total * porcentaje_pago / porcentaje_total).quantize(Decimal('0.01'))
-            else:
-                # Si no hay porcentajes, toda la comisión va a cobro por defecto
-                comision_cobro = comision_total
+            if self.metodo_cobro and self.metodo_cobro.comision > 0:
+                comision_cobro = monto_pyg_bruto * (Decimal(str(self.metodo_cobro.comision)) / Decimal('100'))
+            
+            if self.metodo_pago and self.metodo_pago.comision > 0:
+                comision_pago = monto_pyg_bruto * (Decimal(str(self.metodo_pago.comision)) / Decimal('100'))
+        else:
+            # Para COMPRAS: recalcular el subtotal desde el total almacenado
+            # monto_origen almacena el TOTAL (subtotal + comisiones)
+            # Necesitamos recalcular el subtotal: cantidad_divisa × tasa
+            subtotal_pyg = self.monto_destino * self.tasa_cambio
+            
+            if self.metodo_cobro and self.metodo_cobro.comision > 0:
+                comision_cobro = subtotal_pyg * (Decimal(str(self.metodo_cobro.comision)) / Decimal('100'))
+            
+            if self.metodo_pago and self.metodo_pago.comision > 0:
+                comision_pago = subtotal_pyg * (Decimal(str(self.metodo_pago.comision)) / Decimal('100'))
+        
+        comision_total = comision_cobro + comision_pago
+        
+        # Descuento aplicado (sobre las comisiones)
+        descuento_aplicado = Decimal('0')
+        descuento_pct = Decimal('0')
+        if self.cliente and self.cliente.tipo_cliente and self.cliente.tipo_cliente.activo and self.cliente.tipo_cliente.descuento > 0:
+            descuento_pct = Decimal(str(self.cliente.tipo_cliente.descuento))
+            descuento_aplicado = comision_total * (descuento_pct / Decimal('100'))
         
         # Definir variables según el tipo de operación
         if self.tipo_operacion.codigo == 'VENTA':
-            # VENTA en BD = Cliente COMPRA divisas
-            # moneda_origen = PYG, moneda_destino = divisa extranjera
-            # monto_origen = total PYG que paga (incluye comisiones)
-            # monto_destino = divisa que recibe
-            subtotal_display = self.monto_destino * self.tasa_cambio  # Subtotal PYG antes de comisiones
-            monto_base = subtotal_display
-            total_cliente = self.monto_origen  # Total que paga (incluye comisiones)
-        else:
-            # COMPRA en BD = Cliente VENDE divisas
-            # moneda_origen = divisa extranjera, moneda_destino = PYG
-            # monto_origen = divisa que entrega
-            # monto_destino = PYG que recibe (después de comisiones)
-            # Para calcular subtotal: monto_origen × tasa = PYG bruto antes de comisiones
-            subtotal_display = self.monto_origen * self.tasa_cambio  # PYG bruto antes de comisiones
-            monto_base = self.monto_origen  # La divisa extranjera que entrega
+            # Para ventas: el cliente entrega divisa extranjera
+            monto_base = self.monto_origen  # Divisa extranjera que entrega
+            subtotal_display = self.monto_origen  # Divisa que vende
             total_cliente = self.monto_origen  # Lo que entrega el cliente
+        else:
+            # Para compras: recalcular subtotal desde la cantidad de divisa × tasa
+            subtotal_display = self.monto_destino * self.tasa_cambio  # Subtotal en PYG antes de comisiones
+            monto_base = subtotal_display  # Monto base para mostrar
+            total_cliente = self.monto_origen  # Total que paga (incluye comisiones)
         
         # Formatear montos usando el filtro moneda_format
         from monedas.templatetags.moneda_extras import moneda_format
-        from monedas.models import Moneda
-        
-        # Obtener moneda PYG para formatear subtotales (siempre en PYG)
-        moneda_pyg = Moneda.objects.get(codigo='PYG')
         
         def formatear_monto(valor, moneda):
             return moneda_format(valor, moneda.codigo)
         
         return {
-            # Básicos - subtotal siempre en PYG
+            # Básicos
             'subtotal': float(subtotal_display),
-            'subtotal_formateado': formatear_monto(subtotal_display, moneda_pyg),
+            'subtotal_formateado': formatear_monto(subtotal_display, self.moneda_origen),
             
             # Comisiones - formatear según el tipo de operación
             'comision_cobro': float(comision_cobro),

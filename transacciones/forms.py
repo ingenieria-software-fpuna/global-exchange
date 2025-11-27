@@ -182,6 +182,16 @@ class FiltroReporteForm(forms.Form):
         })
     )
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Personalizar las etiquetas del selector de tipo_operacion para mostrar perspectiva de la casa
+        if 'tipo_operacion' in self.fields:
+            self.fields['tipo_operacion'].label_from_instance = lambda obj: (
+                'Venta de Divisas' if obj.codigo == 'COMPRA' else 
+                'Compra de Divisas' if obj.codigo == 'VENTA' else 
+                obj.nombre
+            )
+    
     estado = forms.ModelChoiceField(
         queryset=EstadoTransaccion.objects.filter(activo=True),
         required=False,

@@ -28,32 +28,51 @@ from monedas.templatetags.moneda_extras import moneda_format
 from configuracion.models import ConfiguracionSistema
 
 
+def obtener_tipo_operacion_display(transaccion):
+    """
+    Retorna el tipo de operación para visualización en reportes.
+    En la BD se guarda desde perspectiva del cliente, pero en reportes
+    se muestra desde perspectiva de la casa de cambio (invertido).
+    
+    Cliente COMPRA divisa -> Casa VENDE divisa
+    Cliente VENDE divisa -> Casa COMPRA divisa
+    """
+    if transaccion.tipo_operacion.codigo == 'COMPRA':
+        return 'Venta de Divisas'  # Cliente compra = Casa vende
+    elif transaccion.tipo_operacion.codigo == 'VENTA':
+        return 'Compra de Divisas'  # Cliente vende = Casa compra
+    return transaccion.tipo_operacion.nombre
+
+
 def calcular_comision_real_cambio(transaccion):
     """
     Calcula la comisión real de cambio (no el costo operativo de métodos).
-    PERSPECTIVA DE LA CASA DE CAMBIO.
+    IMPORTANTE: Los tipos de operación están desde la perspectiva del CLIENTE.
+    Para la casa de cambio, la operación es inversa:
+    - Si el cliente COMPRA divisa → la casa de cambio VENDE divisa
+    - Si el cliente VENDE divisa → la casa de cambio COMPRA divisa
     
     Args:
         transaccion: Instancia de Transaccion
         
     Returns:
-        Decimal: Comisión real en PYG
+        Decimal: Comisión real en PYG (ganancia para la casa de cambio)
     """
     # Para transacciones con tasa_cambio_base y precio_base guardados
     if transaccion.tasa_cambio_base and transaccion.precio_base:
         # Determinar la cantidad de divisa operada (no PYG)
         if transaccion.tipo_operacion.codigo == 'COMPRA':
-            # COMPRA: Casa compra USD del cliente (cliente vende USD, recibe PYG)
-            # moneda_origen=USD, moneda_destino=PYG
-            # Comisión = (precio_base - tasa_cambio_base) × cantidad_divisa_entregada
-            cantidad_divisa = transaccion.monto_origen
-            comision_por_unidad = transaccion.precio_base - transaccion.tasa_cambio_base
-        else:  # VENTA
-            # VENTA: Casa vende USD al cliente (cliente compra USD, paga PYG)
-            # moneda_origen=PYG, moneda_destino=USD
-            # Comisión = (tasa_cambio_base - precio_base) × cantidad_divisa_recibida
-            cantidad_divisa = transaccion.monto_destino
+            # Cliente COMPRA divisa → Casa de cambio VENDE divisa
+            # Casa de cambio vende más caro que el precio base
+            # Ganancia = (tasa_cambio_base - precio_base) × cantidad_divisa_vendida
+            cantidad_divisa = transaccion.monto_destino  # Divisa que la casa entrega
             comision_por_unidad = transaccion.tasa_cambio_base - transaccion.precio_base
+        else:  # VENTA
+            # Cliente VENDE divisa → Casa de cambio COMPRA divisa
+            # Casa de cambio compra más barato que el precio base
+            # Ganancia = (precio_base - tasa_cambio_base) × cantidad_divisa_comprada
+            cantidad_divisa = transaccion.monto_origen  # Divisa que la casa recibe
+            comision_por_unidad = transaccion.precio_base - transaccion.tasa_cambio_base
         
         return (comision_por_unidad * cantidad_divisa).quantize(Decimal('0.01'))
     else:
@@ -130,8 +149,13 @@ def calcular_ganancias_por_tipo(transacciones):
             
             ganancia_neta_pyg = comisiones_pyg - descuentos_pyg
             
-            ganancias_por_tipo[tipo.codigo] = {
+            # Invertir el código para mostrar perspectiva de la casa
+            codigo_display = 'VENTA' if tipo.codigo == 'COMPRA' else 'COMPRA'
+            nombre_display = 'Venta de Divisas' if tipo.codigo == 'COMPRA' else 'Compra de Divisas'
+            
+            ganancias_por_tipo[codigo_display] = {
                 'tipo': tipo,
+                'nombre_display': nombre_display,
                 'comisiones_pyg': comisiones_pyg,
                 'descuentos_pyg': descuentos_pyg,
                 'ganancia_neta_pyg': ganancia_neta_pyg,
@@ -172,6 +196,7 @@ def reporte_transacciones(request):
     transacciones = transacciones.order_by('-fecha_creacion')
     
     # Calcular estadísticas
+    # NOTA: Las estadísticas muestran la perspectiva de la casa de cambio (invertido de BD)
     total_canceladas_anuladas = transacciones.filter(
         estado__codigo__in=['CANCELADA', 'ANULADA']
     ).count()
@@ -181,8 +206,10 @@ def reporte_transacciones(request):
         'pagadas': transacciones.filter(estado__codigo='PAGADA').count(),
         'pendientes': transacciones.filter(estado__codigo='PENDIENTE').count(),
         'canceladas': total_canceladas_anuladas,
-        'compras': transacciones.filter(tipo_operacion__codigo='COMPRA').count(),
-        'ventas': transacciones.filter(tipo_operacion__codigo='VENTA').count(),
+        # En BD: COMPRA = cliente compra, pero mostramos como "Ventas" de la casa
+        'ventas': transacciones.filter(tipo_operacion__codigo='COMPRA').count(),
+        # En BD: VENTA = cliente vende, pero mostramos como "Compras" de la casa
+        'compras': transacciones.filter(tipo_operacion__codigo='VENTA').count(),
     }
     
     # Preparar datos para el gráfico de líneas (transacciones por día)
@@ -231,6 +258,9 @@ def reporte_transacciones(request):
         
         # El descuento siempre está en PYG
         transaccion.descuento_pyg = transaccion.monto_descuento
+        
+        # Agregar tipo de operación desde perspectiva de la casa (invertido)
+        transaccion.tipo_operacion_display = obtener_tipo_operacion_display(transaccion)
         
         # Solo calcular ganancia para transacciones completadas
         if transaccion.estado.codigo in ['PAGADA', 'ENTREGADA', 'RETIRADO']:
@@ -300,7 +330,7 @@ def reporte_ganancias(request):
     except:
         moneda_base = Moneda.objects.filter(codigo='PYG').first()
     
-    # Solo iterar sobre monedas con tasas de cambio activas
+    # Obtener solo monedas que tienen tasa de cambio activa
     monedas_con_tasa = Moneda.objects.filter(
         es_activa=True,
         tasas_cambio__es_activa=True
@@ -313,9 +343,6 @@ def reporte_ganancias(request):
             Q(moneda_origen=moneda) | Q(moneda_destino=moneda)
         )
         
-        if transacciones_moneda.count() == 0:
-            continue
-        
         # Calcular comisión real iterando (no podemos usar aggregate aquí)
         comision_pyg = Decimal('0.00')
         descuento_pyg = Decimal('0.00')
@@ -326,7 +353,7 @@ def reporte_ganancias(request):
         
         ganancia_pyg = comision_pyg - descuento_pyg
         
-        # Siempre mostrar si hay transacciones (incluso si comisión es 0)
+        # Mostrar todas las monedas con tasa de cambio, incluso si tienen ganancia 0
         ganancias_por_moneda[moneda.codigo] = {
             'moneda': moneda,
             'total_comision': None,  # No aplica porque mezclamos origen/destino
@@ -334,11 +361,11 @@ def reporte_ganancias(request):
             'ganancia_neta': None,   # No aplica porque mezclamos origen/destino
             'comision_pyg': comision_pyg,
             'descuento_pyg': descuento_pyg,
-            'ganancia_pyg': ganancia_pyg,
-            'cantidad_transacciones': transacciones_moneda.count(),
-        }
-        # NO sumamos a los totales aquí porque ya se calcularon arriba
-        # (cada transacción aparece en múltiples monedas, causaría duplicación)
+                'ganancia_pyg': ganancia_pyg,
+                'cantidad_transacciones': transacciones_moneda.count(),
+            }
+            # NO sumamos a los totales aquí porque ya se calcularon arriba
+            # (cada transacción aparece en múltiples monedas, causaría duplicación)
     
     # Estadísticas generales
     estadisticas = {
@@ -430,7 +457,7 @@ def exportar_transacciones_excel(request):
         ws.cell(row=row_num, column=2).value = trans.fecha_creacion.strftime('%Y-%m-%d %H:%M')
         ws.cell(row=row_num, column=3).value = f"{trans.usuario.nombre} {trans.usuario.apellido}".strip() if trans.usuario else '-'
         ws.cell(row=row_num, column=4).value = trans.cliente.nombre_comercial if trans.cliente else 'Cliente Casual'
-        ws.cell(row=row_num, column=5).value = trans.tipo_operacion.nombre
+        ws.cell(row=row_num, column=5).value = obtener_tipo_operacion_display(trans)
         ws.cell(row=row_num, column=6).value = trans.estado.nombre
         ws.cell(row=row_num, column=7).value = trans.moneda_origen.codigo
         ws.cell(row=row_num, column=8).value = float(trans.monto_origen)
@@ -574,12 +601,15 @@ def exportar_transacciones_pdf(request):
             ganancia_pyg = Decimal('0.00')
         ganancia_pyg_fmt = moneda_format(ganancia_pyg, 'PYG')
         
+        # Obtener tipo de operación invertido (perspectiva de la casa)
+        tipo_display = 'VENTA' if trans.tipo_operacion.codigo == 'COMPRA' else 'COMPRA'
+        
         data.append([
             trans.id_transaccion,  # ID completo sin cortar
             trans.fecha_creacion.strftime('%d/%m/%Y'),
             usuario_nombre[:15],
             cliente_nombre[:15],
-            trans.tipo_operacion.codigo,
+            tipo_display,
             trans.estado.codigo,
             monto_origen_fmt,
             monto_destino_fmt,
@@ -705,9 +735,10 @@ def exportar_ganancias_excel(request):
         cell.font = header_font
         cell.alignment = Alignment(horizontal='center')
     
-    # Calcular ganancias por moneda (solo divisas extranjeras con tasa de cambio activa)
+    # Calcular ganancias por moneda (solo divisas extranjeras, no PYG)
     row_num = current_row + 1
     
+    # Obtener solo monedas que tienen tasa de cambio activa
     monedas_con_tasa = Moneda.objects.filter(
         es_activa=True,
         tasas_cambio__es_activa=True
@@ -717,9 +748,6 @@ def exportar_ganancias_excel(request):
         transacciones_moneda = transacciones.filter(
             Q(moneda_origen=moneda) | Q(moneda_destino=moneda)
         )
-        
-        if transacciones_moneda.count() == 0:
-            continue
         
         # Calcular comisión real iterando
         comision_total = Decimal('0.00')
@@ -731,7 +759,7 @@ def exportar_ganancias_excel(request):
         
         ganancia_neta = comision_total - descuento_total
         
-        # Siempre mostrar si hay transacciones (incluso si comisión es 0)
+        # Mostrar todas las monedas con tasa de cambio, incluso si tienen ganancia 0
         # Los valores ya están en PYG
         ws.cell(row=row_num, column=1).value = moneda.codigo
         ws.cell(row=row_num, column=2).value = float(comision_total)
@@ -801,7 +829,7 @@ def exportar_ganancias_excel(request):
         row_num += 1
         
         for codigo, data in ganancias_por_tipo.items():
-            ws.cell(row=row_num, column=1).value = data['tipo'].nombre
+            ws.cell(row=row_num, column=1).value = data['nombre_display']
             ws.cell(row=row_num, column=1).font = Font(bold=True)
             ws.cell(row=row_num, column=2).value = float(data['comisiones_pyg'])
             ws.cell(row=row_num, column=3).value = float(data['descuentos_pyg'])
@@ -884,9 +912,10 @@ def exportar_ganancias_pdf(request):
         elements.append(Paragraph(periodo_text, styles['Normal']))
         elements.append(Spacer(1, 12))
     
-    # Calcular ganancias (solo divisas extranjeras con tasa de cambio activa)
+    # Calcular ganancias (solo divisas extranjeras, no PYG)
     data = [['Moneda', 'Comisiones', 'Descuentos', 'Ganancia Neta', 'Ganancia PYG']]
-    
+
+    # Obtener solo monedas que tienen tasa de cambio activa
     monedas_con_tasa = Moneda.objects.filter(
         es_activa=True,
         tasas_cambio__es_activa=True
@@ -896,9 +925,6 @@ def exportar_ganancias_pdf(request):
         transacciones_moneda = transacciones.filter(
             Q(moneda_origen=moneda) | Q(moneda_destino=moneda)
         )
-        
-        if transacciones_moneda.count() == 0:
-            continue
         
         # Calcular comisión real iterando
         comision_total = Decimal('0.00')
@@ -910,7 +936,7 @@ def exportar_ganancias_pdf(request):
         
         ganancia_neta = comision_total - descuento_total
         
-        # Siempre mostrar si hay transacciones (incluso si comisión es 0)
+        # Mostrar todas las monedas con tasa de cambio, incluso si tienen ganancia 0
         # Los valores ya están en PYG
         data.append([
             moneda.codigo,
@@ -986,7 +1012,7 @@ def exportar_ganancias_pdf(request):
         tipo_data = [['Tipo de Operación', 'Comisiones (PYG)', 'Descuentos (PYG)', 'Ganancia Neta (PYG)', 'Transacciones']]
         for codigo, data_tipo in ganancias_por_tipo.items():
             tipo_data.append([
-                data_tipo['tipo'].nombre,
+                data_tipo['nombre_display'],
                 f"{data_tipo['comisiones_pyg']:,.0f}",
                 f"{data_tipo['descuentos_pyg']:,.0f}",
                 f"{data_tipo['ganancia_neta_pyg']:,.0f}",
