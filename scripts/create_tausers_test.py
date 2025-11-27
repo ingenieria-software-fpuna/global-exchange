@@ -16,8 +16,8 @@ from datetime import datetime, timedelta
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'global_exchange.settings')
 django.setup()
 
-from tauser.models import Tauser, Stock, HistorialStock
-from monedas.models import Moneda
+from tauser.models import Tauser, Stock, HistorialStock, StockDenominacion, HistorialStockDenominacion
+from monedas.models import Moneda, DenominacionMoneda
 from usuarios.models import Usuario
 from django.contrib.auth.models import Group
 from django.utils import timezone
@@ -38,13 +38,11 @@ def obtener_datos_requeridos():
     """Obtener todos los datos necesarios para crear Tausers"""
     print("📋 Obteniendo datos necesarios...")
 
-    # Operadores
     operadores = obtener_operadores()
     if not operadores:
         print("  ❌ No se encontraron operadores")
         return None
 
-    # Monedas activas (al menos 3)
     monedas = list(Moneda.objects.filter(es_activa=True))
     if len(monedas) < 3:
         print("  ❌ Se necesitan al menos 3 monedas activas")
@@ -60,13 +58,11 @@ def obtener_datos_requeridos():
 
 
 def crear_tausers_ejemplo(datos, cantidad=5):
-    """Crear Tausers de ejemplo con información realista"""
     print(f"\n🏪 Creando {cantidad} Tausers de ejemplo...")
 
     tausers_creados = 0
     errores = 0
 
-    # Datos de ejemplo para Tausers
     nombres_tausers = [
         "Casa Central - Asunción",
         "Sucursal Shopping del Sol",
@@ -102,16 +98,13 @@ def crear_tausers_ejemplo(datos, cantidad=5):
 
     for i in range(cantidad):
         try:
-            # Seleccionar datos aleatorios
             nombre = nombres_tausers[i] if i < len(nombres_tausers) else f"Tauser {i+1}"
             direccion = direcciones[i] if i < len(direcciones) else f"Dirección {i+1}"
             horario = horarios[i] if i < len(horarios) else "Lunes a Viernes: 8:00 - 18:00"
-            
-            # Fecha de instalación (últimos 6 meses)
+
             dias_atras = random.randint(30, 180)
             fecha_instalacion = timezone.now() - timedelta(days=dias_atras)
 
-            # Crear Tauser
             tauser = Tauser.objects.create(
                 nombre=nombre,
                 direccion=direccion,
@@ -120,97 +113,233 @@ def crear_tausers_ejemplo(datos, cantidad=5):
                 fecha_instalacion=fecha_instalacion
             )
 
-            # Crear stock para al menos 3 monedas aleatorias
             monedas_seleccionadas = random.sample(datos['monedas'], min(3, len(datos['monedas'])))
-            
+
             for moneda in monedas_seleccionadas:
-                # Cantidad inicial de stock
+                denominaciones = DenominacionMoneda.objects.filter(
+                    moneda=moneda,
+                    es_activa=True,
+                    tipo='BILLETE'
+                ).order_by('-valor')
+
+                if not denominaciones.exists():
+                    print(f"  ⚠️  No hay denominaciones de billetes para {moneda.codigo}, saltando...")
+                    continue
+
                 if moneda.codigo == 'PYG':
-                    cantidad_inicial = Decimal(str(random.randint(5000000, 20000000)))  # 5M - 20M PYG
+                    cantidad_inicial = Decimal(str(random.randint(5000000, 20000000)))
                 else:
-                    cantidad_inicial = Decimal(str(random.randint(1000, 10000)))  # 1000 - 10000 USD/EUR/etc
+                    cantidad_inicial = Decimal(str(random.randint(1000, 10000)))
 
-
-                # Crear stock
                 stock = Stock.objects.create(
                     tauser=tauser,
                     moneda=moneda,
-                    cantidad=cantidad_inicial,
+                    cantidad=Decimal('0'),
                     es_activo=True
                 )
 
-                # Crear movimientos de historial (simular cargas previas)
                 operador = random.choice(datos['operadores'])
-                
-                # Movimiento inicial (creación del stock)
+
+                monto_restante = cantidad_inicial
+                denominaciones_distribuidas = []
+                denominaciones_ordenadas = list(denominaciones)
+
+                for idx, denominacion in enumerate(denominaciones_ordenadas):
+                    if monto_restante <= 0:
+                        break
+
+                    if idx == 0:
+                        porcentaje = Decimal(str(random.uniform(0.20, 0.30)))
+                    elif idx == 1:
+                        porcentaje = Decimal(str(random.uniform(0.25, 0.35)))
+                    elif idx == 2:
+                        porcentaje = Decimal(str(random.uniform(0.20, 0.30)))
+                    else:
+                        porcentaje = Decimal('1') / Decimal(str(len(denominaciones_ordenadas) - idx))
+
+                    monto_denominacion = (monto_restante * porcentaje).quantize(
+                        Decimal('0.01'), rounding=ROUND_HALF_UP
+                    )
+
+                    if monto_denominacion > monto_restante:
+                        monto_denominacion = monto_restante
+
+                    cantidad_billetes = int(monto_denominacion / denominacion.valor)
+
+                    if cantidad_billetes > 0:
+                        valor_total_denominacion = cantidad_billetes * denominacion.valor
+                        denominaciones_distribuidas.append({
+                            'denominacion': denominacion,
+                            'cantidad': cantidad_billetes,
+                            'valor_total': valor_total_denominacion
+                        })
+                        monto_restante -= valor_total_denominacion
+
+                if monto_restante > 0 and denominaciones_distribuidas:
+                    ultima = denominaciones_distribuidas[-1]
+                    billetes_extra = int(monto_restante / ultima['denominacion'].valor)
+                    if billetes_extra > 0:
+                        ultima['cantidad'] += billetes_extra
+                        ultima['valor_total'] += billetes_extra * ultima['denominacion'].valor
+                        monto_restante -= billetes_extra * ultima['denominacion'].valor
+
+                total_distribuido = Decimal('0')
+                for item in denominaciones_distribuidas:
+                    denominacion = item['denominacion']
+                    cantidad_billetes = item['cantidad']
+                    valor_total = item['valor_total']
+
+                    stock_denom = StockDenominacion.objects.create(
+                        stock=stock,
+                        denominacion=denominacion,
+                        cantidad=cantidad_billetes,
+                        es_activo=True
+                    )
+
+                    HistorialStockDenominacion.objects.create(
+                        stock_denominacion=stock_denom,
+                        tipo_movimiento='ENTRADA',
+                        origen_movimiento='MANUAL',
+                        cantidad_movida=cantidad_billetes,
+                        cantidad_anterior=0,
+                        cantidad_posterior=cantidad_billetes,
+                        usuario=operador,
+                        observaciones=f'Stock inicial - {cantidad_billetes} billetes de {denominacion.valor} {moneda.simbolo}'
+                    )
+
+                    total_distribuido += valor_total
+
+                stock.cantidad = total_distribuido.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                stock.save()
+
                 HistorialStock.objects.create(
                     stock=stock,
                     tipo_movimiento='ENTRADA',
                     origen_movimiento='MANUAL',
-                    cantidad_movida=cantidad_inicial,
+                    cantidad_movida=total_distribuido,
                     cantidad_anterior=Decimal('0'),
-                    cantidad_posterior=cantidad_inicial,
+                    cantidad_posterior=total_distribuido,
                     usuario=operador,
-                    observaciones=f'Stock inicial creado para {moneda.nombre}'
+                    observaciones=f'Stock inicial creado para {moneda.nombre} por denominaciones - Total: {moneda.simbolo}{total_distribuido:.{moneda.decimales}f}'
                 )
 
-                # Simular algunos movimientos adicionales (entradas y salidas)
-                cantidad_actual = cantidad_inicial
-                for j in range(random.randint(2, 5)):  # 2-5 movimientos adicionales
-                    # Fecha del movimiento (en los últimos 30 días)
-                    dias_movimiento = random.randint(1, 30)
-                    fecha_movimiento = timezone.now() - timedelta(days=dias_movimiento)
-                    
-                    # Tipo de movimiento (70% entradas, 30% salidas)
+                cantidad_actual = total_distribuido
+
+                for j in range(random.randint(2, 5)):
+                    dias_mov = random.randint(1, 30)
+                    fecha_mov = timezone.now() - timedelta(days=dias_mov)
+
+                    cantidad_anterior = cantidad_actual
+                    tipo_movimiento = None
+                    observacion = None
+                    historial_denom = None
+
                     if random.random() < 0.7:
-                        # Entrada
-                        cantidad_movida = (
-                            cantidad_inicial
-                            * Decimal(str(random.uniform(0.1, 0.3)))
-                        ).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
-                        if cantidad_movida <= 0:
-                            cantidad_movida = Decimal('1')
-                        cantidad_anterior = cantidad_actual
-                        cantidad_actual += cantidad_movida
-                        tipo_movimiento = 'ENTRADA'
-                        observacion = f'Carga de stock - {cantidad_movida} {moneda.simbolo}'
-                    else:
-                        # Salida
-                        cantidad_movida = (
-                            cantidad_inicial
-                            * Decimal(str(random.uniform(0.05, 0.15)))
-                        ).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
-                        if cantidad_movida <= 0:
-                            cantidad_movida = Decimal('1')
-                        if cantidad_movida < cantidad_actual:  # Solo si hay suficiente stock
-                            cantidad_anterior = cantidad_actual
-                            cantidad_actual -= cantidad_movida
-                            tipo_movimiento = 'SALIDA'
-                            observacion = f'Retiro de stock - {cantidad_movida} {moneda.simbolo}'
+                        if denominaciones_distribuidas:
+                            item = random.choice(denominaciones_distribuidas)
+                            denominacion = item['denominacion']
+                            billetes_entrada = random.randint(1, 10)
+                            valor_entrada = billetes_entrada * denominacion.valor
+
+                            stock_denom = StockDenominacion.objects.get(
+                                stock=stock,
+                                denominacion=denominacion
+                            )
+                            cant_ant = stock_denom.cantidad
+                            stock_denom.cantidad += billetes_entrada
+                            stock_denom.save()
+
+                            historial_denom = HistorialStockDenominacion.objects.create(
+                                stock_denominacion=stock_denom,
+                                tipo_movimiento='ENTRADA',
+                                origen_movimiento='MANUAL',
+                                cantidad_movida=billetes_entrada,
+                                cantidad_anterior=cant_ant,
+                                cantidad_posterior=stock_denom.cantidad,
+                                usuario=operador,
+                                observaciones=f'Carga de stock - {billetes_entrada} billetes de {denominacion.valor} {moneda.simbolo}'
+                            )
+
+                            cantidad_actual += valor_entrada
+                            tipo_movimiento = 'ENTRADA'
+                            observacion = f'Carga de stock - {valor_entrada} {moneda.simbolo} ({billetes_entrada} billetes de {denominacion.valor})'
                         else:
-                            continue  # Saltar este movimiento si no hay suficiente stock
+                            continue
+                    else:
+                        if denominaciones_distribuidas:
+                            item = random.choice(denominaciones_distribuidas)
+                            denominacion = item['denominacion']
 
-                    # Crear movimiento en historial
-                    cantidad_actual = cantidad_actual.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+                            stock_denom = StockDenominacion.objects.get(
+                                stock=stock,
+                                denominacion=denominacion
+                            )
 
-                    historial = HistorialStock.objects.create(
-                        stock=stock,
-                        tipo_movimiento=tipo_movimiento,
-                        origen_movimiento='MANUAL',
-                        cantidad_movida=cantidad_movida,
-                        cantidad_anterior=cantidad_anterior,
-                        cantidad_posterior=cantidad_actual,
-                        usuario=operador,
-                        observaciones=observacion
-                    )
-                    
-                    # Actualizar fecha del movimiento
-                    HistorialStock.objects.filter(pk=historial.pk).update(
-                        fecha_movimiento=fecha_movimiento
-                    )
+                            if stock_denom.cantidad > 0:
+                                billetes_salida = random.randint(1, min(5, stock_denom.cantidad))
+                                valor_salida = billetes_salida * denominacion.valor
 
-                # Actualizar stock con la cantidad final
-                stock.cantidad = cantidad_actual.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+                                if valor_salida <= cantidad_actual:
+                                    cant_ant = stock_denom.cantidad
+                                    stock_denom.cantidad -= billetes_salida
+                                    stock_denom.save()
+
+                                    historial_denom = HistorialStockDenominacion.objects.create(
+                                        stock_denominacion=stock_denom,
+                                        tipo_movimiento='SALIDA',
+                                        origen_movimiento='MANUAL',
+                                        cantidad_movida=billetes_salida,
+                                        cantidad_anterior=cant_ant,
+                                        cantidad_posterior=stock_denom.cantidad,
+                                        usuario=operador,
+                                        observaciones=f'Retiro de stock - {billetes_salida} billetes de {denominacion.valor} {moneda.simbolo}'
+                                    )
+
+                                    cantidad_actual -= valor_salida
+                                    tipo_movimiento = 'SALIDA'
+                                    observacion = f'Retiro de stock - {valor_salida} {moneda.simbolo} ({billetes_salida} billetes de {denominacion.valor})'
+                                else:
+                                    continue
+                            else:
+                                continue
+                        else:
+                            continue
+
+                    if tipo_movimiento and observacion:
+                        cantidad_actual = cantidad_actual.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                        cantidad_movida = abs(cantidad_actual - cantidad_anterior)
+
+                        historial = HistorialStock.objects.create(
+                            stock=stock,
+                            tipo_movimiento=tipo_movimiento,
+                            origen_movimiento='MANUAL',
+                            cantidad_movida=cantidad_movida,
+                            cantidad_anterior=cantidad_anterior,
+                            cantidad_posterior=cantidad_actual,
+                            usuario=operador,
+                            observaciones=observacion
+                        )
+
+                        HistorialStock.objects.filter(pk=historial.pk).update(
+                            fecha_movimiento=fecha_mov
+                        )
+
+                        if historial_denom:
+                            HistorialStockDenominacion.objects.filter(pk=historial_denom.pk).update(
+                                fecha_movimiento=fecha_mov
+                            )
+
+                # Recalcular stock total basándose en las denominaciones actuales
+                # Esto asegura que el stock total siempre coincida con las denominaciones
+                stock_denominaciones = StockDenominacion.objects.filter(
+                    stock=stock,
+                    es_activo=True
+                )
+                total_real = Decimal('0')
+                for stock_denom in stock_denominaciones:
+                    total_real += stock_denom.cantidad * stock_denom.denominacion.valor
+                
+                stock.cantidad = total_real.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 stock.save()
 
             tausers_creados += 1
@@ -229,33 +358,28 @@ def crear_tausers_ejemplo(datos, cantidad=5):
 
 
 def mostrar_estadisticas():
-    """Mostrar estadísticas de Tausers y stock creados"""
     print("\n📊 Estadísticas de Tausers:")
 
-    # Tausers totales
     total_tausers = Tauser.objects.count()
     tausers_activos = Tauser.objects.filter(es_activo=True).count()
     print(f"  • Total Tausers: {total_tausers}")
     print(f"  • Tausers activos: {tausers_activos}")
 
-    # Stock por moneda
     print(f"\n💰 Stock por moneda:")
     for moneda in Moneda.objects.filter(es_activa=True):
         stocks = Stock.objects.filter(moneda=moneda, es_activo=True)
         total_cantidad = sum(stock.cantidad for stock in stocks)
         print(f"  • {moneda.codigo}: {total_cantidad} {moneda.simbolo} en {stocks.count()} Tausers")
 
-    # Movimientos de historial
     total_movimientos = HistorialStock.objects.count()
     entradas = HistorialStock.objects.filter(tipo_movimiento='ENTRADA').count()
     salidas = HistorialStock.objects.filter(tipo_movimiento='SALIDA').count()
-    
+
     print(f"\n📈 Movimientos de historial:")
     print(f"  • Total movimientos: {total_movimientos}")
     print(f"  • Entradas: {entradas}")
     print(f"  • Salidas: {salidas}")
 
-    # Tausers con más stock
     print(f"\n🏆 Tausers con más stock:")
     for tauser in Tauser.objects.filter(es_activo=True):
         total_stock = sum(stock.cantidad for stock in tauser.stocks.filter(es_activo=True))
@@ -264,7 +388,6 @@ def mostrar_estadisticas():
 
 
 def verificar_datos():
-    """Verificar que los datos se crearon correctamente"""
     print("\n🔍 Verificando datos creados...")
 
     total_tausers = Tauser.objects.count()
@@ -284,36 +407,25 @@ def verificar_datos():
 
 
 def main():
-    """Función principal del script"""
     print("🚀 Iniciando creación de Tausers de ejemplo...")
     print("=" * 65)
 
     try:
-        # Obtener datos necesarios
         datos = obtener_datos_requeridos()
         if not datos:
             print("\n❌ No se pudieron obtener todos los datos necesarios.")
-            print("   Asegúrate de ejecutar estos scripts primero:")
+            print("   Asegúrate de ejecutar:")
             print("   • make create-currencies")
             print("   • make create-groups-users")
             sys.exit(1)
 
-        # Crear Tausers
-        cantidad = int(os.environ.get('CANTIDAD_TAUSERS', '5'))  # Por defecto 5
+        cantidad = int(os.environ.get('CANTIDAD_TAUSERS', '5'))
         tausers_creados = crear_tausers_ejemplo(datos, cantidad)
 
-        # Mostrar estadísticas
         mostrar_estadisticas()
 
-        # Verificar datos
         if verificar_datos():
             print("\n🎉 ¡Tausers de ejemplo creados exitosamente!")
-            print(f"\n📋 Se crearon {tausers_creados} Tausers con:")
-            print(f"   • Stock de al menos 3 monedas por Tauser")
-            print(f"   • Movimientos de historial simulados")
-            print(f"   • Distribución realista de cantidades")
-            print(f"   • Fechas de instalación en los últimos 6 meses")
-            print(f"\n🎯 Ahora puedes probar el sistema de Tausers y stock")
         else:
             print("\n❌ Error al crear los Tausers.")
             sys.exit(1)
