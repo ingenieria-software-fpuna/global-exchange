@@ -229,7 +229,23 @@ class Transaccion(models.Model):
         max_digits=12,
         decimal_places=4,
         verbose_name="Tasa de Cambio",
-        help_text="Tasa de cambio aplicada en la transacción"
+        help_text="Tasa de cambio aplicada en la transacción (con descuentos aplicados)"
+    )
+    tasa_cambio_base = models.DecimalField(
+        max_digits=12,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        verbose_name="Tasa de Cambio Base",
+        help_text="Tasa de cambio sin descuentos (precio_base +/- comisión de cambio). Usado para calcular ganancia real."
+    )
+    precio_base = models.DecimalField(
+        max_digits=12,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        verbose_name="Precio Base",
+        help_text="Precio base de la tasa de cambio al momento de la transacción (sin comisiones de cambio)"
     )
     
     # Comisiones y descuentos
@@ -337,6 +353,8 @@ class Transaccion(models.Model):
         ]
         permissions = [
             ('can_operate', 'Puede realizar operaciones de compra y venta'),
+            ('view_reporte_transacciones', 'Puede ver reporte de transacciones'),
+            ('view_reporte_ganancias', 'Puede ver reporte de ganancias'),
         ]
 
     def __str__(self):

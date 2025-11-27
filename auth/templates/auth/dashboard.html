@@ -166,7 +166,7 @@
                             </div>
                             <div class="btn-group" role="group">
                                 <a href="{% url 'tauser:tauser_list' %}" class="btn btn-outline-primary btn-sm" title="Ver Tausers">
-                                    <i class="fas fa-list"></i>
+                                    <i class="fas fa-arrow-right"></i>
                                 </a>
                             </div>
                         </div>
@@ -334,11 +334,12 @@
     </div>
     {% endif %}
 
-    <!-- Administration Sections Row 3: Configuration (can share row if needed) -->
-    {% if can_view_configuracion %}
+    <!-- Administration Sections Row 3: Configuration & Reports -->
+    {% if can_view_configuracion or can_view_reporte_transacciones or can_view_reporte_ganancias %}
     <div class="admin-section-container p-3 mb-3">
     <div class="row">
         <!-- System Configuration Section -->
+        {% if can_view_configuracion %}
         <div class="col-lg-6 mb-2">
             <div class="group-header p-2 mb-2">
                 <h2 class="h6 fw-bold text-dark mb-0">
@@ -360,11 +361,56 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
-        <!-- Empty space for potential future modules or asymmetric layouts -->
+        <!-- Reports Section -->
+        {% if can_view_reporte_transacciones or can_view_reporte_ganancias %}
         <div class="col-lg-6 mb-2">
-            <!-- This space is available for future modules or remains empty for better visual balance -->
+            <div class="group-header p-2 mb-2">
+                <h2 class="h6 fw-bold text-dark mb-0">
+                    <i class="fas fa-chart-bar text-danger me-2"></i>Reportes
+                </h2>
+            </div>
+            <div class="row">
+                {% if can_view_reporte_transacciones %}
+                <div class="col-12 mb-1">
+                    <div class="card border-0 shadow-sm hover-shadow">
+                        <div class="card-body d-flex align-items-center p-3">
+                            <div class="bg-danger bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 35px; height: 35px;">
+                                <i class="fas fa-file-alt text-danger"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="card-title fw-semibold mb-1">Reporte de Transacciones</h6>
+                                <p class="card-text text-muted mb-0" style="font-size: 0.7rem;">Consulta y exporta transacciones</p>
+                            </div>
+                            <a href="{% url 'transacciones:reporte_transacciones' %}" class="btn btn-outline-danger btn-sm">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if can_view_reporte_ganancias %}
+                <div class="col-12 mb-1">
+                    <div class="card border-0 shadow-sm hover-shadow">
+                        <div class="card-body d-flex align-items-center p-3">
+                            <div class="bg-danger bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 35px; height: 35px;">
+                                <i class="fas fa-chart-line text-danger"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="card-title fw-semibold mb-1">Tablero de Control de Ganancias</h6>
+                                <p class="card-text text-muted mb-0" style="font-size: 0.7rem;">Consulta y exporta comisiones y ganancias</p>
+                            </div>
+                            <a href="{% url 'transacciones:reporte_ganancias' %}" class="btn btn-outline-danger btn-sm">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
         </div>
+        {% endif %}
     </div>
     </div>
     {% endif %}

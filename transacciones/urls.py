@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import views_reportes
 
 app_name = 'transacciones'
 
@@ -23,4 +24,12 @@ urlpatterns = [
     path('cancelar-por-cambio-cotizacion/<str:transaccion_id>/', views.cancelar_por_cambio_cotizacion, name='cancelar_por_cambio_cotizacion'),
     path('descargar-factura/<str:transaccion_id>/<str:tipo_archivo>/', views.descargar_factura, name='descargar_factura'),
     path('reintentar-factura/<str:transaccion_id>/', views.reintentar_factura, name='reintentar_factura'),
+    
+    # Reportes
+    path('reportes/transacciones/', views_reportes.reporte_transacciones, name='reporte_transacciones'),
+    path('reportes/ganancias/', views_reportes.reporte_ganancias, name='reporte_ganancias'),
+    path('reportes/transacciones/exportar/excel/', views_reportes.exportar_transacciones_excel, name='exportar_transacciones_excel'),
+    path('reportes/transacciones/exportar/pdf/', views_reportes.exportar_transacciones_pdf, name='exportar_transacciones_pdf'),
+    path('reportes/ganancias/exportar/excel/', views_reportes.exportar_ganancias_excel, name='exportar_ganancias_excel'),
+    path('reportes/ganancias/exportar/pdf/', views_reportes.exportar_ganancias_pdf, name='exportar_ganancias_pdf'),
 ]

@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% load static %}
+{% load moneda_extras %}
 
-{% block title %}Mis transacciones - Global Exchange{% endblock %}
+{% block title %}Reporte de Transacciones - Global Exchange{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
@@ -13,7 +14,7 @@
                 </a>
             </li>
             <li class="breadcrumb-item active" aria-current="page">
-                <i class="fas fa-exchange-alt me-1"></i>Mis transacciones
+                <i class="fas fa-file-alt me-1"></i>Reporte de Transacciones
             </li>
         </ol>
     </nav>
@@ -26,9 +27,19 @@
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h2">
-            <i class="fas fa-exchange-alt text-primary me-2"></i>
-            Mis transacciones
+            <i class="fas fa-file-alt text-primary me-2"></i>
+            Reporte de Transacciones
         </h1>
+        <div>
+            <a href="{% url 'transacciones:exportar_transacciones_excel' %}?{{ request.GET.urlencode }}" 
+               class="btn btn-success">
+                <i class="fas fa-file-excel me-2"></i>Exportar Excel
+            </a>
+            <a href="{% url 'transacciones:exportar_transacciones_pdf' %}?{{ request.GET.urlencode }}" 
+               class="btn btn-danger ms-2">
+                <i class="fas fa-file-pdf me-2"></i>Exportar PDF
+            </a>
+        </div>
     </div>
 
     <!-- Estadísticas rápidas -->
@@ -39,7 +50,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h5 class="card-title">Total</h5>
-                            <h2>{{ estadisticas.total_transacciones }}</h2>
+                            <h2>{{ estadisticas.total }}</h2>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-list fa-2x opacity-75"></i>
@@ -84,7 +95,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h5 class="card-title">Canceladas</h5>
-                            <h2>{{ estadisticas.canceladas|add:estadisticas.anuladas }}</h2>
+                            <h2>{{ estadisticas.canceladas }}</h2>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-times-circle fa-2x opacity-75"></i>
@@ -96,18 +107,14 @@
     </div>
 
     <!-- Gráfico opcional -->
-    {% if estadisticas.total_transacciones > 0 %}
+    {% if estadisticas.total > 0 %}
     <div class="row mb-4">
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0">
                         <i class="fas fa-chart-line me-2"></i>
-                        {% if filtros.fecha_desde or filtros.fecha_hasta %}
-                            Transacciones en el período seleccionado
-                        {% else %}
-                            Transacciones de los últimos 30 días
-                        {% endif %}
+                        Transacciones en el período seleccionado
                     </h5>
                 </div>
                 <div class="card-body">
@@ -133,51 +140,38 @@
         <div class="card-body">
             <form method="get" class="row g-3">
                 <div class="col-md-3">
-                    <label for="fecha_desde" class="form-label">Fecha Desde</label>
-                    <input type="date" id="fecha_desde" name="fecha_desde" class="form-control" value="{{ filtros.fecha_desde }}" />
+                    <label for="id_fecha_desde" class="form-label">Fecha Desde</label>
+                    {{ form.fecha_desde }}
                 </div>
                 <div class="col-md-3">
-                    <label for="fecha_hasta" class="form-label">Fecha Hasta</label>
-                    <input type="date" id="fecha_hasta" name="fecha_hasta" class="form-control" value="{{ filtros.fecha_hasta }}" />
+                    <label for="id_fecha_hasta" class="form-label">Fecha Hasta</label>
+                    {{ form.fecha_hasta }}
                 </div>
-                <div class="col-md-2">
-                    <label for="tipo" class="form-label">Tipo</label>
-                    <select id="tipo" name="tipo" class="form-select">
-                        <option value="">Todos</option>
-                        {% for tipo in tipos_operacion %}
-                        <option value="{{ tipo.pk }}" {% if filtros.tipo == tipo.pk|stringformat:"s" %}selected{% endif %}>
-                            {{ tipo.nombre }}
-                        </option>
-                        {% endfor %}
-                    </select>
+                <div class="col-md-3">
+                    <label for="id_tipo_operacion" class="form-label">Tipo</label>
+                    {{ form.tipo_operacion }}
                 </div>
-                <div class="col-md-2">
-                    <label for="estado" class="form-label">Estado</label>
-                    <select id="estado" name="estado" class="form-select">
-                        <option value="">Todos</option>
-                        {% for estado in estados_transaccion %}
-                        <option value="{{ estado.pk }}" {% if filtros.estado == estado.pk|stringformat:"s" %}selected{% endif %}>
-                            {{ estado.nombre }}
-                        </option>
-                        {% endfor %}
-                    </select>
+                <div class="col-md-3">
+                    <label for="id_estado" class="form-label">Estado</label>
+                    {{ form.estado }}
                 </div>
-                <div class="col-md-2">
-                    <label for="cliente" class="form-label">Cliente</label>
-                    <select id="cliente" name="cliente" class="form-select">
-                        <option value="">Todos</option>
-                        {% for cliente in clientes %}
-                        <option value="{{ cliente.pk }}" {% if filtros.cliente == cliente.pk|stringformat:"s" %}selected{% endif %}>
-                            {{ cliente.nombre_comercial }}
-                        </option>
-                        {% endfor %}
-                    </select>
+                <div class="col-md-3">
+                    <label for="id_moneda" class="form-label">Moneda</label>
+                    {{ form.moneda }}
                 </div>
-                <div class="col-12 d-flex justify-content-end">
+                <div class="col-md-3">
+                    <label for="id_cliente" class="form-label">Cliente</label>
+                    {{ form.cliente }}
+                </div>
+                <div class="col-md-3">
+                    <label for="id_usuario" class="form-label">Usuario</label>
+                    {{ form.usuario }}
+                </div>
+                <div class="col-md-12 d-flex justify-content-end align-items-end mt-3">
                     <button type="submit" class="btn btn-primary me-2">
                         <i class="fas fa-search me-1"></i>Filtrar
                     </button>
-                    <a href="{% url 'transacciones:mis_transacciones' %}" class="btn btn-outline-secondary">
+                    <a href="{% url 'transacciones:reporte_transacciones' %}" class="btn btn-outline-secondary">
                         <i class="fas fa-times me-1"></i>Limpiar
                     </a>
                 </div>
@@ -195,6 +189,7 @@
                         <tr>
                             <th>ID Transacción</th>
                             <th>Fecha</th>
+                            <th>Usuario</th>
                             <th>Cliente</th>
                             <th>Tipo</th>
                             <th>Estado</th>
@@ -203,7 +198,9 @@
                             <th>Moneda Destino</th>
                             <th>Monto Destino</th>
                             <th class="text-center">Retiro</th>
-                            <th class="text-center">Acciones</th>
+                            <th class="text-end">Comisión</th>
+                            <th class="text-end">Descuento</th>
+                            <th class="text-end">Ganancia (PYG)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -212,6 +209,13 @@
                             <td><strong>{{ transaccion.id_transaccion }}</strong></td>
                             <td><small class="text-muted">{{ transaccion.fecha_creacion|date:"d/m/Y H:i" }}</small></td>
                             <td>
+                                {% if transaccion.usuario %}
+                                    {{ transaccion.usuario.nombre }} {{ transaccion.usuario.apellido|default:"" }}
+                                {% else %}
+                                    <em class="text-muted">-</em>
+                                {% endif %}
+                            </td>
+                            <td>
                                 {% if transaccion.cliente %}
                                     {{ transaccion.cliente.nombre_comercial }}
                                 {% else %}
@@ -219,7 +223,7 @@
                                 {% endif %}
                             </td>
                             <td>
-                               <span class="badge bg-info">{{ transaccion.tipo_operacion.nombre }}</span>
+                                <span class="badge bg-info">{{ transaccion.tipo_operacion_display }}</span>
                             </td>
                             <td>
                                 {% if transaccion.estado.codigo == 'PAGADA' %}
@@ -244,19 +248,11 @@
                             </td>
                             <td>{{ transaccion.moneda_origen.codigo }}</td>
                             <td class="text-end">
-                                {% if transaccion.moneda_origen.codigo == 'PYG' %}
-                                    ₲ {{ transaccion.monto_origen|floatformat:0|floatformat:"g" }}
-                                {% else %}
-                                    {{ transaccion.moneda_origen.simbolo }} {{ transaccion.monto_origen|floatformat:2 }}
-                                {% endif %}
+                                {{ transaccion.monto_origen|moneda_format:transaccion.moneda_origen.codigo }}
                             </td>
                             <td>{{ transaccion.moneda_destino.codigo }}</td>
                             <td class="text-end">
-                                {% if transaccion.moneda_destino.codigo == 'PYG' %}
-                                    ₲ {{ transaccion.monto_destino|floatformat:0|floatformat:"g" }}
-                                {% else %}
-                                    {{ transaccion.moneda_destino.simbolo }} {{ transaccion.monto_destino|floatformat:2 }}
-                                {% endif %}
+                                {{ transaccion.monto_destino|moneda_format:transaccion.moneda_destino.codigo }}
                             </td>
                             <td class="text-center">
                                 {% if transaccion.requiere_retiro_fisico %}
@@ -277,13 +273,14 @@
                                     </span>
                                 {% endif %}
                             </td>
-                            <td class="text-center">
-                                <div class="btn-group" role="group">
-                                    <a href="{% url 'transacciones:resumen_transaccion' transaccion.id_transaccion %}"
-                                       class="btn btn-sm btn-outline-primary" title="Ver resumen">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                </div>
+                            <td class="text-end">
+                                {{ transaccion.comision_pyg|moneda_format:"PYG" }}
+                            </td>
+                            <td class="text-end">
+                                {{ transaccion.descuento_pyg|moneda_format:"PYG" }}
+                            </td>
+                            <td class="text-end">
+                                <strong class="text-success">{{ transaccion.ganancia_pyg|moneda_format:"PYG" }}</strong>
                             </td>
                         </tr>
                         {% endfor %}
@@ -294,13 +291,13 @@
             <nav aria-label="Navegación de páginas" class="mt-3">
                 <ul class="pagination justify-content-center">
                     {% if page_obj.has_previous %}
-                    <li class="page-item"><a class="page-link" href="?page=1{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.cliente %}&cliente={{ request.GET.cliente }}{% endif %}"><i class="fas fa-angle-double-left"></i></a></li>
-                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.cliente %}&cliente={{ request.GET.cliente }}{% endif %}"><i class="fas fa-angle-left"></i></a></li>
+                    <li class="page-item"><a class="page-link" href="?page=1{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.tipo_operacion %}&tipo_operacion={{ request.GET.tipo_operacion }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.moneda %}&moneda={{ request.GET.moneda }}{% endif %}{% if request.GET.cliente %}&cliente={{ request.GET.cliente }}{% endif %}{% if request.GET.usuario %}&usuario={{ request.GET.usuario }}{% endif %}"><i class="fas fa-angle-double-left"></i></a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.tipo_operacion %}&tipo_operacion={{ request.GET.tipo_operacion }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.moneda %}&moneda={{ request.GET.moneda }}{% endif %}{% if request.GET.cliente %}&cliente={{ request.GET.cliente }}{% endif %}{% if request.GET.usuario %}&usuario={{ request.GET.usuario }}{% endif %}"><i class="fas fa-angle-left"></i></a></li>
                     {% endif %}
                     <li class="page-item active"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
                     {% if page_obj.has_next %}
-                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.cliente %}&cliente={{ request.GET.cliente }}{% endif %}"><i class="fas fa-angle-right"></i></a></li>
-                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.cliente %}&cliente={{ request.GET.cliente }}{% endif %}"><i class="fas fa-angle-double-right"></i></a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.tipo_operacion %}&tipo_operacion={{ request.GET.tipo_operacion }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.moneda %}&moneda={{ request.GET.moneda }}{% endif %}{% if request.GET.cliente %}&cliente={{ request.GET.cliente }}{% endif %}{% if request.GET.usuario %}&usuario={{ request.GET.usuario }}{% endif %}"><i class="fas fa-angle-right"></i></a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.tipo_operacion %}&tipo_operacion={{ request.GET.tipo_operacion }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.moneda %}&moneda={{ request.GET.moneda }}{% endif %}{% if request.GET.cliente %}&cliente={{ request.GET.cliente }}{% endif %}{% if request.GET.usuario %}&usuario={{ request.GET.usuario }}{% endif %}"><i class="fas fa-angle-double-right"></i></a></li>
                     {% endif %}
                 </ul>
             </nav>
@@ -315,7 +312,7 @@
     {% endif %}
 </div>
 
-{% if estadisticas.total_transacciones > 0 %}
+{% if estadisticas.total > 0 %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -425,8 +422,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Gráfico de dona - Tipos de operación
     const ctxTipos = document.getElementById('tiposChart');
     if (ctxTipos) {
-        const compras = {{ estadisticas_tipo.compras }};
-        const ventas = {{ estadisticas_tipo.ventas }};
+        const compras = {{ estadisticas.compras|default:0 }};
+        const ventas = {{ estadisticas.ventas|default:0 }};
 
         new Chart(ctxTipos, {
             type: 'doughnut',
