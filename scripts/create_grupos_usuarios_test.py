@@ -54,7 +54,8 @@ def crear_grupos_ejemplo():
         {
             'nombre': 'Analista',
             'descripcion': 'Acceso completo a monedas, tasas, transacciones, métodos de pago/cobro, clientes y configuraciones del sistema',
-            'apps_completas': ['tasa_cambio', 'configuracion']
+            'apps_completas': ['tasa_cambio', 'configuracion'],
+            'permisos_especiales': ['view_reporte_ganancias', 'view_reporte_transacciones']  # Permisos para reportes
         },
         {
             'nombre': 'Operador',
