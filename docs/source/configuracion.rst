@@ -8,8 +8,8 @@ Descripción General
 
 Este módulo implementa un patrón Singleton para mantener una única instancia de configuración del sistema. Permite a los administradores configurar límites operacionales que afectan el comportamiento de todas las transacciones.
 
-Modelo Principal
-----------------
+Modelos Principales
+-------------------
 
 ConfiguracionSistema
 ~~~~~~~~~~~~~~~~~~~~
@@ -57,6 +57,116 @@ Método de clase que obtiene la configuración del sistema, creando una instanci
 
 - Si no existe configuración, crea una con valores por defecto (0, 0)
 - Siempre retorna la misma instancia (patrón Singleton)
+
+ContadorDocumentoFactura
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Modelo Singleton que gestiona el contador auto-incremental para números de documentos de facturas electrónicas.
+
+**Campos principales:**
+
+- ``numero_actual``: Número actual del documento (default: 501)
+- ``numero_minimo``: Número mínimo permitido del rango (default: 501)
+- ``numero_maximo``: Número máximo permitido del rango (default: 550)
+- ``formato_longitud``: Cantidad de dígitos para formatear (default: 7)
+- ``fecha_creacion``: Fecha de creación del registro
+- ``fecha_actualizacion``: Fecha de última actualización
+
+**Validaciones:**
+
+- ``numero_actual`` debe estar entre ``numero_minimo`` y ``numero_maximo``
+- ``numero_minimo`` no puede ser mayor que ``numero_maximo``
+- Solo puede existir una instancia del contador (Singleton)
+
+**Configuración del modelo:**
+
+- ``verbose_name``: "Contador de Documentos de Factura"
+- ``verbose_name_plural``: "Contadores de Documentos de Factura"
+- ``db_table``: 'contador_documento_factura'
+
+**Métodos principales:**
+
+get_numero_formateado()
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Retorna el número actual formateado con ceros a la izquierda.
+
+.. code-block:: python
+
+   contador = ContadorDocumentoFactura.get_contador()
+   numero_fmt = contador.get_numero_formateado()
+   # Resultado: "0000501" (si numero_actual=501 y formato_longitud=7)
+
+obtener_siguiente_numero()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Método de clase thread-safe que obtiene el siguiente número de documento.
+
+**Características:**
+
+- Usa ``select_for_update()`` para bloqueo a nivel de base de datos
+- Garantiza thread-safety en entornos concurrentes
+- Incrementa automáticamente el contador
+- Valida que no se exceda el máximo del rango
+- Retorna el número formateado
+
+**Uso:**
+
+.. code-block:: python
+
+   from configuracion.models import ContadorDocumentoFactura
+   
+   try:
+       numero_doc = ContadorDocumentoFactura.obtener_siguiente_numero()
+       print(f"Número de documento: {numero_doc}")
+       # Resultado: "0000501"
+   except ValidationError as e:
+       print(f"Error: {e}")
+       # Error si se alcanzó el límite máximo
+
+**Excepciones:**
+
+- ``ValidationError``: Si se alcanzó el límite máximo del rango
+
+get_contador()
+^^^^^^^^^^^^^^
+
+Método de clase que obtiene el contador actual, creando uno por defecto si no existe.
+
+.. code-block:: python
+
+   contador = ContadorDocumentoFactura.get_contador()
+   print(f"Rango: {contador.numero_minimo}-{contador.numero_maximo}")
+   print(f"Actual: {contador.numero_actual}")
+
+**Retorna:**
+
+- Instancia de ``ContadorDocumentoFactura``
+
+**Ejemplo de uso en facturación:**
+
+.. code-block:: python
+
+   from configuracion.models import ContadorDocumentoFactura
+   from django.core.exceptions import ValidationError
+   
+   def generar_factura(transaccion, cliente):
+       try:
+           # Obtener siguiente número de documento
+           numero_doc = ContadorDocumentoFactura.obtener_siguiente_numero()
+           
+           # Usar número en factura
+           factura = {
+               'numero_documento': numero_doc,
+               'transaccion': transaccion,
+               'cliente': cliente,
+               # ... otros campos
+           }
+           
+           return factura
+       except ValidationError:
+           # Límite alcanzado - notificar administrador
+           raise Exception("Rango de numeración agotado. Contacte al administrador.")
 
 Métodos de Instancia
 --------------------

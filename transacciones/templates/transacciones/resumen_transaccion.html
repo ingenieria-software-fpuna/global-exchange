@@ -82,12 +82,14 @@
         <div class="card-body">
           <div class="row">
             <div class="col-md-6">
-              <p><strong>Tipo:</strong> {{ transaccion.tipo_operacion.nombre }}</p>
-              <p><strong>Moneda:</strong> 
+                <p><strong>Tipo:</strong> {{ transaccion.tipo_operacion.nombre }}</p>
+                <p><strong>Moneda:</strong> 
                 {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
-                  {{ transaccion.moneda_origen.nombre }} ({{ transaccion.moneda_origen.codigo }})
+                   {{ transaccion.moneda_origen.nombre }} ({{ transaccion.moneda_origen.codigo }})
                 {% else %}
+                
                   {{ transaccion.moneda_destino.nombre }} ({{ transaccion.moneda_destino.codigo }})
+               
                 {% endif %}
               </p>
               <p><strong>Fecha:</strong> {{ transaccion.fecha_creacion|date:"d/m/Y H:i" }}</p>
@@ -130,15 +132,15 @@
           <div class="row">
             <!-- Información principal adaptada según tipo de operación -->
             <div class="col-12">
-              {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
-              <div class="alert alert-primary alert-sm mb-3">
-                <i class="fas fa-hand-holding-usd me-1"></i>
-                <strong>Cliente vende:</strong> {{ resumen_detallado.total_cliente_formateado }}
-              </div>
-              {% else %}
+              {% if transaccion.tipo_operacion.codigo == 'COMPRA' %}
               <div class="alert alert-primary alert-sm mb-3">
                 <i class="fas fa-info-circle me-1"></i>
                 <strong>Cliente debe pagar:</strong> {{ resumen_detallado.total_cliente_formateado }}
+              </div>
+              {% else %}
+              <div class="alert alert-primary alert-sm mb-3">
+                <i class="fas fa-hand-holding-usd me-1"></i>
+                <strong>Cliente vende:</strong> {{ resumen_detallado.total_cliente_formateado }}
               </div>
               {% endif %}
             </div>
@@ -147,57 +149,57 @@
             <div class="col-md-6">
               <div class="mb-2">
                 <label class="text-muted small">Monto base:</label>
-                <div class="fw-bold">{{ resumen_detallado.subtotal_formateado }}</div>
+                 <div class="fw-bold">{{ resumen_detallado.subtotal_formateado }}</div>
               </div>
               
               <div class="mb-2">
-                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
-                <label class="text-muted small">Tasa de compra base:</label>
-                {% else %}
+                {% if transaccion.tipo_operacion.codigo == 'COMPRA' %}
                 <label class="text-muted small">Tasa base ({{ resumen_detallado.tasa_cambio_tipo }}):</label>
+                {% else %}
+                   <label class="text-muted small">Tasa de compra base:</label>
                 {% endif %}
-                <div class="fw-bold">₲ {{ resumen_detallado.tasa_base|floatformat:4 }}</div>
+                <div class="fw-bold">{{ resumen_detallado.tasa_base|moneda_format:'PYG' }}</div>
               </div>
               
               {% if resumen_detallado.cliente and resumen_detallado.cliente.descuento > 0 %}
               <div class="mb-2">
-                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
-                <label class="text-muted small">Tasa ajustada (con descuento):</label>
+                {% if transaccion.tipo_operacion.codigo == 'COMPRA' %}
+                <label class="text-muted small">Tasa de compra ajustada (con descuento):</label>
                 {% else %}
-                <label class="text-muted small">Tasa ajustada (con descuento):</label>
+                <label class="text-muted small">Tasa de venta ajustada (con descuento):</label>
                 {% endif %}
-                <div class="fw-bold text-success">₲ {{ resumen_detallado.tasa_ajustada|floatformat:4 }}</div>
+                <div class="fw-bold text-success">{{ resumen_detallado.tasa_ajustada|moneda_format:'PYG' }}</div>
               </div>
               {% else %}
               <div class="mb-2">
-                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
+                {% if transaccion.tipo_operacion.codigo == 'COMPRA' %}
                 <label class="text-muted small">Tasa de compra aplicada:</label>
                 {% else %}
-                <label class="text-muted small">Tasa utilizada ({{ resumen_detallado.tasa_cambio_tipo }}):</label>
+                <label class="text-muted small">Tasa de venta aplicada:</label>
                 {% endif %}
-                <div class="fw-bold">₲ {{ resumen_detallado.tasa_cambio|floatformat:4 }}</div>
+                <div class="fw-bold">{{ resumen_detallado.tasa_cambio|moneda_format:'PYG' }}</div>
               </div>
               {% endif %}
               
               {% if resumen_detallado.comision_cobro > 0 %}
               <div class="mb-2">
-                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
-                <label class="text-muted small">Comisión por recibir {{ transaccion.moneda_origen.codigo }}:</label>
+                {% if transaccion.tipo_operacion.codigo == 'COMPRA' %}
+                <label class="text-muted small">Comisión cobro ({{ transaccion.metodo_cobro.nombre }}):</label>
                 {% else %}
-                <label class="text-muted small">Comisión cobro:</label>
+                <label class="text-muted small">Comisión por recibir {{ transaccion.moneda_origen.codigo }}:</label>
                 {% endif %}
-                <div class="text-danger">+ {{ resumen_detallado.comision_cobro_formateado }} ({{ resumen_detallado.metodo_cobro.comision }}%)</div>
+                <div class="text-danger">+ {{ resumen_detallado.comision_cobro|moneda_format:'PYG' }} ({{ resumen_detallado.metodo_cobro.comision }}%)</div>
               </div>
               {% endif %}
               
               {% if resumen_detallado.comision_pago > 0 %}
               <div class="mb-2">
-                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
-                <label class="text-muted small">Comisión por entregar PYG:</label>
+                {% if transaccion.tipo_operacion.codigo == 'COMPRA' %}
+                <label class="text-muted small">Comisión entrega ({{ transaccion.metodo_pago.nombre }}):</label>
                 {% else %}
-                <label class="text-muted small">Comisión entrega:</label>
+                <label class="text-muted small">Comisión pago ({{ transaccion.metodo_pago.nombre }}):</label>
                 {% endif %}
-                <div class="text-danger">- {{ resumen_detallado.comision_pago_formateado }} ({{ resumen_detallado.metodo_pago.comision }}%)</div>
+                <div class="text-danger">- {{ resumen_detallado.comision_pago|moneda_format:'PYG' }} ({{ resumen_detallado.metodo_pago.comision }}%)</div>
               </div>
               {% endif %}
               
@@ -206,13 +208,8 @@
             <!-- Columna derecha: Lo que recibe (destacado) -->
             <div class="col-md-6">
               <div class="alert alert-success alert-sm mb-3">
-                {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
                 <i class="fas fa-money-bill-wave me-1"></i>
-                <strong>Cliente recibirá:</strong> {{ resumen_detallado.monto_recibe_formateado }}
-                {% else %}
-                <i class="fas fa-money-bill-wave me-1"></i>
-                <strong>Cliente recibirá:</strong> {{ resumen_detallado.monto_recibe_formateado }}
-                {% endif %}
+                <strong>Cliente recibirá:</strong> {{ resumen_detallado.monto_recibe|moneda_format:transaccion.moneda_destino.codigo }}
               </div>
               
               {% if resumen_detallado.cliente %}
@@ -283,7 +280,7 @@
               {% if transaccion.estado.codigo == 'PAGADA' %}
                 <i class="fas fa-check-circle text-success fs-3"></i>
                 <p class="mt-2">
-                  {% if transaccion.tipo_operacion.codigo == 'COMPRA' %}
+                  {% if transaccion.tipo_operacion.codigo == 'VENTA' %}
                     Esta transacción ha sido pagada. Puede retirar sus divisas en el Tauser.
                   {% else %}
                     Esta transacción ha sido pagada. {% if transaccion.metodo_cobro.requiere_retiro_fisico %}Puede retirar sus guaraníes en el Tauser.{% else %}El pago fue procesado.{% endif %}
@@ -700,15 +697,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function mostrarModalCambioCotizacion(data) {
-        // Rellenar los datos del modal
+        // Los valores ya vienen formateados desde el backend usando la misma lógica que moneda_format
         document.getElementById('modal-moneda').textContent = data.moneda_nombre;
-        document.getElementById('modal-tasa-original').textContent = data.tasa_original + ' Gs.';
-        document.getElementById('modal-monto-origen-original').textContent = data.monto_origen_original + ' Gs.';
-        document.getElementById('modal-monto-destino-original').textContent = data.monto_destino_original + ' ' + data.moneda_simbolo;
+        document.getElementById('modal-tasa-original').textContent = data.tasa_original;
+        document.getElementById('modal-monto-origen-original').textContent = data.monto_origen_original;
+        document.getElementById('modal-monto-destino-original').textContent = data.monto_destino_original;
         
-        document.getElementById('modal-tasa-nueva').textContent = data.tasa_nueva + ' Gs.';
-        document.getElementById('modal-monto-origen-nuevo').textContent = data.monto_origen_nuevo + ' Gs.';
-        document.getElementById('modal-monto-destino-nuevo').textContent = data.monto_destino_nuevo + ' ' + data.moneda_simbolo;
+        document.getElementById('modal-tasa-nueva').textContent = data.tasa_nueva;
+        document.getElementById('modal-monto-origen-nuevo').textContent = data.monto_origen_nuevo;
+        document.getElementById('modal-monto-destino-nuevo').textContent = data.monto_destino_nuevo;
         
         // Guardar datos para crear nueva transacción
         btnContinuarNuevaCotizacion.setAttribute('data-transaccion-datos', JSON.stringify(data.nueva_transaccion_datos));

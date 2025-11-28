@@ -103,9 +103,12 @@ class TasaCambioHistorialView(LoginRequiredMixin, PermissionRequiredMixin, ListV
         context['estado'] = self.request.GET.get('estado', '')
         context['fecha_desde'] = self.request.GET.get('fecha_desde', '')
         context['fecha_hasta'] = self.request.GET.get('fecha_hasta', '')
-        
+
         # Permiso para ver columnas sensibles
         context['can_view_sensitive_columns'] = self.request.user.has_perm('tasa_cambio.can_view_sensitive_columns')
+
+        # Lista de todas las monedas activas para el selector
+        context['monedas'] = Moneda.objects.filter(es_activa=True).order_by('nombre')
 
         # Datos para gráficos
         historial_datos = list(self.get_queryset()[:50].values(

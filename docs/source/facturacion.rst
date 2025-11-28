@@ -44,27 +44,215 @@ Módulo principal para generación de facturas electrónicas.
 factura_utils
 ~~~~~~~~~~~~~
 
-Utilidades para manejo de facturas.
+Módulo de utilidades para consultar el estado de facturas electrónicas y obtener archivos generados.
 
-**Funciones:**
+**Funciones principales:**
 
-- Formateo de montos según requerimientos SIFEN
-- Validación de RUC y datos fiscales
-- Cálculo de totales e impuestos
-- Generación de representación gráfica (PDF)
+get_sql_proxy_connection()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Crea una conexión a la base de datos de SQL-Proxy.
+
+- Lee credenciales desde variables de entorno
+- Retorna conexión psycopg
+- Lanza excepción si la conexión falla
+
+get_de_status(de_id)
+^^^^^^^^^^^^^^^^^^^^
+
+Obtiene el estado de un Documento Electrónico desde SQL-Proxy.
+
+**Parámetros:**
+
+- ``de_id``: ID del DE en la base de datos de SQL-Proxy
+
+**Retorna:**
+
+Dict con información del DE o None si no se encuentra:
+
+.. code-block:: python
+
+    {
+        'id': int,
+        'dnumdoc': str,          # Número de documento
+        'dest': str,             # Establecimiento
+        'dpunexp': str,          # Punto de expedición
+        'estado': str,           # Estado interno
+        'cdc': str,              # Código de Control
+        'dfeemide': str,         # Fecha de emisión
+        'estado_sifen': str,     # Estado en SIFEN
+        'error_sifen': str,      # Error si falló
+        'error_inu': str         # Error de inutilización
+    }
+
+**Uso:**
+
+.. code-block:: python
+
+    from facturacion_service.factura_utils import get_de_status
+    
+    de_info = get_de_status(123)
+    if de_info:
+        print(f"CDC: {de_info['cdc']}")
+        print(f"Estado SIFEN: {de_info['estado_sifen']}")
+
+find_de_files(de_info)
+^^^^^^^^^^^^^^^^^^^^^^
+
+Busca los archivos PDF y XML generados para un DE.
+
+**Parámetros:**
+
+- ``de_info``: Dict con información del DE (retornado por get_de_status)
+
+**Retorna:**
+
+Dict con rutas a los archivos:
+
+.. code-block:: python
+
+    {
+        'pdf': '/path/to/factura.pdf' o None,
+        'xml': '/path/to/factura.xml' o None
+    }
+
+**Directorio de búsqueda:**
+
+- Lee ``INVOICE_FILES_DIR`` de variables de entorno
+- Default: ``/app/invoices``
+- Busca archivos por patrón del CDC
+
+**Ejemplo:**
+
+.. code-block:: python
+
+    from facturacion_service.factura_utils import get_de_status, find_de_files
+    
+    de_info = get_de_status(123)
+    if de_info:
+        archivos = find_de_files(de_info)
+        if archivos['pdf']:
+            print(f"PDF disponible en: {archivos['pdf']}")
+        if archivos['xml']:
+            print(f"XML disponible en: {archivos['xml']}")
 
 inutilizar
 ~~~~~~~~~~
 
-Gestión de inutilización de rangos de numeración de facturas.
+Script y módulo para inutilización de rangos de numeración de documentos electrónicos.
 
-**Uso:**
+**Descripción:**
 
-Cuando se pierden o dañan documentos físicos pre-impresos, este módulo permite:
+Cuando se pierden, dañan o no se utilizan documentos de un rango pre-asignado, la normativa SIFEN requiere inutilizarlos formalmente. Este módulo permite:
 
-- Registrar rangos de documentos inutilizados
-- Notificar a SIFEN según normativa
+- Registrar documentos con estado 'Inutilizar' en la base de datos
+- Notificar a SIFEN según normativa paraguaya
 - Mantener trazabilidad de numeración
+- Evitar huecos en la secuencia de facturas
+
+**Funciones principales:**
+
+get_default_range()
+^^^^^^^^^^^^^^^^^^^
+
+Obtiene el rango por defecto desde variables de entorno.
+
+**Variables de entorno:**
+
+- ``INUTILIZAR_START``: Número inicial del rango (default: 1)
+- ``INUTILIZAR_END``: Número final del rango (default: 100)
+
+**Retorna:**
+
+- Tupla ``(start, end)`` con los números del rango
+
+insert_de_inutilizar(connection, dNumDoc)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Inserta un documento electrónico con estado 'Inutilizar'.
+
+**Parámetros:**
+
+- ``connection``: Conexión a la base de datos SQL-Proxy
+- ``dNumDoc``: Número de documento (será formateado a 7 dígitos)
+
+**Retorna:**
+
+- ``True`` si fue exitoso
+- ``False`` si falló
+
+**Proceso:**
+
+1. Formatea el número a 7 dígitos con ceros a la izquierda
+2. Inserta registro en tabla ``de`` con estado 'Inutilizar'
+3. El sistema SQL-Proxy procesa la inutilización en SIFEN
+4. Registra timestamp de inserción
+
+inutilizar_range(start, end)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Inutiliza un rango completo de documentos.
+
+**Parámetros:**
+
+- ``start``: Número inicial del rango
+- ``end``: Número final del rango
+
+**Proceso:**
+
+.. code-block:: python
+
+    def inutilizar_range(start, end):
+        connection = get_sql_proxy_connection()
+        exitosos = 0
+        fallidos = 0
+        
+        for num in range(start, end + 1):
+            if insert_de_inutilizar(connection, num):
+                exitosos += 1
+            else:
+                fallidos += 1
+        
+        connection.close()
+        return exitosos, fallidos
+
+**Uso desde línea de comandos:**
+
+.. code-block:: bash
+
+    # Inutilizar rango por defecto (desde variables de entorno)
+    python facturacion_service/inutilizar.py
+    
+    # Inutilizar números específicos
+    python facturacion_service/inutilizar.py 1 2 3 5 10
+    
+    # Inutilizar rango específico
+    python facturacion_service/inutilizar.py --start 100 --end 200
+
+**Uso programático:**
+
+.. code-block:: python
+
+    from facturacion_service.inutilizar import inutilizar_range
+    
+    # Inutilizar documentos 501-520
+    exitosos, fallidos = inutilizar_range(501, 520)
+    print(f"Inutilizados: {exitosos}, Fallidos: {fallidos}")
+
+**Casos de uso comunes:**
+
+1. **Cambio de numeración:** Al cambiar de rango pre-asignado
+2. **Documentos dañados:** Hojas de talonarios físicos dañadas
+3. **Error en configuración:** Números asignados incorrectamente
+4. **Migración de sistema:** Rangos no utilizados del sistema anterior
+
+**Consideraciones importantes:**
+
+- Solo se pueden inutilizar documentos que no han sido emitidos
+- La inutilización es irreversible
+- SIFEN registra la inutilización permanentemente
+- Mantener log de todas las inutilizaciones
+- Documentar el motivo de cada inutilización
 
 Configuración
 -------------

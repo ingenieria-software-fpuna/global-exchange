@@ -579,7 +579,7 @@ def validar_transaccion_retiro(request):
         
         # Enviar email con código de verificación
         exito, mensaje = EmailServiceRetiro.enviar_codigo_verificacion_retiro(
-            transaccion, codigo_verificacion, request
+            transaccion, codigo_verificacion, request, tauser=tauser
         )
         
         if not exito:

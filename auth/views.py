@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, get_user_model
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.conf import settings
@@ -132,6 +133,7 @@ def verify_code_view(request):
 
     return render(request, 'auth/verify_code.html', {'form': form}) 
     
+@login_required
 def dashboard_view(request):
     """Renderiza la página del dashboard."""
     return render(request, 'auth/dashboard.html')

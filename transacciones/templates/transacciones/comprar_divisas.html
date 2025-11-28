@@ -373,12 +373,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 3. Total = subtotal + comisiones
                 const totalAPagar = subtotal + comisionTotal;
                 
-                const selectedOption = monedaDestino.options[monedaDestino.selectedIndex];
-                const simbolo = selectedOption.getAttribute('data-simbolo') || '$';
+                // Formatear montos usando códigos de moneda
+                const formatearPYG = (valor) => `PYG ${Math.round(valor).toLocaleString('es-PY')}`;
+                const formatearDivisa = (valor) => `${monedaComprar} ${valor.toLocaleString('es-PY', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
                 
-                // Formatear montos
-                const formatearPYG = (valor) => `₲ ${Math.round(valor).toLocaleString('es-PY')}`;
-                const formatearDivisa = (valor) => `${simbolo}${valor.toLocaleString('es-PY', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                // Obtener texto de la moneda seleccionada
+                const monedaTexto = monedaDestino.options[monedaDestino.selectedIndex].text;
                 
                 // Diseño limpio y profesional con fórmula correcta
                 previewContent.innerHTML = `
@@ -389,7 +389,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <div class="h2 mb-0 text-success">
                                     ${formatearDivisa(cantidadDeseada)}
                                 </div>
-                                <small class="text-muted">${monedaDestino.options[monedaDestino.selectedIndex].text}</small>
+                                <small class="text-muted">${monedaTexto}</small>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -407,13 +407,13 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="col-6">
                                 <div class="d-flex justify-content-between">
                                     <span class="text-muted">Tasa base:</span>
-                                    <strong>₲ ${data.tasa_base.toLocaleString('es-PY')}</strong>
+                                    <strong>PYG ${data.tasa_base.toLocaleString('es-PY')}</strong>
                                 </div>
                             </div>
                             <div class="col-6">
                                 <div class="d-flex justify-content-between">
                                     <span class="text-success">Tasa aplicada:</span>
-                                    <strong class="text-success">₲ ${tasaAjustada.toLocaleString('es-PY')}</strong>
+                                    <strong class="text-success">PYG ${tasaAjustada.toLocaleString('es-PY')}</strong>
                                 </div>
                             </div>
                             <div class="col-12"><hr class="my-1"></div>

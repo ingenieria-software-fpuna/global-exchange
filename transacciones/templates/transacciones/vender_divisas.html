@@ -19,14 +19,59 @@
     </div>
     <div class="card-body">
       <!-- Información -->
-      <div class="alert alert-warning mb-4">
+      <div class="alert alert-info mb-3">
         <i class="fas fa-info-circle me-2"></i>
-        <strong>¿Cómo funciona?</strong> Ingrese la cantidad de divisa extranjera que desea vender y el sistema calculará cuántos Guaraníes recibirá después de aplicar comisiones y descuentos.
+        Ingrese la cantidad de divisa extranjera que desea vender y calculamos cuánto recibirá en Guaraníes.
       </div>
 
       <form id="formVenta" novalidate>
         {% csrf_token %}
         <div class="row g-3">
+          <!-- Sección Principal: ¿Qué quiero vender? -->
+          <div class="col-12">
+            <div class="card border-warning">
+              <div class="card-header bg-warning text-dark py-2">
+                <h6 class="mb-0"><i class="fas fa-hand-holding-usd me-2"></i>¿Qué divisa quiere vender?</h6>
+              </div>
+              <div class="card-body">
+                <div class="row g-3">
+                  <!-- Monto -->
+                  <div class="col-md-6">
+                    <label for="monto" class="form-label">Cantidad a Vender <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                      <span class="input-group-text" id="simbolo-moneda">$</span>
+                      <input id="monto" name="monto" type="number" class="form-control" 
+                             placeholder="Ej: 100" step="0.01" min="0.01" required
+                             {% if cantidad_preseleccionada %}value="{{ cantidad_preseleccionada }}"{% endif %}>
+                    </div>
+                    <div class="form-text">
+                      Ingrese cuánta divisa extranjera tiene para vender
+                    </div>
+                  </div>
+
+                  <!-- Moneda Origen -->
+                  <div class="col-md-6">
+                    <label for="moneda_origen" class="form-label">Moneda a Vender <span class="text-danger">*</span></label>
+                    <select id="moneda_origen" name="moneda_origen" class="form-select" required>
+                      {% for moneda in monedas_origen %}
+                        <option value="{{ moneda.codigo }}" 
+                                data-simbolo="{{ moneda.simbolo }}"
+                                {% if moneda_origen_preseleccionada == moneda.codigo %}selected{% endif %}>
+                          {{ moneda.nombre }} ({{ moneda.codigo }})
+                        </option>
+                      {% empty %}
+                        <option value="" disabled>No hay monedas disponibles</option>
+                      {% endfor %}
+                    </select>
+                    <div class="form-text">
+                      Seleccione la divisa extranjera
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Cliente -->
           <div class="col-md-12">
             <label for="cliente" class="form-label">Cliente <span class="text-danger">*</span></label>
@@ -36,41 +81,56 @@
                 <option value="{{ cliente.id }}" data-descuento="{{ cliente.tipo_cliente.descuento }}" 
                         {% if cliente_preseleccionado and cliente.id|stringformat:"s" == cliente_preseleccionado %}selected{% endif %}>
                   {{ cliente.nombre_comercial }}{% if cliente.tipo_cliente.activo %} — {{ cliente.tipo_cliente.nombre }} 
-                  ({{ cliente.tipo_cliente.descuento }}% descuento){% endif %}
+                  {% endif %}
                 </option>
               {% empty %}
                 <option value="" disabled>No hay clientes asociados</option>
               {% endfor %}
             </select>
             <div class="form-text">
-              Las ventas de divisas requieren cliente para aplicar descuentos y controlar límites.
+              Seleccione el cliente para aplicar beneficios
             </div>
           </div>
           <div class="col-md-6">
-            <label for="metodo_cobro" class="form-label">Método de Cobro <span class="text-danger">*</span></label>
+            <label for="metodo_cobro" class="form-label">¿Cómo entregará la divisa? <span class="text-danger">*</span></label>
             <select id="metodo_cobro" name="metodo_cobro_id" class="form-select" required>
-              <option value="">Cargando métodos de cobro...</option>
+              <option value="">Seleccione un método de entrega</option>
+              {% for metodo in metodos_cobro %}
+                <option value="{{ metodo.id }}" data-comision="{{ metodo.comision }}">
+                  {{ metodo.nombre }}{% if metodo.comision > 0 %} ({{ metodo.comision }}% comisión){% endif %}
+                </option>
+              {% empty %}
+                <option value="" disabled>No hay métodos de cobro activos</option>
+              {% endfor %}
             </select>
-            <div class="form-text">Seleccione cómo recibiremos la divisa extranjera.</div>
+            <div class="form-text">Seleccione cómo nos entregará la divisa extranjera</div>
           </div>
 
           <!-- Método de Entrega/Pago -->
           <div class="col-md-6">
-            <label for="metodo_pago" class="form-label">Método de Pago <span class="text-danger">*</span></label>
+            <label for="metodo_pago" class="form-label">¿Cómo recibirá los Guaraníes? <span class="text-danger">*</span></label>
             <select id="metodo_pago" name="metodo_pago_id" class="form-select" required>
               <option value="">Seleccione cómo pagará los Guaraníes</option>
               {% for metodo in metodos_pago %}
                 {% if "efectivo" not in metodo.nombre|lower %}
                 <option value="{{ metodo.id }}" data-comision="{{ metodo.comision }}">
                   {{ metodo.nombre }} 
-                  {% if metodo.comision > 0 %}({{ metodo.comision }}% comisión){% else %}(sin comisión){% endif %}
+                 
                 </option>
                 {% endif %}
               {% empty %}
                 <option value="" disabled>No hay métodos de pago activos</option>
               {% endfor %}
             </select>
-            <div class="form-text">Seleccione cómo entregaremos los Guaraníes al cliente.</div>
+            <div class="form-text">Seleccione cómo recibirá los Guaraníes</div>
+          </div>
+
+          <!-- Botón Calcular -->
+          <div class="col-12 text-center mt-3">
+            <button type="button" id="btnCalcular" class="btn btn-outline-primary me-2">
+              <i class="fas fa-calculator me-1"></i>
+              Calcular cuánto recibiré
+            </button>
           </div>
 
           <!-- Campos del Método de Pago -->
@@ -84,46 +144,6 @@
               <div class="card-body" id="campos-container">
                 <!-- Los campos se cargarán dinámicamente aquí -->
               </div>
-            </div>
-          </div>
-
-          <!-- Monto -->
-          <div class="col-md-4">
-            <label for="monto" class="form-label">Monto a Vender <span class="text-danger">*</span></label>
-            <input id="monto" name="monto" type="number" class="form-control" 
-                   placeholder="100.00" step="any" min="0.01" required
-                   {% if cantidad_preseleccionada %}value="{{ cantidad_preseleccionada }}"{% endif %}>
-            <div class="form-text">
-              Ingrese cuánta divisa extranjera quiere vender
-            </div>
-          </div>
-
-          <!-- Moneda Origen -->
-          <div class="col-md-4">
-            <label for="moneda_origen" class="form-label">Moneda a Vender</label>
-            <select id="moneda_origen" name="moneda_origen" class="form-select" required>
-              {% for moneda in monedas_origen %}
-                <option value="{{ moneda.codigo }}" 
-                  {% if moneda_origen_preseleccionada == moneda.codigo %}selected
-                  {% elif not moneda_origen_preseleccionada and moneda.codigo == 'USD' %}selected
-                  {% endif %}>
-                  {{ moneda.nombre }} ({{ moneda.codigo }})
-                </option>
-              {% endfor %}
-            </select>
-            <div class="form-text">
-              Divisa extranjera que está vendiendo
-            </div>
-          </div>
-
-          <!-- Moneda Destino -->
-          <div class="col-md-4">
-            <label for="moneda_destino" class="form-label">Recibiendo</label>
-            <select id="moneda_destino" name="moneda_destino" class="form-select" required readonly>
-              <option value="PYG" selected>Guaraní (PYG)</option>
-            </select>
-            <div class="form-text">
-              Las ventas siempre reciben Guaraníes
             </div>
           </div>
 
@@ -146,29 +166,24 @@
           </div>
 
           <!-- Preview del Cálculo -->
-          <div class="col-md-12">
-            <div id="preview" class="card bg-light mt-3" style="display: none;">
-              <div class="card-header">
-                <h6 class="mb-0">
-                  <i class="fas fa-calculator me-2"></i>
-                  Vista Previa del Cálculo
-                </h6>
-              </div>
-              <div class="card-body" id="preview-content">
-                <!-- Content will be loaded dynamically -->
+          <div class="col-12">
+            <div id="preview" class="mt-3" style="display: none;">
+              <div class="card border-warning shadow-sm">
+                <div class="card-header bg-light border-warning">
+                  <h6 class="mb-0 text-warning"><i class="fas fa-calculator me-2"></i>Vista Previa del Cálculo</h6>
+                </div>
+                <div class="card-body" id="preview-content">
+                  <!-- Content will be loaded dynamically -->
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Botones de Acción -->
-        <div class="d-flex justify-content-end mt-4">
-          <button type="button" id="btnCalcular" class="btn btn-outline-primary me-2">
-            <i class="fas fa-calculator me-1"></i>
-            Calcular
-          </button>
-          <button type="submit" id="btnVender" class="btn btn-warning" disabled>
-            <i class="fas fa-hand-holding-usd me-1"></i>
+        <!-- Botón de Venta -->
+        <div class="d-flex justify-content-end mt-3">
+          <button type="submit" id="btnVender" class="btn btn-warning px-4" disabled>
+            <i class="fas fa-hand-holding-usd me-2"></i>
             Proceder con la Venta
           </button>
         </div>
@@ -178,17 +193,28 @@
 
   <!-- Información adicional -->
   <div class="card shadow-sm mt-4">
-    <div class="card-header">
-      <strong><i class="fas fa-info-circle me-2"></i>Información Importante</strong>
+    <div class="card-header bg-warning text-dark">
+      <strong><i class="fas fa-lightbulb me-2"></i>Beneficios y Condiciones</strong>
     </div>
     <div class="card-body">
-      <ul class="mb-0">
-        <li>Las transacciones tienen un tiempo límite de <strong>5 minutos</strong> para completar el pago.</li>
-        <li>Los tipos de cliente con descuentos mejoran la tasa de cambio y reducen comisiones.</li>
-        <li>El monto ingresado es la divisa que <strong>venderá</strong>, las comisiones se descuentan del PYG que recibirá.</li>
-        <li>Una vez iniciada la venta, recibirá un código de verificación único para su transacción.</li>
-        <li>Puede cancelar la transacción antes de realizar el intercambio sin penalización.</li>
-      </ul>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <h6 class="text-warning"><i class="fas fa-check-circle me-1"></i> Ventajas</h6>
+          <ul class="mb-0">
+            <li><strong>Descuentos exclusivos</strong> según su tipo de cliente</li>
+            <li><strong>Tasas competitivas</strong> actualizadas en tiempo real</li>
+            <li><strong>Cálculo transparente</strong> con detalle completo</li>
+          </ul>
+        </div>
+        <div class="col-md-6">
+          <h6 class="text-info"><i class="fas fa-info-circle me-1"></i> Importante</h6>
+          <ul class="mb-0">
+            <li>Tiempo límite de <strong>5 minutos</strong> para completar el pago</li>
+            <li>Recibirá un <strong>código de verificación único</strong></li>
+            <li>Puede cancelar antes del pago sin penalización</li>
+          </ul>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -206,6 +232,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const monto = document.getElementById('monto');
     const monedaOrigen = document.getElementById('moneda_origen');
+    const simboloMoneda = document.getElementById('simbolo-moneda');
     const monedaDestino = document.getElementById('moneda_destino');
     const cliente = document.getElementById('cliente');
     const metodoCobro = document.getElementById('metodo_cobro');
@@ -213,6 +240,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const camposMetodoPago = document.getElementById('campos-metodo-pago');
     const camposContainer = document.getElementById('campos-container');
     const tauser = document.getElementById('tauser');
+    
+    // Actualizar símbolo de moneda cuando cambie la selección
+    function actualizarSimboloMoneda() {
+        const selectedOption = monedaOrigen.options[monedaOrigen.selectedIndex];
+        const simbolo = selectedOption.getAttribute('data-simbolo') || '$';
+        simboloMoneda.textContent = simbolo;
+    }
+    
+    monedaOrigen.addEventListener('change', actualizarSimboloMoneda);
+    actualizarSimboloMoneda(); // Inicializar
     
     // Función para cargar campos del método de pago
     async function cargarCamposMetodoPago(metodoPagoId) {
@@ -426,7 +463,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             
             // Limpiar opciones actuales
-            metodoCobro.innerHTML = '<option value="">Seleccione cómo recibiremos la divisa</option>';
+            metodoCobro.innerHTML = '<option value="">Seleccione un método de entrega</option>';
             
             if (result.success && result.metodos_cobro.length > 0) {
                 // Agregar nuevas opciones
@@ -434,7 +471,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const option = document.createElement('option');
                     option.value = metodo.id;
                     option.setAttribute('data-comision', metodo.comision);
-                    option.textContent = `${metodo.nombre} ${metodo.comision > 0 ? `(${metodo.comision}% comisión)` : '(sin comisión)'}`;
+                    option.textContent = `${metodo.nombre}${metodo.comision > 0 ? ' (' + metodo.comision + '% comisión)' : ''}`;
                     metodoCobro.appendChild(option);
                 });
             } else {
@@ -490,83 +527,86 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (result.success) {
                 const data = result.data;
+                
+                // Formatear montos usando códigos de moneda
+                const formatearPYG = (valor) => `PYG ${Math.round(valor).toLocaleString('es-PY')}`;
+                const formatearDivisa = (valor, moneda) => `${moneda} ${valor.toLocaleString('es-PY', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                
+                // Obtener texto de la moneda seleccionada
+                const monedaTexto = monedaOrigen.options[monedaOrigen.selectedIndex].text;
+                
                 previewContent.innerHTML = `
-                    <div class="row g-2">
-                        <div class="col-12">
-                            <div class="alert alert-primary alert-sm mb-3">
-                                <i class="fas fa-hand-holding-usd me-1"></i>
-                                <strong>Usted venderá:</strong> ${data.total_formateado}
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="p-3 bg-light rounded text-center">
+                                <small class="text-muted d-block mb-1">Usted vende</small>
+                                <div class="h2 mb-0 text-warning">
+                                    ${formatearDivisa(parseFloat(datos.monto), datos.origen)}
+                                </div>
+                                <small class="text-muted">${monedaTexto}</small>
                             </div>
                         </div>
-
-                        <div class="col-6">
-                            <small class="text-muted">Tasa base:</small><br>
-                            <strong>₲ ${data.tasa_base.toLocaleString()}</strong>
+                        <div class="col-md-6">
+                            <div class="p-3 bg-success bg-opacity-10 rounded border border-success text-center">
+                                <small class="text-muted d-block mb-1">Usted recibe</small>
+                                <div class="h2 mb-0 text-dark">
+                                    ${formatearPYG(data.resultado)}
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-6">
-                            <small class="text-muted">${data.descuento_pct > 0 ? `Tasa ajustada (con ${data.descuento_pct}% descuento):` : 'Tasa aplicada:'}</small><br>
-                            <strong>₲ ${data.tasa_ajustada.toLocaleString()}</strong>
-                        </div>
+                    </div>
                     
-
-                        ${data.comision_cobro > 0 ? `
-                        <div class="col-6">
-                            <small class="text-muted">Comisión cobro:</small><br>
-                            <span class="text-danger">- ${data.comision_cobro_formateado} (${data.metodo_cobro.comision}%)</span>
-                        </div>
-                        ` : ''}
-                        ${data.comision_pago > 0 ? `
-                        <div class="col-6">
-                            <small class="text-muted">Comisión entrega:</small><br>
-                            <span class="text-danger">- ${data.comision_pago_formateado} (${data.metodo_pago.comision}%)</span>
-                        </div>
-                        ` : ''}
-                         ${data.descuento_pct > 0 ? `
-                        <div class="col-6">
-                            <small class="text-muted">Descuento aplicado por tipo cliente:</small><br>
-                            <span class="text-success">${data.descuento_pct}%</span>
-                        </div>
-                        ` : ''}
-                        <div class="col-12">
-                            <hr class="my-2">
-                            <div class="alert alert-success alert-sm mb-0">
-                                <i class="fas fa-money-bill-wave me-1"></i>
-                                <strong>Usted recibirá:</strong> 
-                                <span class="fs-5">${data.resultado_formateado}</span>
+                    <div class="border-top pt-3">
+                        <div class="row g-2 small">
+                            <div class="col-6">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Tasa base:</span>
+                                    <strong>PYG ${data.tasa_base.toLocaleString('es-PY')}</strong>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-success">Tasa aplicada:</span>
+                                    <strong class="text-success">PYG ${data.tasa_ajustada.toLocaleString('es-PY')}</strong>
+                                </div>
+                            </div>
+                            <div class="col-12"><hr class="my-1"></div>
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Subtotal (cantidad × tasa):</span>
+                                    <strong>${formatearPYG(parseFloat(datos.monto) * data.tasa_ajustada)}</strong>
+                                </div>
+                            </div>
+                            ${data.comision_cobro > 0 ? `
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between text-danger">
+                                    <span>- Comisión cobro (${data.metodo_cobro.comision}%):</span>
+                                    <strong>${formatearPYG(data.comision_cobro)}</strong>
+                                </div>
+                            </div>
+                            ` : ''}
+                            ${data.comision_pago > 0 ? `
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between text-danger">
+                                    <span>- Comisión entrega (${data.metodo_pago.comision}%):</span>
+                                    <strong>${formatearPYG(data.comision_pago)}</strong>
+                                </div>
+                            </div>
+                            ` : ''}
+                            <div class="col-12"><hr class="my-1"></div>
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <strong class="text-success">Total a recibir:</strong>
+                                    <strong class="text-success h5 mb-0">${formatearPYG(data.resultado)}</strong>
+                                </div>
                             </div>
                         </div>
-                        
-
                     </div>
                     <hr class="my-2">
-
+                    <div class="text-center">
+                        <small class="text-muted">${data.detalle}</small>
+                    </div>
                 `;
-                
-                // Mostrar mensaje informativo para ventas con cobro en efectivo
-                if (datos.tauser_id && datos.metodo_cobro_id) {
-                    try {
-                        // Obtener información del método de cobro para verificar si es efectivo
-                        const metodoCobroOption = document.querySelector(`#metodo_cobro option[value="${datos.metodo_cobro_id}"]`);
-                        const esEfectivo = metodoCobroOption && metodoCobroOption.textContent.toLowerCase().includes('efectivo');
-                        
-                        if (esEfectivo) {
-                            // Mostrar mensaje informativo sobre el proceso de venta
-                            const metodoPagoOption = document.querySelector(`#metodo_pago option[value="${datos.metodo_pago_id}"]`);
-                            const nombreMetodoPago = metodoPagoOption ? metodoPagoOption.textContent.split('(')[0].trim() : 'el método seleccionado';
-                            
-                            const mensajeEnvio = `
-                                <div class="alert alert-info alert-sm mt-2">
-                                    <i class="fas fa-info-circle me-1"></i>
-                                    <strong>Proceso de venta:</strong> Usted entregará ${datos.monto} ${datos.origen} en efectivo en este punto de atención. 
-                                    Sus Guaraníes serán enviados vía <strong>${nombreMetodoPago}</strong> según su selección.
-                                </div>
-                            `;
-                            previewContent.innerHTML += mensajeEnvio;
-                        }
-                    } catch (error) {
-                        console.error('Error mostrando mensaje informativo:', error);
-                    }
-                }
                 
                 // Validar límites antes de habilitar el botón de venta
                 // Para ventas: validar el monto que el cliente va a recibir contra el límite de la moneda que se vende
@@ -583,9 +623,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (!limitesResult.valido) {
                         // Agregar alerta de límites excedidos
                         const alertaLimites = `
-                            <div class="alert alert-danger alert-sm mt-2">
-                                <i class="fas fa-exclamation-triangle me-1"></i>
-                                <strong>Límites excedidos:</strong> ${limitesResult.mensaje}
+                            <div class="alert alert-danger mt-3 mb-0 py-2" id="alerta-limites">
+                                <small><i class="fas fa-exclamation-triangle me-1"></i>
+                                ${limitesResult.mensaje}</small>
                             </div>
                         `;
                         previewContent.innerHTML += alertaLimites;
@@ -594,10 +634,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Mostrar información de límites aplicables
                         if (limitesResult.limites_aplicados && limitesResult.limites_aplicados.length > 0) {
                             const infoLimites = `
-                                <div class="alert alert-info alert-sm mt-2">
-                                    <i class="fas fa-info-circle me-1"></i>
-                                    <strong>Límites aplicables:</strong><br>
-                                    <small>${limitesResult.limites_aplicados.join('<br>')}</small>
+                                <div class="mt-3 text-center" id="info-limites">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle"></i> ${limitesResult.limites_aplicados[0]}
+                                    </small>
                                 </div>
                             `;
                             previewContent.innerHTML += infoLimites;
@@ -610,6 +650,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 preview.style.display = 'block';
+                preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } else {
                 previewContent.innerHTML = `<div class="text-danger">Error: ${result.error || 'Error desconocido'}</div>`;
                 preview.style.display = 'block';
@@ -627,9 +668,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Event listener especial para cambio de moneda origen
     monedaOrigen.addEventListener('change', function() {
+        actualizarSimboloMoneda();
         if (this.value) {
             cargarMetodosCobro(this.value);
         }
+        preview.style.display = 'none';
+        btnVender.disabled = true;
     });
     
     // Event listener para cambio de método de pago
@@ -645,31 +689,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Auto-calcular cuando cambien los valores (excepto moneda origen que ya tiene su listener)
-    [monto, cliente, metodoCobro, metodoPago, tauser].forEach(element => {
+    // Auto-calcular NO está habilitado, el usuario debe hacer clic en Calcular
+    // Solo resetear el preview cuando cambien valores que afectan el cálculo
+    [monto, cliente, metodoCobro, metodoPago].forEach(element => {
         element.addEventListener('change', function() {
-            if (monto.value && parseFloat(monto.value) > 0) {
-                calcularPreview();
-            } else {
-                // Si no hay monto válido, deshabilitar botón
-                btnVender.disabled = true;
+            // Si cambian valores después de calcular, ocultar preview para forzar recalcular
+            if (preview.style.display !== 'none') {
                 preview.style.display = 'none';
+                btnVender.disabled = true;
             }
         });
     });
     
-    // Validar campos del método de pago cuando cambien (event listener global)
+    // Validar campos del método de pago cuando cambien (sin auto-calcular)
     document.addEventListener('input', function(e) {
         if (e.target.classList.contains('campo-metodo-pago')) {
             validarCamposMetodoPago(false);
-            // Revalidar formulario completo
-            if (monto.value && parseFloat(monto.value) > 0) {
-                calcularPreview();
+            // Si el preview está visible, ocultarlo para forzar recalcular
+            if (preview.style.display !== 'none') {
+                preview.style.display = 'none';
+                btnVender.disabled = true;
             }
         }
     });
-    
-    // No mostrar mensaje inmediato al hacer focus en campos del método de pago
     
     // Validar formulario completo cuando cambien campos obligatorios
     [tauser, cliente, metodoCobro, metodoPago].forEach(element => {

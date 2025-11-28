@@ -88,6 +88,10 @@ class PasarelaService:
                 "webhook_url": self.webhook_url
             }
             
+            # Agregar id_transaccion si está presente en datos_adicionales
+            if datos_adicionales and 'transaccion_id' in datos_adicionales:
+                payload['id_transaccion'] = datos_adicionales['transaccion_id']
+            
             # Agregar datos específicos según el método de pago
             if datos_adicionales:
                 # Para métodos de tarjeta (débito y crédito local), agregar número de tarjeta

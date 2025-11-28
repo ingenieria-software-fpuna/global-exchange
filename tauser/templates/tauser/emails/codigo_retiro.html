@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Código de Verificación de Retiro</title>
+    <title>Código de Verificación de Transacción</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -139,12 +139,12 @@
     <div class="container">
         <div class="header">
             <div class="logo">{{ sitio_web }}</div>
-            <h2>🏧 Código de Verificación de Retiro</h2>
+            <h2>🏧 Código de Verificación de Transacción</h2>
         </div>
         
-        <p>Hola <strong>{{ cliente_nombre }}</strong>,</p>
+        <p>Hola,</p>
         
-        <p>Has solicitado retirar efectivo de tu transacción. Para completar el proceso de retiro, utiliza el siguiente código de verificación:</p>
+        <p>Se ha recibido una solicitud de transacción desde el Tauser. Para completar el proceso, utiliza el siguiente código de verificación:</p>
         
         <div class="code-container">
             <div>Tu código de verificación es:</div>
@@ -159,9 +159,15 @@
         <div class="transaction-info">
             <h4>💰 Información de la Transacción</h4>
             <p><strong>ID de Transacción:</strong> {{ transaccion.id_transaccion }}</p>
-            <p><strong>Monto a Retirar:</strong> {{ monto_retiro }}</p>
+            <p><strong>Monto:</strong> {{ monto_retiro }}</p>
             <p><strong>Moneda:</strong> {{ moneda }}</p>
             <p><strong>Tipo:</strong> {{ transaccion.tipo_operacion.nombre }}</p>
+            {% if tauser_nombre %}
+            <p><strong>Tauser:</strong> {{ tauser_nombre }}</p>
+            {% if tauser_direccion %}
+            <p><strong>Ubicación:</strong> {{ tauser_direccion }}</p>
+            {% endif %}
+            {% endif %}
         </div>
         
         <div class="security-info">
@@ -170,14 +176,14 @@
             {% if ip_address %}
             <p class="info-text"><strong>Dirección IP:</strong> {{ ip_address }}</p>
             {% endif %}
-            <p class="warning">⚠️ Si no solicitaste este retiro, ignora este mensaje y contacta a soporte inmediatamente.</p>
+            <p class="warning">⚠️ Si no solicitaste esta transacción, ignora este mensaje y contacta a soporte inmediatamente.</p>
         </div>
         
-        <p>Una vez que ingreses este código en el simulador de cajero, podrás retirar tu efectivo de forma segura.</p>
+        <p>Una vez que ingreses este código en el simulador de cajero, podrás completar la transacción de forma segura.</p>
         
         <div class="footer">
             <p>Este es un mensaje automático, por favor no respondas a este email.</p>
-            <p>© {{ sitio_web }} - Sistema de Retiro Seguro</p>
+            <p>© {{ sitio_web }} - Sistema de Transacciones</p>
         </div>
     </div>
 </body>

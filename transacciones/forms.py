@@ -1,5 +1,10 @@
-from django import forms
+﻿from django import forms
 from django.core.validators import RegexValidator
+
+from .models import TipoOperacion, EstadoTransaccion
+from monedas.models import Moneda
+from clientes.models import Cliente
+from usuarios.models import Usuario
 
 
 class BilleteraElectronicaForm(forms.Form):
@@ -143,3 +148,103 @@ class TransferenciaBancariaForm(forms.Form):
             'placeholder': 'Observaciones adicionales...'
         })
     )
+
+class FiltroReporteForm(forms.Form):
+    """Formulario para filtros de reportes de transacciones y ganancias"""
+    
+    fecha_desde = forms.DateField(
+        required=False,
+        label="Fecha desde",
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date',
+            'id': 'id_fecha_desde'
+        })
+    )
+    
+    fecha_hasta = forms.DateField(
+        required=False,
+        label="Fecha hasta",
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date',
+            'id': 'id_fecha_hasta'
+        })
+    )
+    
+    tipo_operacion = forms.ModelChoiceField(
+        queryset=TipoOperacion.objects.filter(activo=True),
+        required=False,
+        empty_label="Todos los tipos",
+        label="Tipo de operación",
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Personalizar las etiquetas del selector de tipo_operacion para mostrar perspectiva de la casa
+        if 'tipo_operacion' in self.fields:
+            self.fields['tipo_operacion'].label_from_instance = lambda obj: (
+                'Venta de Divisas' if obj.codigo == 'COMPRA' else 
+                'Compra de Divisas' if obj.codigo == 'VENTA' else 
+                obj.nombre
+            )
+    
+    estado = forms.ModelChoiceField(
+        queryset=EstadoTransaccion.objects.filter(activo=True),
+        required=False,
+        empty_label="Todos los estados",
+        label="Estado",
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )
+    
+    moneda = forms.ModelChoiceField(
+        queryset=Moneda.objects.filter(
+            es_activa=True,
+            tasas_cambio__es_activa=True
+        ).distinct(),
+        required=False,
+        empty_label="Todas las monedas",
+        label="Moneda",
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )
+    
+    cliente = forms.ModelChoiceField(
+        queryset=Cliente.objects.filter(activo=True).order_by('nombre_comercial'),
+        required=False,
+        empty_label="Todos los clientes",
+        label="Cliente",
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )
+    
+    usuario = forms.ModelChoiceField(
+        queryset=Usuario.objects.filter(es_activo=True).order_by('nombre', 'apellido'),
+        required=False,
+        empty_label="Todos los usuarios",
+        label="Usuario",
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        fecha_desde = cleaned_data.get('fecha_desde')
+        fecha_hasta = cleaned_data.get('fecha_hasta')
+        
+        if fecha_desde and fecha_hasta:
+            if fecha_desde > fecha_hasta:
+                raise forms.ValidationError(
+                    'La fecha desde no puede ser mayor que la fecha hasta'
+                )
+        
+        return cleaned_data
+
