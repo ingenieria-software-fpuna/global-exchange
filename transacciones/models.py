@@ -492,10 +492,12 @@ class Transaccion(models.Model):
         
         # Definir variables según el tipo de operación
         if self.tipo_operacion.codigo == 'VENTA':
-            # Para ventas: el cliente entrega divisa extranjera
-            monto_base = self.monto_origen  # Divisa extranjera que entrega
-            subtotal_display = self.monto_origen  # Divisa que vende
-            total_cliente = self.monto_origen  # Lo que entrega el cliente
+            # Para ventas: el cliente entrega divisa extranjera y recibe PYG
+            # El subtotal debe mostrar el monto en PYG antes de comisiones
+            monto_pyg_bruto = self.monto_origen * self.tasa_cambio
+            monto_base = monto_pyg_bruto  # Monto base en PYG antes de comisiones
+            subtotal_display = monto_pyg_bruto  # Subtotal en PYG (antes de comisiones de métodos)
+            total_cliente = self.monto_origen  # Lo que entrega el cliente (divisa extranjera)
         else:
             # Para compras: recalcular subtotal desde la cantidad de divisa × tasa
             subtotal_display = self.monto_destino * self.tasa_cambio  # Subtotal en PYG antes de comisiones
@@ -511,7 +513,8 @@ class Transaccion(models.Model):
         return {
             # Básicos
             'subtotal': float(subtotal_display),
-            'subtotal_formateado': formatear_monto(subtotal_display, self.moneda_origen),
+            'subtotal_formateado': formatear_monto(subtotal_display, 
+                self.moneda_destino if self.tipo_operacion.codigo == 'VENTA' else self.moneda_origen),
             
             # Comisiones - formatear según el tipo de operación
             'comision_cobro': float(comision_cobro),

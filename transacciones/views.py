@@ -1208,10 +1208,10 @@ def calcular_transaccion_completa(monto, moneda_origen, moneda_destino, cliente=
                 } if cliente else None,
                 
                 # Detalle explicativo
-                'detalle': (f"PYG -> {moneda_destino.codigo} usando precio de venta" + 
-                           (f" con descuento {descuento_pct}% en comisión" if descuento_pct > 0 else "")) if moneda_origen.codigo == 'PYG' 
-                           else (f"{moneda_origen.codigo} -> PYG usando precio de compra" + 
-                                (f" con descuento {descuento_pct}% en comisión" if descuento_pct > 0 else ""))
+                'detalle': (f"PYG → {moneda_destino.codigo} usando precio de venta" + 
+                           (f" con descuento de cliente {cliente.tipo_cliente.nombre}" if cliente and cliente.tipo_cliente else "")) if moneda_origen.codigo == 'PYG' 
+                           else (f"{moneda_origen.codigo} → PYG usando precio de compra" + 
+                                (f" con descuento de cliente {cliente.tipo_cliente.nombre}" if cliente and cliente.tipo_cliente else ""))
             }
         }
         
@@ -1404,8 +1404,8 @@ def calcular_venta_completa(monto, moneda_origen, moneda_destino, cliente=None, 
                 } if cliente else None,
                 
                 # Detalle explicativo
-                'detalle': f"{moneda_origen.codigo} -> PYG usando precio de compra" + 
-                          (f" con descuento {descuento_pct}% en comisión" if descuento_pct > 0 else "")
+                'detalle': f"{moneda_origen.codigo} → PYG usando precio de compra" + 
+                          (f" con descuento de cliente {cliente.tipo_cliente.nombre}" if cliente and cliente.tipo_cliente else "")
             }
         }
         
