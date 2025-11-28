@@ -12,6 +12,7 @@ Esta sección contiene las conversaciones y prompts utilizados con herramientas 
    sprint-3-2025-09-26/index
    sprint-4-2025-10-17/index
    sprint-5-2025-10-31/index
+   sprint-6-2025-11-28/index
 
 Descripción
 -----------
