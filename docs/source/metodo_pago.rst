@@ -8,8 +8,110 @@ Descripción General
 
 Los métodos de pago representan los diferentes canales o medios por los cuales la casa de cambio entrega dinero a los clientes. Cada método puede tener comisiones específicas y estar restringido a ciertas monedas, complementando los métodos de cobro para completar el flujo transaccional.
 
-Modelo Principal
-----------------
+Modelos Principales
+-------------------
+
+Campo
+~~~~~
+
+Modelo genérico para definir campos personalizados de métodos de pago.
+
+**Descripción:**
+
+Permite definir campos dinámicos que se pueden asociar a métodos de pago específicos, como número de cuenta bancaria, número de teléfono, etc.
+
+**Campos principales:**
+
+- ``nombre``: Nombre único del campo (ej: "numero_telefono", "documento")
+- ``etiqueta``: Etiqueta a mostrar en el formulario (ej: "Número de Teléfono")
+- ``tipo``: Tipo de campo HTML (text, number, email, phone, select, textarea)
+- ``es_obligatorio``: Indica si el campo es obligatorio
+- ``max_length``: Longitud máxima del campo (opcional)
+- ``regex_validacion``: Expresión regular para validación (opcional)
+- ``placeholder``: Texto de ayuda para el campo
+- ``opciones``: Opciones para campos de selección (una por línea)
+- ``es_activo``: Indica si el campo está activo
+- ``fecha_creacion``: Fecha de creación del registro
+
+**Tipos de campo disponibles:**
+
+.. code-block:: python
+
+    TIPOS_CAMPO = [
+        ('text', 'Texto'),
+        ('number', 'Número'),
+        ('email', 'Email'),
+        ('phone', 'Teléfono'),
+        ('select', 'Selección'),
+        ('textarea', 'Área de texto'),
+    ]
+
+**Métodos:**
+
+get_opciones_list()
+^^^^^^^^^^^^^^^^^^^
+
+Retorna las opciones como lista.
+
+.. code-block:: python
+
+   campo = Campo.objects.get(nombre='banco')
+   opciones = campo.get_opciones_list()
+   # Retorna: ['Banco A', 'Banco B', 'Banco C']
+
+**Configuración del modelo:**
+
+- ``verbose_name``: "Campo"
+- ``verbose_name_plural``: "Campos"
+- ``ordering``: Ordenado alfabéticamente por nombre
+- ``db_table``: 'metodo_pago_campo'
+
+**Ejemplo de uso:**
+
+.. code-block:: python
+
+   # Crear campo de número de cuenta bancaria
+   campo_cuenta = Campo.objects.create(
+       nombre='numero_cuenta',
+       etiqueta='Número de Cuenta',
+       tipo='text',
+       es_obligatorio=True,
+       max_length=20,
+       regex_validacion=r'^\d{10,20}$',
+       placeholder='Ingrese su número de cuenta (10-20 dígitos)',
+       es_activo=True
+   )
+   
+   # Crear campo de selección de banco
+   campo_banco = Campo.objects.create(
+       nombre='banco',
+       etiqueta='Banco',
+       tipo='select',
+       es_obligatorio=True,
+       opciones='Banco Continental\nItaú\nBNF\nVision Banco',
+       es_activo=True
+   )
+
+**Casos de uso comunes:**
+
+1. **Transferencia bancaria:**
+   
+   - Número de cuenta
+   - Banco
+   - Tipo de cuenta (ahorro/corriente)
+   - Titular de la cuenta
+
+2. **Billetera digital:**
+   
+   - Número de teléfono
+   - Nombre de usuario
+   - Email asociado
+
+3. **Tarjeta de crédito:**
+   
+   - Últimos 4 dígitos
+   - Banco emisor
+   - Nombre del titular
 
 MetodoPago
 ~~~~~~~~~~

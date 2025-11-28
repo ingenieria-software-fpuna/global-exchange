@@ -108,28 +108,102 @@ EmailService
 
 Servicio para envío de correos electrónicos relacionados con autenticación.
 
-**Funcionalidades:**
+**Configuración de 2FA:**
 
-- Envío de códigos de verificación para login
-- Envío de códigos de verificación para registro
-- Envío de enlaces de reseteo de contraseña
-- Plantillas HTML personalizadas por tipo de correo
-- Gestión de errores de envío
+El servicio respeta tres variables de entorno:
 
-**Uso:**
+- ``ENABLE_2FA``: (true/false) Habilita o deshabilita completamente el 2FA
+- ``ENABLE_2FA_DEV_MODE``: (true/false) Modo desarrollo que muestra códigos en consola sin enviar emails
+- ``FIXED_2FA_CODE``: Código fijo para desarrollo/testing
+
+**Método principal:**
+
+enviar_codigo_verificacion(usuario, codigo_obj, request=None)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Envía email con código de verificación usando template HTML.
+
+**Parámetros:**
+
+- ``usuario``: Instancia de Usuario que recibirá el código
+- ``codigo_obj``: Instancia de CodigoVerificacion con el código generado
+- ``request``: Request de Django (opcional, para obtener IP)
+
+**Comportamiento según configuración:**
+
+1. **Si ENABLE_2FA=False:**
+   
+   - No envía email
+   - Retorna (True, "2FA deshabilitada")
+   - El sistema hace login directo
+
+2. **Si ENABLE_2FA_DEV_MODE=True:**
+   
+   - Muestra código en consola con formato destacado
+   - Registra en logs
+   - No envía email real
+   - Retorna (True, "Código mostrado en consola")
+
+3. **Si está en modo producción:**
+   
+   - Renderiza template HTML según tipo (login/registro)
+   - Crea EmailMultiAlternatives con versión texto plano
+   - Envía email con código
+   - Retorna (True, "Email enviado") o (False, mensaje_error)
+
+**Templates utilizados:**
+
+- ``auth/emails/codigo_login.html``: Para códigos de login
+- ``auth/emails/codigo_registro.html``: Para códigos de registro
+
+**Contexto pasado al template:**
+
+.. code-block:: python
+
+    context = {
+        'usuario': usuario,
+        'codigo': codigo_obj.codigo,
+        'codigo_obj': codigo_obj,
+        'tipo': codigo_obj.get_tipo_display(),
+        'minutos_expiracion': 5,
+        'fecha_expiracion': codigo_obj.fecha_expiracion,
+        'ip_address': codigo_obj.ip_address,
+        'sitio_web': 'Global Exchange',
+    }
+
+**Ejemplo de uso completo:**
 
 .. code-block:: python
 
     from auth.services import EmailService
+    from auth.models import CodigoVerificacion
     
-    # Enviar código de login
-    EmailService.enviar_codigo_login(usuario, codigo)
+    # Crear código
+    codigo_obj = CodigoVerificacion.crear_codigo(
+        usuario=user,
+        tipo='login',
+        request=request,
+        minutos_expiracion=5
+    )
     
-    # Enviar código de registro
-    EmailService.enviar_codigo_registro(usuario, codigo)
+    # Enviar email
+    exito, mensaje = EmailService.enviar_codigo_verificacion(
+        usuario=user,
+        codigo_obj=codigo_obj,
+        request=request
+    )
     
-    # Enviar enlace de reset
-    EmailService.enviar_reset_password(usuario, token)
+    if exito:
+        print("Email enviado exitosamente")
+    else:
+        print(f"Error: {mensaje}")
+
+**Manejo de errores:**
+
+- Captura excepciones de SMTP
+- Registra errores en logs
+- Retorna tupla (False, mensaje_error)
+- No interrumpe el flujo de la aplicación
 
 Middleware
 ----------
@@ -161,35 +235,248 @@ Agregar en ``settings.py``:
 Vistas (Views)
 --------------
 
-El módulo incluye las siguientes vistas principales:
+El módulo incluye las siguientes vistas principales (todas basadas en funciones):
 
 **Autenticación básica:**
 
-- ``LoginView``: Inicio de sesión con verificación de código
-- ``LogoutView``: Cierre de sesión
-- ``VerifyCodeView``: Verificación de códigos de dos factores
+login_view
+~~~~~~~~~~
 
-**Registro:**
+Vista principal de inicio de sesión.
 
-- ``RegisterView``: Registro de nuevos usuarios
-- ``VerifyEmailView``: Verificación de email con código
+**Funcionalidad:**
+
+- Autentica usuario con email y contraseña
+- Verifica estado del usuario (activo y email verificado)
+- Si 2FA está habilitado: genera código de verificación y redirige a verificación
+- Si 2FA está deshabilitado: realiza login directo
+- Envía código de verificación por email
+- Maneja usuarios no verificados mostrando opción de reenvío
+
+**Configuración 2FA:**
+
+- Variable de entorno: ``ENABLE_2FA`` (true/false)
+- Si está deshabilitada, el login es directo sin código
+- Si está habilitada, envía código de 6 dígitos con expiración de 5 minutos
+
+logout_view
+~~~~~~~~~~~
+
+Cierra la sesión del usuario actual.
+
+- Limpia sesión de Django
+- Redirige a página de login
+- Muestra mensaje de confirmación
+
+verify_code_view
+~~~~~~~~~~~~~~~~
+
+Verifica códigos de verificación de dos factores.
+
+**Funcionalidad:**
+
+- Valida código ingresado contra código almacenado
+- Verifica tipo de verificación (login, registro, reset_password)
+- Comprueba expiración del código
+- Marca código como usado al validar
+- Realiza login automático si es código de login
+- Activa cuenta si es código de registro
+
+dashboard_view
+~~~~~~~~~~~~~~
+
+Vista principal del dashboard (requiere login).
+
+**Registro de usuarios:**
+
+registro_view
+~~~~~~~~~~~~~
+
+Formulario de registro de nuevos usuarios.
+
+**Validaciones:**
+
+- Email único
+- Cédula única
+- Formato de contraseña segura
+- Edad mínima (18 años)
+- Campos requeridos: email, cédula, nombre, fecha_nacimiento, password
+
+**Proceso:**
+
+1. Valida datos del formulario
+2. Crea usuario con ``activo=False`` y ``es_activo=True``
+3. Genera código de verificación de 6 dígitos
+4. Envía email con código
+5. Guarda user_id en sesión para verificación posterior
+6. Redirige a página de verificación
+
+verificar_registro_view
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Verifica código enviado al email durante el registro.
+
+**Funcionalidad:**
+
+- Valida código de 6 dígitos
+- Marca usuario como ``activo=True`` (email verificado)
+- Realiza login automático después de verificar
+- Redirige al dashboard
+
+reenviar_codigo_view
+~~~~~~~~~~~~~~~~~~~~
+
+Reenvía código de verificación de registro.
+
+- Verifica que el usuario existe y no está verificado
+- Genera nuevo código
+- Invalida códigos anteriores
+- Envía nuevo email
+
+reenviar_verificacion_login_view
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Reenvía código de verificación desde pantalla de login.
+
+- Similar a reenviar_codigo_view
+- Usado cuando usuario intenta login sin verificar email
 
 **Reseteo de contraseña:**
 
-- ``PasswordResetRequestView``: Solicitud de reset
-- ``PasswordResetConfirmView``: Confirmación con token
-- ``PasswordResetCompleteView``: Finalización del proceso
+password_reset_request_view
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Solicitud de reseteo de contraseña.
+
+**Proceso:**
+
+1. Usuario ingresa su email
+2. Sistema verifica que el email existe
+3. Genera token único de 64 caracteres
+4. Envía email con enlace que contiene el token
+5. Token válido por 1 hora
+
+**Características:**
+
+- Genera PasswordResetToken con expiración de 1 hora
+- Invalida tokens anteriores del mismo usuario
+- Envía email con enlace de reseteo
+- Muestra mensaje de éxito sin revelar si el email existe (seguridad)
+
+password_reset_confirm_view
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Confirmación de reseteo con token desde el email.
+
+**Parámetros:**
+
+- ``token``: Token de 64 caracteres de la URL
+
+**Proceso:**
+
+1. Valida que el token existe y no ha expirado
+2. Verifica que no ha sido usado
+3. Muestra formulario para nueva contraseña
+4. Valida que las contraseñas coincidan
+5. Actualiza contraseña del usuario
+6. Marca token como usado
+7. Redirige a página de completado
+
+password_reset_complete_view
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Vista de confirmación después de reseteo exitoso.
+
+- Muestra mensaje de éxito
+- Proporciona enlace para iniciar sesión
 
 Formularios
 -----------
 
 El módulo proporciona formularios especializados:
 
-- ``LoginForm``: Formulario de inicio de sesión
-- ``VerificationCodeForm``: Formulario para códigos de verificación
-- ``RegisterForm``: Formulario de registro con validaciones
-- ``PasswordResetRequestForm``: Solicitud de reset
-- ``PasswordResetForm``: Establecimiento de nueva contraseña
+LoginForm
+~~~~~~~~~
+
+Formulario para autenticación de usuarios.
+
+**Campos:**
+
+- ``email``: EmailField con placeholder
+- ``password``: PasswordField
+
+**Validaciones personalizadas:**
+
+.. code-block:: python
+
+    def clean(self):
+        # 1. Verifica que el email existe
+        # 2. Verifica que la contraseña es correcta
+        # 3. Verifica que el usuario está activo (es_activo=True)
+        # 4. Verifica que el email está verificado (activo=True)
+        
+**Métodos:**
+
+- ``get_user()``: Retorna usuario autenticado o None
+- ``get_unverified_user()``: Retorna usuario no verificado si existe
+
+**Comportamiento:**
+
+- Si el usuario no está activo (``es_activo=False``): error "cuenta desactivada"
+- Si el email no está verificado (``activo=False``): error con opción de reenviar código
+- Si la contraseña es incorrecta: error "contraseña incorrecta"
+- Si el email no existe: error "email no existe"
+
+VerificationCodeForm
+~~~~~~~~~~~~~~~~~~~~
+
+Formulario simple para ingresar códigos de verificación.
+
+**Campos:**
+
+- ``code``: CharField, max 6 caracteres
+- Widget con placeholder "Código de verificación"
+
+RegistroForm
+~~~~~~~~~~~~
+
+Formulario extendido de UserCreationForm para registro de usuarios.
+
+**Campos:**
+
+- ``email``: EmailField requerido
+- ``cedula``: CharField (max 20), requerido
+- ``nombre``: CharField (max 100), requerido
+- ``apellido``: CharField (max 100), opcional
+- ``fecha_nacimiento``: DateField con widget date picker, requerido
+- ``password1``: PasswordField
+- ``password2``: PasswordField (confirmación)
+
+**Validaciones automáticas:**
+
+- Email único en el sistema
+- Cédula única en el sistema
+- Edad mínima de 18 años (calculada desde fecha_nacimiento)
+- Las dos contraseñas deben coincidir
+- Contraseña debe cumplir requisitos de seguridad de Django
+
+**Ejemplo de uso:**
+
+.. code-block:: python
+
+    form = RegistroForm(request.POST)
+    if form.is_valid():
+        usuario = form.save(commit=False)
+        usuario.activo = False  # Email no verificado aún
+        usuario.es_activo = True  # Usuario habilitado
+        usuario.save()
+        
+        # Generar y enviar código de verificación
+        codigo = CodigoVerificacion.crear_codigo(
+            usuario=usuario,
+            tipo='registro',
+            request=request
+        )
 
 Plantillas
 ----------
