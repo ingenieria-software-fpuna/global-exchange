@@ -283,3 +283,417 @@ class TransaccionViewsTest(TestCase):
             resultado_con_descuento['data']['precio_usado'],
             resultado_sin_descuento['data']['precio_usado']
         )
+
+
+class ReportesViewsTest(TestCase):
+    """Tests para vistas de reportes"""
+    
+    def setUp(self):
+        from django.utils import timezone
+        from datetime import timedelta
+        from transacciones.models import TipoOperacion, EstadoTransaccion, Transaccion
+        from configuracion.models import ConfiguracionSistema
+        
+        # Crear usuario de prueba
+        self.user = Usuario.objects.create_user(
+            email='reportes@test.com',
+            nombre='Reportes',
+            apellido='User',
+            password='testpass123'
+        )
+        
+        # Crear monedas
+        self.usd = Moneda.objects.create(codigo='USD', nombre='Dólar', simbolo='$', es_activa=True)
+        self.pyg = Moneda.objects.create(codigo='PYG', nombre='Guaraní', simbolo='₲', es_activa=True)
+        
+        # Crear tasa de cambio
+        self.tasa_usd = TasaCambio.objects.create(
+            moneda=self.usd,
+            precio_base=Decimal('7400'),
+            comision_compra=Decimal('200'),
+            comision_venta=Decimal('200'),
+            es_activa=True
+        )
+        
+        # Crear tipos de operación y estados
+        self.tipo_compra = TipoOperacion.objects.create(
+            codigo='COMPRA',
+            nombre='Compra de Divisas',
+            activo=True
+        )
+        self.tipo_venta = TipoOperacion.objects.create(
+            codigo='VENTA',
+            nombre='Venta de Divisas',
+            activo=True
+        )
+        
+        self.estado_pagada = EstadoTransaccion.objects.create(
+            codigo='PAGADA',
+            nombre='Pagada',
+            es_final=False
+        )
+        self.estado_pendiente = EstadoTransaccion.objects.create(
+            codigo='PENDIENTE',
+            nombre='Pendiente',
+            es_final=False
+        )
+        self.estado_cancelada = EstadoTransaccion.objects.create(
+            codigo='CANCELADA',
+            nombre='Cancelada',
+            es_final=True
+        )
+        
+        # Crear transacciones de prueba
+        fecha_base = timezone.now() - timedelta(days=5)
+        
+        # Transacción COMPRA (cliente compra USD) - PAGADA
+        self.trans_compra = Transaccion.objects.create(
+            id_transaccion=f'TXN-{timezone.now().strftime("%Y%m%d%H%M%S")}-TEST1',
+            tipo_operacion=self.tipo_compra,
+            estado=self.estado_pagada,
+            moneda_origen=self.pyg,
+            moneda_destino=self.usd,
+            monto_origen=Decimal('760000'),
+            monto_destino=Decimal('100'),
+            tasa_cambio=Decimal('7600'),
+            tasa_cambio_base=Decimal('7600'),
+            precio_base=Decimal('7400'),
+            monto_comision=Decimal('20000'),
+            monto_descuento=Decimal('0'),
+            usuario=self.user,
+            fecha_creacion=fecha_base
+        )
+        
+        # Transacción VENTA (cliente vende USD) - PAGADA
+        self.trans_venta = Transaccion.objects.create(
+            id_transaccion=f'TXN-{timezone.now().strftime("%Y%m%d%H%M%S")}-TEST2',
+            tipo_operacion=self.tipo_venta,
+            estado=self.estado_pagada,
+            moneda_origen=self.usd,
+            moneda_destino=self.pyg,
+            monto_origen=Decimal('100'),
+            monto_destino=Decimal('720000'),
+            tasa_cambio=Decimal('7200'),
+            tasa_cambio_base=Decimal('7200'),
+            precio_base=Decimal('7400'),
+            monto_comision=Decimal('20000'),
+            monto_descuento=Decimal('5000'),
+            usuario=self.user,
+            fecha_creacion=fecha_base + timedelta(days=1)
+        )
+        
+        # Transacción PENDIENTE
+        self.trans_pendiente = Transaccion.objects.create(
+            id_transaccion=f'TXN-{timezone.now().strftime("%Y%m%d%H%M%S")}-TEST3',
+            tipo_operacion=self.tipo_compra,
+            estado=self.estado_pendiente,
+            moneda_origen=self.pyg,
+            moneda_destino=self.usd,
+            monto_origen=Decimal('380000'),
+            monto_destino=Decimal('50'),
+            tasa_cambio=Decimal('7600'),
+            tasa_cambio_base=Decimal('7600'),
+            precio_base=Decimal('7400'),
+            monto_comision=Decimal('10000'),
+            monto_descuento=Decimal('0'),
+            usuario=self.user,
+            fecha_creacion=fecha_base + timedelta(days=2)
+        )
+        
+        # Asignar permisos necesarios
+        from django.contrib.auth.models import Permission
+        perm_reporte_trans = Permission.objects.get(codename='view_reporte_transacciones')
+        perm_reporte_gan = Permission.objects.get(codename='view_reporte_ganancias')
+        self.user.user_permissions.add(perm_reporte_trans, perm_reporte_gan)
+        
+        self.client = Client()
+        self.client.force_login(self.user)
+        
+        # Crear configuración del sistema
+        try:
+            config = ConfiguracionSistema.objects.first()
+            if not config:
+                ConfiguracionSistema.objects.create(moneda_base=self.pyg)
+        except:
+            pass
+
+    def test_obtener_tipo_operacion_display(self):
+        """Test: La función obtener_tipo_operacion_display invierte correctamente"""
+        from transacciones.views_reportes import obtener_tipo_operacion_display
+        
+        # COMPRA desde cliente = VENTA desde casa
+        display_compra = obtener_tipo_operacion_display(self.trans_compra)
+        self.assertEqual(display_compra, 'Venta de Divisas')
+        
+        # VENTA desde cliente = COMPRA desde casa
+        display_venta = obtener_tipo_operacion_display(self.trans_venta)
+        self.assertEqual(display_venta, 'Compra de Divisas')
+
+    def test_calcular_comision_real_cambio(self):
+        """Test: La función calcular_comision_real_cambio calcula correctamente"""
+        from transacciones.views_reportes import calcular_comision_real_cambio
+        
+        # Para COMPRA: (tasa_cambio_base - precio_base) × cantidad_divisa
+        # tasa_cambio_base = 7600, precio_base = 7400, cantidad = 100
+        # comision = (7600 - 7400) × 100 = 20000
+        comision_compra = calcular_comision_real_cambio(self.trans_compra)
+        self.assertEqual(comision_compra, Decimal('20000'))
+        
+        # Para VENTA: (precio_base - tasa_cambio_base) × cantidad_divisa
+        # precio_base = 7400, tasa_cambio_base = 7200, cantidad = 100
+        # comision = (7400 - 7200) × 100 = 20000
+        comision_venta = calcular_comision_real_cambio(self.trans_venta)
+        self.assertEqual(comision_venta, Decimal('20000'))
+
+    def test_aplicar_filtros_transacciones(self):
+        """Test: La función aplicar_filtros_transacciones filtra correctamente"""
+        from transacciones.views_reportes import aplicar_filtros_transacciones
+        from transacciones.models import Transaccion
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        queryset = Transaccion.objects.all()
+        
+        # Filtro por tipo de operación
+        form_data = {'tipo_operacion': self.tipo_compra}
+        filtered, _, _ = aplicar_filtros_transacciones(queryset, form_data)
+        self.assertEqual(filtered.count(), 2)  # trans_compra y trans_pendiente
+        
+        # Filtro por estado
+        form_data = {'estado': self.estado_pagada}
+        filtered, _, _ = aplicar_filtros_transacciones(queryset, form_data)
+        self.assertEqual(filtered.count(), 2)  # trans_compra y trans_venta
+        
+        # Filtro por moneda
+        form_data = {'moneda': self.usd}
+        filtered, _, _ = aplicar_filtros_transacciones(queryset, form_data)
+        self.assertEqual(filtered.count(), 3)  # Todas tienen USD
+        
+        # Filtro por fecha
+        fecha_desde = timezone.now().date() - timedelta(days=3)
+        fecha_hasta = timezone.now().date()
+        form_data = {'fecha_desde': fecha_desde, 'fecha_hasta': fecha_hasta}
+        filtered, fecha_d, fecha_h = aplicar_filtros_transacciones(queryset, form_data)
+        self.assertEqual(fecha_d, fecha_desde)
+        self.assertEqual(fecha_h, fecha_hasta)
+
+    def test_calcular_ganancias_por_tipo(self):
+        """Test: La función calcular_ganancias_por_tipo calcula correctamente"""
+        from transacciones.views_reportes import calcular_ganancias_por_tipo
+        from transacciones.models import Transaccion
+        
+        # Solo transacciones pagadas generan ganancias
+        transacciones = Transaccion.objects.filter(estado=self.estado_pagada)
+        ganancias = calcular_ganancias_por_tipo(transacciones)
+        
+        # Debe tener 2 tipos: VENTA (desde COMPRA) y COMPRA (desde VENTA)
+        self.assertIn('VENTA', ganancias)
+        self.assertIn('COMPRA', ganancias)
+        
+        # Verificar cálculos
+        ganancia_venta = ganancias['VENTA']
+        self.assertEqual(ganancia_venta['comisiones_pyg'], Decimal('20000'))
+        self.assertEqual(ganancia_venta['descuentos_pyg'], Decimal('0'))
+        self.assertEqual(ganancia_venta['ganancia_neta_pyg'], Decimal('20000'))
+        
+        ganancia_compra = ganancias['COMPRA']
+        self.assertEqual(ganancia_compra['comisiones_pyg'], Decimal('20000'))
+        self.assertEqual(ganancia_compra['descuentos_pyg'], Decimal('5000'))
+        self.assertEqual(ganancia_compra['ganancia_neta_pyg'], Decimal('15000'))
+
+    def test_reporte_transacciones_sin_permiso(self):
+        """Test: Usuario sin permiso no puede acceder al reporte"""
+        from django.contrib.auth.models import Permission
+        
+        # Crear usuario sin permisos
+        user_sin_permiso = Usuario.objects.create_user(
+            email='sinpermiso@test.com',
+            nombre='Sin',
+            apellido='Permiso',
+            password='testpass123'
+        )
+        client = Client()
+        client.force_login(user_sin_permiso)
+        
+        response = client.get(reverse('transacciones:reporte_transacciones'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_reporte_transacciones_con_permiso(self):
+        """Test: Usuario con permiso puede acceder al reporte"""
+        response = self.client.get(reverse('transacciones:reporte_transacciones'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Reporte de Transacciones')
+
+    def test_reporte_transacciones_con_filtros(self):
+        """Test: El reporte aplica filtros correctamente"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        fecha_desde = (timezone.now() - timedelta(days=3)).date()
+        fecha_hasta = timezone.now().date()
+        
+        response = self.client.get(reverse('transacciones:reporte_transacciones'), {
+            'fecha_desde': fecha_desde.strftime('%Y-%m-%d'),
+            'fecha_hasta': fecha_hasta.strftime('%Y-%m-%d'),
+            'tipo_operacion': self.tipo_compra.id,
+            'estado': self.estado_pagada.id
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        # Verificar que el contexto tiene las transacciones filtradas
+        self.assertIn('transacciones', response.context)
+
+    def test_reporte_ganancias_sin_permiso(self):
+        """Test: Usuario sin permiso no puede acceder al reporte de ganancias"""
+        from django.contrib.auth.models import Permission
+        
+        user_sin_permiso = Usuario.objects.create_user(
+            email='sinpermiso2@test.com',
+            nombre='Sin',
+            apellido='Permiso2',
+            password='testpass123'
+        )
+        client = Client()
+        client.force_login(user_sin_permiso)
+        
+        response = client.get(reverse('transacciones:reporte_ganancias'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_reporte_ganancias_con_permiso(self):
+        """Test: Usuario con permiso puede acceder al reporte de ganancias"""
+        response = self.client.get(reverse('transacciones:reporte_ganancias'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Tablero de Control de Ganancias')
+
+    def test_reporte_ganancias_solo_pagadas(self):
+        """Test: El reporte de ganancias solo muestra transacciones pagadas"""
+        response = self.client.get(reverse('transacciones:reporte_ganancias'))
+        self.assertEqual(response.status_code, 200)
+        
+        # Verificar que el contexto tiene ganancias
+        self.assertIn('ganancias_por_moneda', response.context)
+        self.assertIn('ganancias_por_tipo', response.context)
+        self.assertIn('total_ganancia_pyg', response.context)
+
+    def test_exportar_transacciones_excel(self):
+        """Test: Exportación a Excel de transacciones"""
+        response = self.client.get(reverse('transacciones:exportar_transacciones_excel'))
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        self.assertIn('attachment', response['Content-Disposition'])
+        self.assertIn('.xlsx', response['Content-Disposition'])
+
+    def test_exportar_transacciones_excel_con_filtros(self):
+        """Test: Exportación a Excel con filtros aplicados"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        fecha_desde = (timezone.now() - timedelta(days=3)).date()
+        fecha_hasta = timezone.now().date()
+        
+        response = self.client.get(reverse('transacciones:exportar_transacciones_excel'), {
+            'fecha_desde': fecha_desde.strftime('%Y-%m-%d'),
+            'fecha_hasta': fecha_hasta.strftime('%Y-%m-%d'),
+            'tipo_operacion': self.tipo_compra.id
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
+    def test_exportar_transacciones_pdf(self):
+        """Test: Exportación a PDF de transacciones"""
+        response = self.client.get(reverse('transacciones:exportar_transacciones_pdf'))
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertIn('attachment', response['Content-Disposition'])
+        self.assertIn('.pdf', response['Content-Disposition'])
+
+    def test_exportar_transacciones_pdf_con_filtros(self):
+        """Test: Exportación a PDF con filtros aplicados"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        fecha_desde = (timezone.now() - timedelta(days=3)).date()
+        fecha_hasta = timezone.now().date()
+        
+        response = self.client.get(reverse('transacciones:exportar_transacciones_pdf'), {
+            'fecha_desde': fecha_desde.strftime('%Y-%m-%d'),
+            'fecha_hasta': fecha_hasta.strftime('%Y-%m-%d'),
+            'estado': self.estado_pagada.id
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+
+    def test_exportar_ganancias_excel(self):
+        """Test: Exportación a Excel de ganancias"""
+        response = self.client.get(reverse('transacciones:exportar_ganancias_excel'))
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        self.assertIn('attachment', response['Content-Disposition'])
+        self.assertIn('.xlsx', response['Content-Disposition'])
+
+    def test_exportar_ganancias_excel_con_filtros(self):
+        """Test: Exportación a Excel de ganancias con filtros"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        fecha_desde = (timezone.now() - timedelta(days=3)).date()
+        fecha_hasta = timezone.now().date()
+        
+        response = self.client.get(reverse('transacciones:exportar_ganancias_excel'), {
+            'fecha_desde': fecha_desde.strftime('%Y-%m-%d'),
+            'fecha_hasta': fecha_hasta.strftime('%Y-%m-%d')
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
+    def test_exportar_ganancias_pdf(self):
+        """Test: Exportación a PDF de ganancias"""
+        response = self.client.get(reverse('transacciones:exportar_ganancias_pdf'))
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertIn('attachment', response['Content-Disposition'])
+        self.assertIn('.pdf', response['Content-Disposition'])
+
+    def test_exportar_ganancias_pdf_con_filtros(self):
+        """Test: Exportación a PDF de ganancias con filtros"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        fecha_desde = (timezone.now() - timedelta(days=3)).date()
+        fecha_hasta = timezone.now().date()
+        
+        response = self.client.get(reverse('transacciones:exportar_ganancias_pdf'), {
+            'fecha_desde': fecha_desde.strftime('%Y-%m-%d'),
+            'fecha_hasta': fecha_hasta.strftime('%Y-%m-%d')
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+
+    def test_reporte_transacciones_paginacion(self):
+        """Test: El reporte de transacciones tiene paginación"""
+        response = self.client.get(reverse('transacciones:reporte_transacciones'))
+        self.assertEqual(response.status_code, 200)
+        
+        # Verificar que el contexto tiene información de paginación
+        self.assertIn('page_obj', response.context)
+        self.assertIn('is_paginated', response.context)
