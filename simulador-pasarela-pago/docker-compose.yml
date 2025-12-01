@@ -3,7 +3,7 @@ services:
 
   simulador-db:
     image: postgres:13.6  
-    restart: always
+    restart: no
     environment:
       POSTGRES_DB: simulador_pagos
       POSTGRES_USER: simulador
@@ -30,7 +30,7 @@ services:
       - WEBHOOK_TIMEOUT=5
     depends_on:
       - simulador-db
-    restart: unless-stopped
+    restart: no
 
 volumes:
   simulador_db_data:
